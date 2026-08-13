@@ -1,0 +1,27 @@
+# === Datos de la chacra: NO se publican ===
+# La base tiene datos personales de los integrantes (teléfonos, direcciones,
+# valor hora). El plan de la temporada se comparte con la app web a través de
+# docs/temporada.json, que solo lleva nombres y roles.
+*.sqlite3
+*.log
+stock_session.json
+stock_cultivos.json
+stock_chacras.json
+csv/
+
+# === Build de Android ===
+.buildozer/
+bin/
+
+# === Python ===
+__pycache__/
+*.pyc
+.venv/
+.venv-linux/
+
+# === Configuración local de la PC ===
+.claude/settings.local.json
+
+# === Material de trabajo (no hace falta publicarlo) ===
+versiones/
+promps para claude.md
