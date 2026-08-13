@@ -166,7 +166,11 @@ function doPost(e) {
 //   integrante | Marto     |
 //   plan       | Lechuga   | 150     | 720
 
-var CONFIG_ENCABEZADOS = ["Sección", "Clave", "Valor 1", "Valor 2", "Valor 3"];
+// Las filas de "plan" usan todos los valores:
+//   plan | Lechuga | superficie m2 | kg esperados | rinde kg/m2 | lineas | distancia cm | plantas
+var CONFIG_ENCABEZADOS = ["Sección", "Clave", "Valor 1", "Valor 2", "Valor 3",
+                          "Valor 4", "Valor 5", "Valor 6"];
+var CONFIG_COLS = CONFIG_ENCABEZADOS.length;
 
 function hojaConfig(libro) {
   var hoja = libro.getSheetByName("Config");
@@ -192,7 +196,7 @@ function leerConfig(chacra) {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
   };
 
-  hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues().forEach(function (f) {
+  hoja.getRange(2, 1, hoja.getLastRow() - 1, CONFIG_COLS).getValues().forEach(function (f) {
     var seccion = String(f[0]), clave = String(f[1]);
     if (!seccion) return;
     if (seccion === "chacra") cfg[clave] = texto(f[2]);
@@ -203,7 +207,9 @@ function leerConfig(chacra) {
     } else if (seccion === "integrante") cfg.integrantes.push(clave);
     else if (seccion === "plan") {
       cfg.plan.push({ cultivo: clave, superficie_m2: Number(f[2]) || 0,
-                      cosecha_esperada_kg: Number(f[3]) || 0 });
+                      cosecha_esperada_kg: Number(f[3]) || 0,
+                      rinde_kg_m2: Number(f[4]) || 0, lineas: Number(f[5]) || 0,
+                      distancia_cm: Number(f[6]) || 0, plantas: Number(f[7]) || 0 });
     }
   });
   return cfg;
@@ -213,27 +219,33 @@ function leerConfig(chacra) {
 function guardarConfig(libro, cfg) {
   var hoja = hojaConfig(libro);
   var filas = [];
-  filas.push(["chacra", "nombre", cfg.nombre || "", "", ""]);
+  var vacios = function (fila) {                 // completa hasta CONFIG_COLS
+    while (fila.length < CONFIG_COLS) fila.push("");
+    return fila;
+  };
+
+  filas.push(vacios(["chacra", "nombre", cfg.nombre || ""]));
   ["nombre", "inicio", "fin"].forEach(function (k) {
-    filas.push(["temporada", k, (cfg.temporada || {})[k] || "", "", ""]);
+    filas.push(vacios(["temporada", k, (cfg.temporada || {})[k] || ""]));
   });
   ["largo_m", "ancho_m", "pasillo_m", "n_bancales"].forEach(function (k) {
-    filas.push(["bancal", k, (cfg.bancal || {})[k] || 0, "", ""]);
+    filas.push(vacios(["bancal", k, (cfg.bancal || {})[k] || 0]));
   });
   (cfg.sectores || []).forEach(function (s) {
-    filas.push(["sector", s.sector, s.bancales || 0, s.tipo_riego || "", ""]);
+    filas.push(vacios(["sector", s.sector, s.bancales || 0, s.tipo_riego || ""]));
   });
   (cfg.integrantes || []).forEach(function (n) {
-    filas.push(["integrante", n, "", "", ""]);
+    filas.push(vacios(["integrante", n]));
   });
   (cfg.plan || []).forEach(function (p) {
-    filas.push(["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0, ""]);
+    filas.push(vacios(["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
+                       p.rinde_kg_m2 || 0, p.lineas || 0, p.distancia_cm || 0, p.plantas || 0]));
   });
 
   if (hoja.getLastRow() > 1) {
-    hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).clearContent();
+    hoja.getRange(2, 1, hoja.getLastRow() - 1, CONFIG_COLS).clearContent();
   }
-  if (filas.length) hoja.getRange(2, 1, filas.length, 5).setValues(filas);
+  if (filas.length) hoja.getRange(2, 1, filas.length, CONFIG_COLS).setValues(filas);
 }
 
 // ---------- Resumen de la temporada ----------

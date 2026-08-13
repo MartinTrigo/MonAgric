@@ -273,6 +273,34 @@ button.secundario {
   font-weight: 600;
 }
 
+.registro .editar {
+  border: none;
+  background: none;
+  color: var(--sage);
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0 2px 0 10px;
+  cursor: pointer;
+}
+.registro .editar:active { color: var(--sage-dark); }
+
+#avanzado-plan { margin-top: 12px; }
+#avanzado-plan summary {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--sage-dark);
+  cursor: pointer;
+  padding: 6px 0;
+}
+.editando {
+  background: var(--sage-suave);
+  color: var(--sage-dark);
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: .92rem;
+  margin-bottom: 12px;
+}
+
 .chip-nombre .quitar,
 .registro .quitar {
   border: none;

@@ -71,8 +71,19 @@ def main() -> None:
         "integrantes": [r["nombre"] for r in
                         conn.execute("SELECT nombre FROM integrantes ORDER BY nombre")],
         "plan": [
-            {"cultivo": r["cultivo"], "superficie_m2": numero(r["superficie_m2"]),
-             "cosecha_esperada_kg": numero(r["cosecha_esperada_kg"])}
+            {
+                "cultivo": r["cultivo"],
+                "superficie_m2": numero(r["superficie_m2"]),
+                "cosecha_esperada_kg": numero(r["cosecha_esperada_kg"]),
+                # El rinde sale de lo planificado, no de la referencia: es el que
+                # esta chacra espera de verdad para ese cultivo.
+                "rinde_kg_m2": round(numero(r["cosecha_esperada_kg"]) /
+                                     numero(r["superficie_m2"], 1), 3)
+                if numero(r["superficie_m2"]) else 0,
+                "lineas": int(r["lineas"] or 0),
+                "distancia_cm": numero(r["distancia_cm"]),
+                "plantas": int(r["plantas"] or 0),
+            }
             for r in conn.execute(
                 "SELECT * FROM plan_temporada WHERE temporada_id = ? ORDER BY cultivo",
                 (temp["id"],))

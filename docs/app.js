@@ -850,28 +850,47 @@ const plantillas = {
 
     <div class="tarjeta">
       <h2>Plan de cultivos <small>${plan.length}</small></h2>
-      <p class="nota">Cuánta superficie le vas a dar a cada cultivo y cuántos kilos
-      esperás. Los cultivos salen de una lista común a todas las chacras: si falta
-      alguno, escribime y lo agregamos.</p>
+      <p class="nota">Se carga en <b>bancales</b>, que es como se planifica en el campo.
+      Los metros, los kilos esperados y las plantas los calcula solo. Los cultivos salen
+      de una lista común a todas las chacras: si falta alguno, escribime y lo agregamos.</p>
+      ${bancalM2() ? "" : `<p class="nota" style="color:#b06a00">Primero cargá las medidas
+        del bancal, acá arriba: sin eso no se puede pasar de bancales a metros.</p>`}
       <div id="lista-plan">
         ${plan.length ? plan.map((p, i) => filaPlan(p, i)).join("")
                       : `<p class="nota">Todavía no planificaste ningún cultivo.</p>`}
       </div>
+
       <form id="form-plan" class="alta">
+        <div id="titulo-plan"></div>
         <label>Cultivo</label>
         ${buscador("cultivo", (CAT?.cultivos || []), { placeholder: "Buscá el cultivo…" })}
-        <div class="fila">
-          <div>
-            <label>Superficie (m²)</label>
-            <input type="text" name="superficie" inputmode="decimal" placeholder="Ej: 150" required>
+
+        <label>¿Cuántos bancales le vas a dar?</label>
+        <input type="text" name="bancales" inputmode="decimal" placeholder="Ej: 5" required>
+
+        <details id="avanzado-plan">
+          <summary>Ajustar rendimiento y densidad</summary>
+          <p class="nota">Vienen del catálogo común. Cambialos si en tu chacra
+          este cultivo se maneja distinto.</p>
+          <div class="fila">
+            <div>
+              <label>Rinde (kg/m²)</label>
+              <input type="text" name="rinde" inputmode="decimal">
+            </div>
+            <div>
+              <label>Líneas por bancal</label>
+              <input type="number" name="lineas" min="1" max="20">
+            </div>
+            <div>
+              <label>Distancia (cm)</label>
+              <input type="text" name="distancia" inputmode="decimal">
+            </div>
           </div>
-          <div>
-            <label>Kg esperados</label>
-            <input type="text" name="kg" inputmode="decimal" placeholder="Ej: 720" required>
-          </div>
-        </div>
+        </details>
+
         <div class="calculo" id="calculo-plan"></div>
-        <button class="secundario">Agregar al plan</button>
+        <button class="secundario" id="btn-plan">Agregar al plan</button>
+        <button type="button" class="secundario" id="btn-cancelar-plan" hidden>Cancelar</button>
       </form>
     </div>`;
   },
@@ -929,13 +948,29 @@ const filaSector = (s, i) => `<div class="registro">
 
 const filaPlan = (p, i) => {
   const b = bancalM2();
+  const detalle = [
+    b ? `${num(p.superficie_m2 / b, 1)} bancales` : "",
+    `${num(p.superficie_m2)} m²`,
+    p.plantas ? `${num(p.plantas)} plantas` : "",
+    p.rinde_kg_m2 ? `${num(p.rinde_kg_m2, 2)} kg/m²` : "",
+  ].filter(Boolean).join(" · ");
+
   return `<div class="registro">
     <div><div class="detalle">${esc(p.cultivo)}</div>
-      <div class="cuando">${num(p.superficie_m2)} m²${b ? ` · ${num(p.superficie_m2 / b, 1)} bancales` : ""}</div></div>
+      <div class="cuando">${detalle}</div></div>
     <span class="etiqueta ok">${num(p.cosecha_esperada_kg)} kg</span>
+    <button type="button" class="editar" data-editar="${i}" aria-label="Editar">&#9998;</button>
     <button type="button" class="quitar" data-plan="${i}" aria-label="Quitar">&times;</button>
   </div>`;
 };
+
+// Cuántas plantas entran: las líneas del bancal por lo que da la distancia a lo
+// largo, por la cantidad de bancales.
+function plantasDe({ bancales, lineas, distancia_cm }) {
+  const largoCm = (CFG?.bancal?.largo_m || 0) * 100;
+  if (!largoCm || !lineas || !distancia_cm) return 0;
+  return Math.round(lineas * Math.floor(largoCm / distancia_cm) * bancales);
+}
 
 function tarjetaElegirChacra() {
   return `<div class="tarjeta">
@@ -1224,34 +1259,120 @@ function prepararConfiguracion() {
   const fPlan = $("#form-plan");
   enlazarBuscadores(fPlan);
   const calculoPlan = $("#calculo-plan");
-  const verPlan = () => {
-    const sup = aNumero(fPlan.superficie.value);
-    const b = bancalM2();
-    const p = perfil(fPlan.cultivo.value);
-    const partes = [];
-    if (sup > 0 && b > 0) partes.push(`<b>${num(sup / b, 1)}</b> bancales`);
-    if (sup > 0 && p.rinde_ref_kg_m2) {
-      partes.push(`referencia: <b>${num(sup * p.rinde_ref_kg_m2)} kg</b>`);
-    }
-    if (p.dias_a_cosecha) partes.push(`${p.dias_a_cosecha} días a cosecha`);
-    calculoPlan.innerHTML = partes.length ? partes.join(" · ")
-      : "Elegí el cultivo y la superficie para ver la referencia.";
+  const buscaCultivo = fPlan.querySelector(".buscador-texto");
+
+  // Al elegir un cultivo se traen los valores del catálogo, salvo que ya esté en
+  // el plan con los suyos propios.
+  const cargarValoresDe = (cultivo) => {
+    const p = perfil(cultivo);
+    const yaEsta = enPlan(cultivo);
+    // Si el cultivo ya estaba planificado sin rinde propio (planes viejos), se
+    // deduce de lo que se planificó: kg esperados sobre los metros.
+    const rindeDelPlan = yaEsta?.rinde_kg_m2 ||
+      (yaEsta?.superficie_m2 ? yaEsta.cosecha_esperada_kg / yaEsta.superficie_m2 : 0);
+    fPlan.rinde.value = redondear(rindeDelPlan || p.rinde_ref_kg_m2 || "");
+    fPlan.lineas.value = yaEsta?.lineas || p.lineas_bancal || "";
+    fPlan.distancia.value = yaEsta?.distancia_cm || p.distancia_cm || "";
   };
+  const redondear = (v) => (v ? String(Math.round(v * 1000) / 1000) : "");
+
+  const verPlan = () => {
+    const cultivo = fPlan.cultivo.value;
+    const b = bancalM2();
+    const bancales = aNumero(fPlan.bancales.value) || 0;
+    const rinde = aNumero(fPlan.rinde.value) || 0;
+    const sup = bancales * b;
+    const plantas = plantasDe({ bancales, lineas: parseInt(fPlan.lineas.value, 10) || 0,
+                                distancia_cm: aNumero(fPlan.distancia.value) || 0 });
+    const ref = perfil(cultivo).rinde_ref_kg_m2 || 0;
+
+    if (!cultivo || !bancales) {
+      calculoPlan.innerHTML = "Elegí el cultivo y cuántos bancales para ver los números.";
+      return;
+    }
+    const partes = [`<b>${num(sup)} m²</b>`];
+    if (rinde) partes.push(`esperados: <b>${num(sup * rinde)} kg</b> a ${num(rinde, 2)} kg/m²`);
+    if (plantas) partes.push(`<b>${num(plantas)}</b> plantas`);
+    const p = perfil(cultivo);
+    if (p.dias_a_cosecha) partes.push(`${p.dias_a_cosecha} días a cosecha`);
+    calculoPlan.innerHTML = partes.join(" · ") +
+      (ref && Math.abs(ref - rinde) > 0.005
+        ? `<div class="nota" style="margin-top:4px">La referencia del catálogo para
+           ${esc(cultivo)} es ${num(ref, 2)} kg/m².</div>` : "");
+  };
+
+  // Al cambiar de cultivo se recargan rinde, líneas y distancia.
+  let ultimoCultivo = "";
+  fPlan.addEventListener("change", () => {
+    if (fPlan.cultivo.value && fPlan.cultivo.value !== ultimoCultivo) {
+      ultimoCultivo = fPlan.cultivo.value;
+      cargarValoresDe(ultimoCultivo);
+    }
+    verPlan();
+  });
   fPlan.addEventListener("input", verPlan);
-  fPlan.addEventListener("change", verPlan);
   verPlan();
+
+  const salirDeEdicion = () => {
+    fPlan.reset();
+    ultimoCultivo = "";
+    buscaCultivo.value = "";
+    buscaCultivo.disabled = false;
+    $("#titulo-plan").innerHTML = "";
+    $("#btn-plan").textContent = "Agregar al plan";
+    $("#btn-cancelar-plan").hidden = true;
+    verPlan();
+  };
+  $("#btn-cancelar-plan").onclick = salirDeEdicion;
 
   fPlan.onsubmit = (e) => {
     e.preventDefault();
     const cultivo = fPlan.cultivo.value;
     if (!cultivo) return aviso("Elegí el cultivo.", true);
-    const sup = aNumero(fPlan.superficie.value), kg = aNumero(fPlan.kg.value);
-    if (!(sup > 0)) return aviso("La superficie tiene que ser mayor a cero.", true);
+    const b = bancalM2();
+    if (!b) return aviso("Primero cargá las medidas del bancal.", true);
+    const bancales = aNumero(fPlan.bancales.value);
+    if (!(bancales > 0)) return aviso("Los bancales tienen que ser más de cero.", true);
+
+    const rinde = aNumero(fPlan.rinde.value) || 0;
+    const lineas = parseInt(fPlan.lineas.value, 10) || 0;
+    const distancia = aNumero(fPlan.distancia.value) || 0;
+    const superficie = bancales * b;
+
     const plan = [...(CFG?.plan || [])].filter((p) => p.cultivo !== cultivo);
-    plan.push({ cultivo, superficie_m2: sup, cosecha_esperada_kg: kg > 0 ? kg : 0 });
+    plan.push({
+      cultivo,
+      superficie_m2: Math.round(superficie * 100) / 100,
+      cosecha_esperada_kg: Math.round(superficie * rinde),
+      rinde_kg_m2: rinde,
+      lineas,
+      distancia_cm: distancia,
+      plantas: plantasDe({ bancales, lineas, distancia_cm: distancia }),
+    });
     plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
-    guardarConfig({ plan }, `${cultivo} agregado al plan ✓`);
+    guardarConfig({ plan }, `${cultivo}: ${num(bancales, 1)} bancales ✓`);
   };
+
+  // ---- editar un cultivo del plan
+  document.querySelectorAll(".editar").forEach((b) => {
+    b.onclick = () => {
+      const p = (CFG.plan || [])[Number(b.dataset.editar)];
+      if (!p) return;
+      const m2 = bancalM2();
+      fPlan.cultivo.value = p.cultivo;
+      buscaCultivo.value = p.cultivo;
+      buscaCultivo.disabled = true;          // editando no se cambia de cultivo
+      ultimoCultivo = p.cultivo;
+      fPlan.bancales.value = m2 ? String(Math.round((p.superficie_m2 / m2) * 100) / 100) : "";
+      cargarValoresDe(p.cultivo);   // lo suyo, y lo que falte del catálogo
+      $("#avanzado-plan").open = true;
+      $("#titulo-plan").innerHTML = `<div class="editando">Editando <b>${esc(p.cultivo)}</b></div>`;
+      $("#btn-plan").textContent = "Guardar cambios";
+      $("#btn-cancelar-plan").hidden = false;
+      verPlan();
+      fPlan.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+  });
 
   // ---- quitar cosas
   document.querySelectorAll(".quitar").forEach((b) => {
