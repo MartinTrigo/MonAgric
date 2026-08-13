@@ -45,6 +45,7 @@ const LS = {
   nombre: "monagric_nombre",
   chacra: "monagric_chacra",
   config: "monagric_config",
+  configLeida: "monagric_config_leida",
   scriptUrl: "monagric_script_url",
   urlHoras: "monagric_url_horas",
   resumen: "monagric_resumen",
@@ -65,6 +66,13 @@ let resumen = leer(LS.resumen, null);   // totales de la chacra (desde su planil
 let CAT = null;                         // catálogo común (catalogo.json)
 let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
+
+// Hasta no haber leído la configuración de la chacra en el servicio no se puede
+// guardar nada: guardar reescribe la hoja Config entera, así que hacerlo con la
+// configuración a medio cargar borraría lo que ya tenía la chacra.
+// Si en este teléfono ya se leyó alguna vez, lo guardado sirve de base y se
+// puede seguir editando sin señal.
+let configConfirmada = leer(LS.configLeida, false);
 
 const urlHoras = () => leer(LS.urlHoras, "") || URL_HORAS_POR_DEFECTO;
 const urlServicio = () => leer(LS.scriptUrl, "") || URL_SERVICIO_POR_DEFECTO;
@@ -733,6 +741,18 @@ const plantillas = {
   // común, que es lo que después permite comparar entre chacras.
   configuracion() {
     if (!chacraActual()) return tarjetaElegirChacra();
+    // Sin haber leído lo que la chacra tiene guardado no se muestran los
+    // formularios: si alguien guardara con la pantalla en blanco, borraría todo.
+    if (!configConfirmada) {
+      return `<div class="tarjeta">
+        <h2>No pude leer la configuración</h2>
+        <p class="nota">Para no pisar lo que la chacra ya tenga cargado, primero hay
+        que leerlo del servidor, y para eso hace falta señal. ${navigator.onLine
+          ? "Estamos reintentando…" : "Ahora no hay conexión."}</p>
+        <button class="principal" id="btn-reintentar-config" style="margin-top:12px">
+          Reintentar</button>
+      </div>`;
+    }
     const c = CFG || {};
     const t = c.temporada || {};
     const b = c.bancal || {};
@@ -1017,12 +1037,22 @@ function render(vista) {
 // Botones que pueden aparecer en cualquier vista.
 function prepararComunes() {
   document.querySelectorAll(".chip-chacra").forEach((b) => {
-    b.onclick = () => {
+    b.onclick = async () => {
       escribir(LS.chacra, b.dataset.chacra);
       CFG = null;
       escribir(LS.config, null);
+      configConfirmada = false;
+      escribir(LS.configLeida, false);
       refrescarEstado();
-      render("configuracion");
+
+      // Primero se busca lo que la chacra ya tenga cargado. Recién después se
+      // decide qué mostrar: si ya está configurada, el inicio; si no, Config.
+      $("#vista").innerHTML = `<div class="tarjeta">
+        <h2>Buscando la configuración de la chacra…</h2>
+        <p class="nota">Un segundo, estamos viendo qué hay cargado.</p></div>`;
+      if (horasVanAparte()) await traerDatosHoras();
+      await traerConfig();
+      render(hayConfig() ? "inicio" : "configuracion");
       sincronizar();
     };
   });
@@ -1113,6 +1143,11 @@ function prepararSiembras() {
 // Se guarda entera cada vez: la app manda la configuración completa y el
 // servicio reescribe la hoja Config. Así no hay estados a medias.
 function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
+  // Red de seguridad: guardar reescribe la hoja Config entera. Si todavía no
+  // pudimos leer lo que la chacra tenía cargado, guardar borraría sus datos.
+  if (!configConfirmada) {
+    return aviso("Esperá: todavía no pude leer la configuración de la chacra.", true);
+  }
   CFG = Object.assign({
     nombre: chacraActual()?.nombre || "", temporada: {}, bancal: {},
     sectores: [], integrantes: [], plan: [],
@@ -1123,6 +1158,14 @@ function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
 }
 
 function prepararConfiguracion() {
+  const reintentar = $("#btn-reintentar-config");
+  if (reintentar) {
+    reintentar.onclick = async () => {
+      await traerConfig();
+      render("configuracion");
+      if (!configConfirmada) aviso("Sigo sin poder leerla. Revisá la señal.", true);
+    };
+  }
   const general = $("#form-config-general");
   if (!general) return;
 
@@ -1233,8 +1276,10 @@ async function traerConfig() {
   try {
     const d = await (await fetch(
       `${urlServicio()}?config=1&chacra=${encodeURIComponent(chacraCodigo())}`)).json();
+    if (!d.ok || !d.config) return;
+
     // Si hay cosas esperando enviarse, lo del teléfono es más nuevo: no se pisa.
-    if (d.ok && d.config && !pendientes.some((r) => r.tipo === "config")) {
+    if (!pendientes.some((r) => r.tipo === "config")) {
       if (d.config.sectores?.length || d.config.plan?.length) {
         const t = d.config.temporada || {};
         t.inicio = aFechaISO(t.inicio);
@@ -1243,6 +1288,11 @@ async function traerConfig() {
         escribir(LS.config, CFG);
       }
     }
+    // Ya sabemos qué tenía la chacra: recién ahora es seguro guardar.
+    const eraDesconocida = !configConfirmada;
+    configConfirmada = true;
+    escribir(LS.configLeida, true);
+    if (eraDesconocida && vistaActual === "configuracion") render("configuracion");
   } catch { /* sin conexión: se usa la última configuración guardada */ }
 }
 
@@ -1395,6 +1445,8 @@ function prepararAjustes() {
       escribir(LS.chacra, nuevaChacra);
       CFG = null;
       escribir(LS.config, null);
+      configConfirmada = false;
+      escribir(LS.configLeida, false);
       escribir(LS.tareas, []);
       resumen = null;
       escribir(LS.resumen, null);
