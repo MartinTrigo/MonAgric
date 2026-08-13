@@ -185,11 +185,18 @@ function leerConfig(chacra) {
   var cfg = { chacra: chacra, temporada: {}, bancal: {}, sectores: [], integrantes: [], plan: [] };
   if (!hoja || hoja.getLastRow() < 2) return cfg;
 
+  // Las fechas la planilla las guarda como fecha de verdad, no como texto: hay
+  // que devolverlas como 2026-07-07 y no como "Tue Jul 07 2026 00:00:00 GMT…".
+  var tz = Session.getScriptTimeZone();
+  var texto = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+
   hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues().forEach(function (f) {
     var seccion = String(f[0]), clave = String(f[1]);
     if (!seccion) return;
-    if (seccion === "chacra") cfg[clave] = f[2];
-    else if (seccion === "temporada") cfg.temporada[clave] = String(f[2] || "");
+    if (seccion === "chacra") cfg[clave] = texto(f[2]);
+    else if (seccion === "temporada") cfg.temporada[clave] = texto(f[2]);
     else if (seccion === "bancal") cfg.bancal[clave] = Number(f[2]) || 0;
     else if (seccion === "sector") {
       cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0, tipo_riego: String(f[3] || "") });

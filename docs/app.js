@@ -14,9 +14,13 @@
 
 "use strict";
 
-// Cada chacra escribe en su propia planilla; el servicio las reparte.
+// Cada chacra escribe en su propia planilla; el servicio las reparte según el
+// código. Para sumar una: crear su planilla, agregarla acá y cargar su id en la
+// propiedad CHACRAS del Apps Script (ver docs/README.md).
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
+  { codigo: "milpa", nombre: "La Milpa" },
+  { codigo: "focoverde", nombre: "Foco Verde" },
 ];
 
 // Los tipos que nacen en bandeja: el formulario pide bandejas en vez de bancal.
@@ -94,6 +98,18 @@ function sumarDias(fechaISO, dias) {
   const d = new Date(fechaISO + "T12:00:00");
   d.setDate(d.getDate() + dias);
   return d.toISOString().slice(0, 10);
+}
+
+// La planilla puede devolver una fecha como "2026-07-07" o como el texto largo
+// que arma JavaScript ("Tue Jul 07 2026 00:00:00 GMT-0300…"). Las dos terminan
+// acá en el mismo formato.
+function aFechaISO(valor) {
+  const txt = String(valor || "").trim();
+  if (!txt) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(txt)) return txt;
+  const d = new Date(txt);
+  if (isNaN(d)) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function fechaCorta(iso) {
@@ -1220,6 +1236,9 @@ async function traerConfig() {
     // Si hay cosas esperando enviarse, lo del teléfono es más nuevo: no se pisa.
     if (d.ok && d.config && !pendientes.some((r) => r.tipo === "config")) {
       if (d.config.sectores?.length || d.config.plan?.length) {
+        const t = d.config.temporada || {};
+        t.inicio = aFechaISO(t.inicio);
+        t.fin = aFechaISO(t.fin);
         CFG = d.config;
         escribir(LS.config, CFG);
       }
