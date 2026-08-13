@@ -7,16 +7,19 @@ la temporada y compara lo planificado con lo logrado.
 Los registros se guardan primero en el teléfono (funciona sin señal en el campo)
 y se envían a una **planilla de Google Sheets** cuando hay conexión.
 
-## Cómo ponerla en marcha (una sola vez)
+**La app está publicada en https://martintrigo.github.io/MonAgric/**
 
-### Paso 1 — Crear la planilla en Google
+## Lo que falta para conectarla con la planilla
 
-1. Entrá a [sheets.google.com](https://sheets.google.com) con tu cuenta.
-2. Creá una planilla nueva y ponele, por ejemplo, **MonAgric Datos**.
+### Paso 1 — La planilla ✅
+
+Ya está creada en tu Drive:
+[**MonAgric Datos 2026-27**](https://docs.google.com/spreadsheets/d/1PrP0FDXG-45iSYWwx8osn5tgVaxiBgbbBDOf8PC7uYQ/edit).
+Las pestañas (Siembras, Horas, Cosechas) se crean solas con el primer registro.
 
 ### Paso 2 — Publicar el servicio (Apps Script)
 
-1. En la planilla: **Extensiones → Apps Script**.
+1. Abrí la planilla y andá a **Extensiones → Apps Script**.
 2. Borrá lo que haya en el editor y pegá todo el código de
    [`apps-script/Code.gs`](../apps-script/Code.gs).
 3. Arriba a la derecha: **Implementar → Nueva implementación**.
@@ -28,12 +31,10 @@ y se envían a una **planilla de Google Sheets** cuando hay conexión.
 > La planilla queda en tu Drive y solo la ves vos. "Cualquier persona" significa
 > que la app puede *enviarle* datos sin que cada integrante inicie sesión.
 
-### Paso 3 — Publicar la app en GitHub Pages
+### Paso 3 — La app publicada ✅
 
-1. Subí este proyecto al repositorio **MonAgric** de tu GitHub (público).
-2. En el repositorio: **Settings → Pages → Source: Deploy from a branch**,
-   rama `main`, carpeta **`/docs`**. Guardá.
-3. En unos minutos queda en `https://martintrigo.github.io/MonAgric/`.
+Ya está en https://martintrigo.github.io/MonAgric/ (GitHub Pages sirve la
+carpeta `docs/` de la rama `main`; se actualiza sola con cada `git push`).
 
 ### Paso 4 — Conectar y repartir
 
