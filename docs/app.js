@@ -20,6 +20,12 @@ const EN_BANDEJA = new Set(["Siembra almácigo", "Esqueje"]);
 const URL_HORAS_POR_DEFECTO =
   "https://script.google.com/macros/s/AKfycbyHBMsZAyLOACCgWclgHGDB6e6M8tw2VX_zonELRuFobPp3TdakCr4Wkh2b8TqtB7P2bw/exec";
 
+// Siembras, cosechas y tareas van a la planilla MonAgric. La dirección viene
+// puesta para que nadie tenga que configurar nada: se abre el enlace, se elige
+// el nombre y listo. Solo permite agregar filas a esa planilla.
+const URL_SERVICIO_POR_DEFECTO =
+  "https://script.google.com/macros/s/AKfycbxCe17bpyv_sOsJAdkyKSr87kwpSnCBSejS4e913m6zmjxSHEuMxiKEVRVaa8uRt85O/exec";
+
 const ACTIVIDADES_RESPALDO = ["Planificación", "Siembra", "Trasplante", "Manejo productivo",
                               "Cosecha y acondicionado", "Administración", "Comercialización",
                               "Comunicación", "Mantenimiento"];
@@ -52,6 +58,7 @@ let TEMP = null;                        // contenido de temporada.json
 let vistaActual = "inicio";
 
 const urlHoras = () => leer(LS.urlHoras, "") || URL_HORAS_POR_DEFECTO;
+const urlServicio = () => leer(LS.scriptUrl, "") || URL_SERVICIO_POR_DEFECTO;
 
 // ---- Utilidades ----
 const $ = (sel) => document.querySelector(sel);
@@ -114,7 +121,6 @@ function refrescarEstado() {
   const t = TEMP?.temporada;
   const base = t ? `Temporada ${t.nombre}` : "Sin plan de temporada";
   if (pendientes.length) el.textContent = `${base} · ${pendientes.length} por enviar`;
-  else if (!leer(LS.scriptUrl, "")) el.textContent = `${base} · falta conectar siembras y cosechas`;
   else el.textContent = `${base} · al día ✓`;
 }
 
@@ -139,10 +145,9 @@ async function sincronizar(silencioso = true) {
   }
 
   const otros = pendientes.filter((r) => r.tipo !== "horas");
-  const url = leer(LS.scriptUrl, "");
-  if (otros.length && url) {
+  if (otros.length) {
     try {
-      const resp = await fetch(url, {
+      const resp = await fetch(urlServicio(), {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ registros: otros }),
@@ -204,10 +209,9 @@ async function traerDatosHoras() {
 
 // Totales de toda la chacra (lo que cargaron todos los teléfonos).
 async function traerResumen() {
-  const url = leer(LS.scriptUrl, "");
-  if (!url || !navigator.onLine) return;
+  if (!navigator.onLine) return;
   try {
-    const r = await fetch(url + "?resumen=1");
+    const r = await fetch(urlServicio() + "?resumen=1");
     const d = await r.json();
     if (d.ok) { resumen = d; escribir(LS.resumen, resumen); }
   } catch { /* sin conexión: se sigue mostrando el último resumen guardado */ }
@@ -680,15 +684,16 @@ const plantillas = {
       <label>Tu nombre (queda en cada registro que cargues)</label>
       <select id="aj-nombre">${opcionesIntegrante(leer(LS.nombre, ""))}</select>
 
-      <label>Servicio de siembras y cosechas <small>(planilla MonAgric)</small></label>
+      <p class="nota">Con elegir tu nombre alcanza: las dos planillas ya vienen
+      conectadas. Los campos de abajo son para cuando cambie algún servicio.</p>
+
+      <label>Servicio de siembras, cosechas y tareas <small>(planilla MonAgric)</small></label>
       <input type="url" id="aj-url" value="${esc(leer(LS.scriptUrl, ""))}"
-             placeholder="https://script.google.com/macros/s/…/exec">
+             placeholder="ya viene configurado — dejalo vacío">
 
       <label>Servicio de horas <small>(planilla del proyecto)</small></label>
       <input type="url" id="aj-url-horas" value="${esc(leer(LS.urlHoras, ""))}"
              placeholder="ya viene configurado — dejalo vacío">
-      <p class="nota" style="margin-top:6px">Las horas siguen yendo a la misma planilla
-      de siempre. Solo tocá esto si cambia el servicio.</p>
 
       <button class="principal" id="btn-guardar-ajustes">Guardar ajustes</button>
       <button class="secundario" id="btn-probar">Probar conexión</button>
@@ -937,10 +942,9 @@ function prepararTareas() {
 
 // Trae del servicio la lista de tareas del equipo.
 async function traerTareas() {
-  const url = leer(LS.scriptUrl, "");
-  if (!url || !navigator.onLine) return;
+  if (!navigator.onLine) return;
   try {
-    const d = await (await fetch(url + "?tareas=1")).json();
+    const d = await (await fetch(urlServicio() + "?tareas=1")).json();
     if (Array.isArray(d.tareas)) escribir(LS.tareas, d.tareas);
   } catch { /* sin conexión: se usa la última lista guardada */ }
 }
@@ -1027,15 +1031,12 @@ function prepararAjustes() {
       partes.push(Array.isArray(d.nombres) ? `horas ✓ (${d.nombres.length} integrantes)` : "horas ✓");
     } catch { partes.push("horas ✗"); }
 
-    const url = leer(LS.scriptUrl, "");
-    if (!url) partes.push("siembras/cosechas: falta la dirección");
-    else {
-      try {
-        const d = await (await fetch(url)).json();
-        partes.push(d.ok ? "siembras/cosechas ✓" : "siembras/cosechas ✗");
-      } catch { partes.push("siembras/cosechas ✗"); }
-    }
-    const hayFalla = partes.some((p) => p.includes("✗") || p.includes("falta"));
+    try {
+      const d = await (await fetch(urlServicio())).json();
+      partes.push(d.ok ? "siembras y tareas ✓" : "siembras y tareas ✗");
+    } catch { partes.push("siembras y tareas ✗"); }
+
+    const hayFalla = partes.some((p) => p.includes("✗"));
     aviso(partes.join(" · "), hayFalla);
     sincronizar();
   };
