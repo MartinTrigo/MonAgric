@@ -22,6 +22,17 @@ __pycache__/
 # === Configuración local de la PC ===
 .claude/settings.local.json
 
+# === Google Drive para escritorio ===
+# La carpeta está sincronizada con Drive: los .gsheet/.gdoc son accesos directos
+# a los archivos de Google (llevan el id y el correo), no documentos de verdad.
+*.gsheet
+*.gdoc
+*.gslides
+*.gform
+*.gdraw
+.tmp.drive*/
+
+
 # === Material de trabajo (no hace falta publicarlo) ===
 versiones/
 promps para claude.md
