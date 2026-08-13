@@ -1,360 +1,39 @@
 {
-  "generado": "2026-08-13T11:03:23",
-  "temporada": {
-    "nombre": "2026-27",
-    "inicio": "2026-07-07",
-    "fin": ""
-  },
-  "chacra": {
-    "nombre": "Chacra Tica",
-    "productor": "Martín",
-    "bancal_m2": 30.0,
-    "largo_bancal_m": 30.0,
-    "ancho_bancal_m": 1.0,
-    "pasillo_m": 0.6,
-    "n_bancales": 165
-  },
-  "sectores": [
-    {
-      "sector": "A",
-      "bancales": 25,
-      "tipo_riego": "Aspersión"
-    },
-    {
-      "sector": "B",
-      "bancales": 25,
-      "tipo_riego": "Aspersión"
-    },
-    {
-      "sector": "C",
-      "bancales": 25,
-      "tipo_riego": "Aspersión"
-    },
-    {
-      "sector": "D",
-      "bancales": 25,
-      "tipo_riego": "Aspersión"
-    }
-  ],
-  "plan": [
-    {
-      "cultivo": "Acelga",
-      "superficie_m2": 180.0,
-      "cosecha_esperada_kg": 990.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 40.0,
-      "lineas": 3,
-      "plantas": 1350
-    },
-    {
-      "cultivo": "Ajo",
-      "superficie_m2": 60.0,
-      "cosecha_esperada_kg": 144.0,
-      "tipo_siembra": "Directa",
-      "distancia_cm": 15.0,
-      "lineas": 4,
-      "plantas": 1600
-    },
-    {
-      "cultivo": "Albahaca",
-      "superficie_m2": 30.0,
-      "cosecha_esperada_kg": 90.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 25.0,
-      "lineas": 4,
-      "plantas": 480
-    },
-    {
-      "cultivo": "Apio",
-      "superficie_m2": 60.0,
-      "cosecha_esperada_kg": 240.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 30.0,
-      "lineas": 4,
-      "plantas": 800
-    },
-    {
-      "cultivo": "Berenjena",
-      "superficie_m2": 30.0,
-      "cosecha_esperada_kg": 90.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 40.0,
-      "lineas": 2,
-      "plantas": 150
-    },
-    {
-      "cultivo": "Brocoli",
-      "superficie_m2": 300.0,
-      "cosecha_esperada_kg": 1200.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 50.0,
-      "lineas": 3,
-      "plantas": 1800
-    },
-    {
-      "cultivo": "Cebolla",
-      "superficie_m2": 240.0,
-      "cosecha_esperada_kg": 960.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 10.0,
-      "lineas": 4,
-      "plantas": 9600
-    },
-    {
-      "cultivo": "Choclos",
-      "superficie_m2": 360.0,
-      "cosecha_esperada_kg": 900.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 25.0,
-      "lineas": 2,
-      "plantas": 2880
-    },
-    {
-      "cultivo": "Coliflor",
-      "superficie_m2": 270.0,
-      "cosecha_esperada_kg": 810.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 50.0,
-      "lineas": 3,
-      "plantas": 1620
-    },
-    {
-      "cultivo": "Espinaca",
-      "superficie_m2": 120.0,
-      "cosecha_esperada_kg": 360.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 20.0,
-      "lineas": 5,
-      "plantas": 3000
-    },
-    {
-      "cultivo": "Habas",
-      "superficie_m2": 120.0,
-      "cosecha_esperada_kg": 300.0,
-      "tipo_siembra": "Directa",
-      "distancia_cm": 15.0,
-      "lineas": 1,
-      "plantas": 800
-    },
-    {
-      "cultivo": "Hakusai",
-      "superficie_m2": 90.0,
-      "cosecha_esperada_kg": 540.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 40.0,
-      "lineas": 3,
-      "plantas": 675
-    },
-    {
-      "cultivo": "Kale",
-      "superficie_m2": 120.0,
-      "cosecha_esperada_kg": 600.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 40.0,
-      "lineas": 3,
-      "plantas": 900
-    },
-    {
-      "cultivo": "Lechuga",
-      "superficie_m2": 150.0,
-      "cosecha_esperada_kg": 720.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 30.0,
-      "lineas": 4,
-      "plantas": 2000
-    },
-    {
-      "cultivo": "Mix de hojas",
-      "superficie_m2": 240.0,
-      "cosecha_esperada_kg": 720.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 5.0,
-      "lineas": 5,
-      "plantas": 24000
-    },
-    {
-      "cultivo": "Morron",
-      "superficie_m2": 30.0,
-      "cosecha_esperada_kg": 150.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 45.0,
-      "lineas": 2,
-      "plantas": 133
-    },
-    {
-      "cultivo": "Nabo Hakurei",
-      "superficie_m2": 150.0,
-      "cosecha_esperada_kg": 675.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 15.0,
-      "lineas": 5,
-      "plantas": 5000
-    },
-    {
-      "cultivo": "Perejil",
-      "superficie_m2": 90.0,
-      "cosecha_esperada_kg": 405.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 10.0,
-      "lineas": 5,
-      "plantas": 4500
-    },
-    {
-      "cultivo": "Puerro",
-      "superficie_m2": 240.0,
-      "cosecha_esperada_kg": 1200.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 15.0,
-      "lineas": 4,
-      "plantas": 6400
-    },
-    {
-      "cultivo": "Rabanito",
-      "superficie_m2": 60.0,
-      "cosecha_esperada_kg": 180.0,
-      "tipo_siembra": "Directa",
-      "distancia_cm": 5.0,
-      "lineas": 5,
-      "plantas": 6000
-    },
-    {
-      "cultivo": "Remolacha",
-      "superficie_m2": 240.0,
-      "cosecha_esperada_kg": 1200.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 15.0,
-      "lineas": 5,
-      "plantas": 8000
-    },
-    {
-      "cultivo": "Repollo bco",
-      "superficie_m2": 450.0,
-      "cosecha_esperada_kg": 2250.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 45.0,
-      "lineas": 3,
-      "plantas": 3000
-    },
-    {
-      "cultivo": "Rucula",
-      "superficie_m2": 90.0,
-      "cosecha_esperada_kg": 450.0,
-      "tipo_siembra": "Directa",
-      "distancia_cm": 5.0,
-      "lineas": 5,
-      "plantas": 9000
-    },
-    {
-      "cultivo": "Tomate",
-      "superficie_m2": 60.0,
-      "cosecha_esperada_kg": 240.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 45.0,
-      "lineas": 2,
-      "plantas": 267
-    },
-    {
-      "cultivo": "Zanahoria",
-      "superficie_m2": 330.0,
-      "cosecha_esperada_kg": 1980.0,
-      "tipo_siembra": "Directa",
-      "distancia_cm": 10.0,
-      "lineas": 5,
-      "plantas": 16500
-    },
-    {
-      "cultivo": "Zapallito",
-      "superficie_m2": 120.0,
-      "cosecha_esperada_kg": 540.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 50.0,
-      "lineas": 1,
-      "plantas": 240
-    },
-    {
-      "cultivo": "Zapallo",
-      "superficie_m2": 600.0,
-      "cosecha_esperada_kg": 1800.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 80.0,
-      "lineas": 1,
-      "plantas": 750
-    },
-    {
-      "cultivo": "Zucchini",
-      "superficie_m2": 120.0,
-      "cosecha_esperada_kg": 540.0,
-      "tipo_siembra": "Almácigo",
-      "distancia_cm": 50.0,
-      "lineas": 1,
-      "plantas": 240
-    }
-  ],
-  "integrantes": [
-    {
-      "nombre": "Belu"
-    },
-    {
-      "nombre": "Luis"
-    },
-    {
-      "nombre": "Luna"
-    },
-    {
-      "nombre": "Marto"
-    },
-    {
-      "nombre": "Nati"
-    },
-    {
-      "nombre": "Tomi"
-    }
-  ],
-  "actividades": [
-    "Planificación",
-    "Siembra",
-    "Trasplante",
-    "Manejo productivo",
-    "Cosecha y acondicionado",
-    "Administración",
-    "Comercialización",
-    "Comunicación",
-    "Mantenimiento"
-  ],
+  "generado": "2026-08-13T12:05:11",
   "cultivos": [
     "Acelga",
     "Ajo",
+    "Ajo de verdeo",
     "Albahaca",
     "Apio",
     "Berenjena",
     "Brocoli",
     "Cebolla",
+    "Cherry",
     "Choclos",
     "Coliflor",
     "Espinaca",
     "Habas",
     "Hakusai",
     "Kale",
+    "Khol Rabi",
     "Lechuga",
     "Mix de hojas",
     "Morron",
     "Nabo Hakurei",
+    "Pak choi",
     "Perejil",
     "Puerro",
     "Rabanito",
     "Remolacha",
     "Repollo bco",
+    "Repollo col",
     "Rucula",
     "Tomate",
     "Zanahoria",
     "Zapallito",
     "Zapallo",
-    "Zucchini",
-    "Ajo de verdeo",
-    "Cherry",
-    "Khol Rabi",
-    "Pak choi",
-    "Repollo col"
+    "Zucchini"
   ],
   "perfiles": {
     "Acelga": {
@@ -654,5 +333,39 @@
       "distancia_cm": 50.0,
       "lineas_bancal": 1
     }
-  }
+  },
+  "actividades": [
+    "Planificación",
+    "Siembra",
+    "Trasplante",
+    "Manejo productivo",
+    "Cosecha y acondicionado",
+    "Administración",
+    "Comercialización",
+    "Comunicación",
+    "Mantenimiento"
+  ],
+  "tipos_siembra": [
+    "Siembra directa",
+    "Siembra almácigo",
+    "Trasplante",
+    "Esqueje"
+  ],
+  "tipos_bandeja": [
+    72,
+    98,
+    128,
+    162
+  ],
+  "tipos_riego": [
+    "Aspersión",
+    "Goteo",
+    "Surco",
+    "Superficie"
+  ],
+  "importancias": [
+    "Alta",
+    "Media",
+    "Baja"
+  ]
 }

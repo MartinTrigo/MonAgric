@@ -66,6 +66,52 @@ En los campos de cultivo hay un **buscador**: se escribe para filtrar (sin
 importar tildes ni mayúsculas) o se toca para ver la lista completa, con los del
 plan de la temporada primero.
 
+## Varias chacras
+
+Un mismo enlace sirve para todas las chacras. Cada persona elige la suya la
+primera vez y a partir de ahí sus registros van a la planilla de esa chacra:
+
+```
+                    ┌─→ MonAgric · Chacra Tica
+App web  →  Apps ───┼─→ MonAgric · Chacra 2
+(1 enlace)  Script  └─→ MonAgric · Chacra 3
+```
+
+**Lo que es igual para todas** (y por eso se puede comparar entre chacras) vive
+en `catalogo.json`: los cultivos, sus perfiles (días a cosecha, rinde de
+referencia, distancias), las actividades de trabajo y los tipos de siembra. No
+se edita desde la app. Se genera con:
+
+```
+python tools/exportar_catalogo.py
+```
+
+**Lo que configura cada chacra** desde la sección Config de la app: nombre,
+temporada, medidas del bancal, sectores con sus bancales, quiénes trabajan y el
+plan de cultivos. Queda en la hoja `Config` de su propia planilla y se puede
+corregir desde el teléfono cuando haga falta.
+
+### Sumar una chacra
+
+1. Crear una planilla nueva en Drive, por ejemplo *MonAgric · Chacra X*.
+2. En el editor de Apps Script: **Configuración del proyecto → Propiedades del
+   script**, y en la propiedad `CHACRAS` agregar el código y el id de la
+   planilla: `{"tica":"1PrP0F…","chacrax":"1AbC…"}`
+3. **Implementar → Administrar implementaciones → lápiz → Nueva versión.**
+4. Agregar la chacra a la lista `CHACRAS` al principio de `app.js` y publicar.
+
+Para arrancar con una configuración ya cargada en vez de tipearla:
+
+```
+python tools/sembrar_config.py tica
+```
+
+### Las horas
+
+Chacra Tica las manda a la planilla del proyecto Bioma, donde está el historial
+desde julio. Las demás chacras las guardan en la hoja `Horas` de su propia
+planilla, igual que el resto de los registros.
+
 ## Traer los datos a la app de escritorio
 
 La app web escribe en la planilla y la de escritorio trabaja con su propia base,

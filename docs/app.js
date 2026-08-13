@@ -1,16 +1,24 @@
 // ==========================================================
 // MonAgric Web — monitoreo agrícola desde el celular
 //
-// Los registros se guardan primero en el teléfono (funciona sin señal)
-// y se envían a la planilla de Google (Apps Script) cuando hay conexión.
-// El plan de la temporada se lee de temporada.json, que se genera desde
-// la app de escritorio con:  python tools/exportar_temporada.py
+// Los registros se guardan primero en el teléfono (funciona sin señal) y se
+// envían a la planilla de Google (Apps Script) cuando hay conexión.
+//
+// Dos fuentes de datos, a propósito:
+//   · catalogo.json  — cultivos, perfiles y actividades. IGUAL para todas las
+//     chacras, lo definimos nosotros: es lo que después permite comparar una
+//     chacra con otra. Se genera con  python tools/exportar_catalogo.py
+//   · Configuración  — sectores, bancales, integrantes y plan de cultivos. Los
+//     carga cada chacra desde la app y viven en la hoja Config de su planilla.
 // ==========================================================
 
 "use strict";
 
-const TIPOS_SIEMBRA = ["Siembra directa", "Siembra almácigo", "Trasplante", "Esqueje"];
-const TIPOS_BANDEJA = [72, 98, 128, 162];
+// Cada chacra escribe en su propia planilla; el servicio las reparte.
+const CHACRAS = [
+  { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
+];
+
 // Los tipos que nacen en bandeja: el formulario pide bandejas en vez de bancal.
 const EN_BANDEJA = new Set(["Siembra almácigo", "Esqueje"]);
 
@@ -26,15 +34,13 @@ const URL_HORAS_POR_DEFECTO =
 const URL_SERVICIO_POR_DEFECTO =
   "https://script.google.com/macros/s/AKfycbxCe17bpyv_sOsJAdkyKSr87kwpSnCBSejS4e913m6zmjxSHEuMxiKEVRVaa8uRt85O/exec";
 
-const ACTIVIDADES_RESPALDO = ["Planificación", "Siembra", "Trasplante", "Manejo productivo",
-                              "Cosecha y acondicionado", "Administración", "Comercialización",
-                              "Comunicación", "Mantenimiento"];
-
 // ---- Almacenamiento en el teléfono ----
 const LS = {
   pendientes: "monagric_pendientes",
   enviados: "monagric_enviados",
   nombre: "monagric_nombre",
+  chacra: "monagric_chacra",
+  config: "monagric_config",
   scriptUrl: "monagric_script_url",
   urlHoras: "monagric_url_horas",
   resumen: "monagric_resumen",
@@ -42,8 +48,6 @@ const LS = {
   ultimasHoras: "monagric_ultimas_horas",
   tareas: "monagric_tareas",
 };
-
-const IMPORTANCIAS = ["Alta", "Media", "Baja"];
 
 const leer = (k, def) => {
   try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); }
@@ -53,12 +57,19 @@ const escribir = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
 let pendientes = leer(LS.pendientes, []);
 let enviados = leer(LS.enviados, []);
-let resumen = leer(LS.resumen, null);   // totales de toda la chacra (desde la planilla)
-let TEMP = null;                        // contenido de temporada.json
+let resumen = leer(LS.resumen, null);   // totales de la chacra (desde su planilla)
+let CAT = null;                         // catálogo común (catalogo.json)
+let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
 
 const urlHoras = () => leer(LS.urlHoras, "") || URL_HORAS_POR_DEFECTO;
 const urlServicio = () => leer(LS.scriptUrl, "") || URL_SERVICIO_POR_DEFECTO;
+
+const chacraCodigo = () => leer(LS.chacra, "");
+const chacraActual = () => CHACRAS.find((c) => c.codigo === chacraCodigo()) || null;
+// Solo Chacra Tica manda las horas a la planilla del proyecto Bioma, donde está
+// el historial desde julio. Las demás las guardan en su propia hoja Horas.
+const horasVanAparte = () => !!chacraActual()?.horasAparte;
 
 // ---- Utilidades ----
 const $ = (sel) => document.querySelector(sel);
@@ -100,26 +111,38 @@ function aviso(msg, esError = false) {
   aviso._t = setTimeout(() => el.classList.add("oculto"), 3400);
 }
 
-const perfil = (cultivo) => (TEMP?.perfiles || {})[cultivo] || {};
-const enPlan = (cultivo) => (TEMP?.plan || []).find((p) => p.cultivo === cultivo);
-const sectores = () => TEMP?.sectores || [];
-const actividades = () => TEMP?.actividades || ACTIVIDADES_RESPALDO;
+// Del catálogo común (igual para todas las chacras)
+const perfil = (cultivo) => (CAT?.perfiles || {})[cultivo] || {};
+const actividades = () => CAT?.actividades || [];
+const tiposSiembra = () => CAT?.tipos_siembra || [];
+const tiposBandeja = () => CAT?.tipos_bandeja || [72, 128];
+const tiposRiego = () => CAT?.tipos_riego || ["Aspersión", "Goteo"];
+const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 
-// La lista de integrantes sale de las dos fuentes: la planilla de horas del
-// proyecto (que manda, porque es donde está el historial) y la configuración de
-// la temporada, para que alguien nuevo aparezca apenas se lo carga en la app de
-// escritorio, sin esperar a que lo agreguen a la planilla.
+// De la configuración de esta chacra
+const enPlan = (cultivo) => (CFG?.plan || []).find((p) => p.cultivo === cultivo);
+const sectores = () => CFG?.sectores || [];
+const hayConfig = () => !!(CFG && CFG.sectores?.length);
+const bancalM2 = () => {
+  const b = CFG?.bancal || {};
+  return (b.largo_m || 0) * (b.ancho_m || 0);
+};
+
+// En Chacra Tica los nombres salen también de la planilla de horas del proyecto,
+// que es donde está el historial; en las demás, solo de su configuración.
 function integrantes() {
-  const dePlanilla = leer(LS.nombresPlanilla, []);
-  const deTemporada = (TEMP?.integrantes || []).map((i) => i.nombre);
-  return [...new Set([...dePlanilla, ...deTemporada])];
+  const deConfig = CFG?.integrantes || [];
+  if (!horasVanAparte()) return [...deConfig];
+  return [...new Set([...leer(LS.nombresPlanilla, []), ...deConfig])];
 }
 
 // ---- Estado de sincronización ----
 function refrescarEstado() {
   const el = $("#estado-sync");
-  const t = TEMP?.temporada;
-  const base = t ? `Temporada ${t.nombre}` : "Sin plan de temporada";
+  const ch = chacraActual();
+  if (!ch) { el.textContent = "Elegí tu chacra para empezar"; return; }
+  const t = CFG?.temporada?.nombre;
+  const base = t ? `${ch.nombre} · ${t}` : ch.nombre;
   if (pendientes.length) el.textContent = `${base} · ${pendientes.length} por enviar`;
   else el.textContent = `${base} · al día ✓`;
 }
@@ -133,7 +156,9 @@ async function sincronizar(silencioso = true) {
   const enviadosAhora = [];
   const fallaron = [];
 
-  const horas = pendientes.filter((r) => r.tipo === "horas");
+  // Las horas de Chacra Tica van al servicio del proyecto (un registro por vez);
+  // las de las demás chacras viajan con todo lo otro a su propia planilla.
+  const horas = horasVanAparte() ? pendientes.filter((r) => r.tipo === "horas") : [];
   for (const r of horas) {
     try {
       await enviarHora(r);
@@ -144,13 +169,13 @@ async function sincronizar(silencioso = true) {
     }
   }
 
-  const otros = pendientes.filter((r) => r.tipo !== "horas");
+  const otros = pendientes.filter((r) => !horas.includes(r));
   if (otros.length) {
     try {
       const resp = await fetch(urlServicio(), {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ registros: otros }),
+        body: JSON.stringify({ chacra: chacraCodigo(), registros: otros }),
       });
       const datos = await resp.json();
       if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
@@ -172,7 +197,7 @@ async function sincronizar(silencioso = true) {
     aviso("No se pudo enviar. Revisá la señal y los Ajustes.", true);
   }
 
-  await Promise.all([traerResumen(), traerDatosHoras(), traerTareas()]);
+  await Promise.all([traerResumen(), traerDatosHoras(), traerTareas(), traerConfig()]);
   refrescarEstado();
   if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) render(vistaActual);
 }
@@ -211,24 +236,27 @@ async function traerDatosHoras() {
 async function traerResumen() {
   if (!navigator.onLine) return;
   try {
-    const r = await fetch(urlServicio() + "?resumen=1");
+    const r = await fetch(
+      `${urlServicio()}?resumen=1&chacra=${encodeURIComponent(chacraCodigo())}`);
     const d = await r.json();
     if (d.ok) { resumen = d; escribir(LS.resumen, resumen); }
   } catch { /* sin conexión: se sigue mostrando el último resumen guardado */ }
 }
 
-function guardarRegistro(tipo, datos) {
+function guardarRegistro(tipo, datos, mensaje = "Registro guardado ✓") {
+  // La configuración no se acumula: si hay una esperando, la nueva la reemplaza.
+  if (tipo === "config") pendientes = pendientes.filter((r) => r.tipo !== "config");
   pendientes.push({
     id: uid(),
     tipo,
     datos,
-    temporada: TEMP?.temporada?.nombre || "",
+    temporada: CFG?.temporada?.nombre || "",
     creado_en: ahora(),
     dispositivo: leer(LS.nombre, ""),
   });
   escribir(LS.pendientes, pendientes);
   refrescarEstado();
-  aviso("Registro guardado ✓");
+  aviso(mensaje);
   sincronizar();
 }
 
@@ -249,8 +277,8 @@ function buscador(nombre, opciones, { placeholder = "Buscá o tocá para ver la 
 }
 
 function cultivosOrdenados() {
-  const delPlan = (TEMP?.plan || []).map((p) => p.cultivo);
-  const otros = (TEMP?.cultivos || []).filter((c) => !delPlan.includes(c));
+  const delPlan = (CFG?.plan || []).map((p) => p.cultivo);
+  const otros = (CAT?.cultivos || []).filter((c) => !delPlan.includes(c));
   return { lista: [...delPlan, ...otros], delPlan };
 }
 
@@ -381,10 +409,12 @@ function barra(porcentaje, clara = false) {
 const plantillas = {
 
   inicio() {
-    if (!TEMP) return tarjetaSinPlan();
-    const t = TEMP.temporada, ch = TEMP.chacra;
-    const supPlan = TEMP.plan.reduce((a, p) => a + p.superficie_m2, 0);
-    const kgPlan = TEMP.plan.reduce((a, p) => a + p.cosecha_esperada_kg, 0);
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!hayConfig()) return tarjetaSinConfig();
+    const t = CFG.temporada || {};
+    const plan = CFG.plan || [];
+    const supPlan = plan.reduce((a, p) => a + p.superficie_m2, 0);
+    const kgPlan = plan.reduce((a, p) => a + p.cosecha_esperada_kg, 0);
     const local = totalesLocales();
     const kgLogrado = resumen ? resumen.kg_cosechados : local.kg;
     const pct = kgPlan ? (kgLogrado / kgPlan) * 100 : 0;
@@ -392,10 +422,10 @@ const plantillas = {
 
     return `
     <div class="tarjeta temporada-cab">
-      <h2>Temporada ${esc(t.nombre)}</h2>
-      <div class="chacra">${esc(ch.nombre)} · ${esc(ch.productor)}</div>
-      <div class="rango">Inicio ${fechaCorta(t.inicio)}${t.fin ? " · fin " + fechaCorta(t.fin) : ""}
-        · ${TEMP.plan.length} cultivos planificados</div>
+      <h2>Temporada ${esc(t.nombre || "sin nombre")}</h2>
+      <div class="chacra">${esc(CFG.nombre || chacraActual().nombre)}</div>
+      <div class="rango">${t.inicio ? "Inicio " + fechaCorta(t.inicio) : "Sin fecha de inicio"}${t.fin ? " · fin " + fechaCorta(t.fin) : ""}
+        · ${plan.length} cultivos planificados</div>
       <div class="cifras">
         <div class="cifra"><b>${num(supPlan)}</b><span>m² planificados</span></div>
         <div class="cifra"><b>${num(kgPlan)}</b><span>kg esperados</span></div>
@@ -404,8 +434,7 @@ const plantillas = {
       ${barra(pct, true)}
       <div class="rango" style="margin-top:6px">
         ${num(pct, 1)}% de lo esperado ·
-        ${resumen ? "datos de toda la chacra"
-                  : "solo este teléfono (conectá la planilla en Ajustes)"}
+        ${resumen ? "datos de toda la chacra" : "solo este teléfono"}
       </div>
     </div>
 
@@ -430,7 +459,8 @@ const plantillas = {
   },
 
   siembras() {
-    if (!TEMP) return tarjetaSinPlan();
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!hayConfig()) return tarjetaSinConfig();
     const yo = leer(LS.nombre, "");
     return `
     <div class="tarjeta">
@@ -455,7 +485,7 @@ const plantillas = {
 
         <label>Tipo</label>
         <select name="tipo" required>
-          ${TIPOS_SIEMBRA.map((t) => `<option${t === "Siembra almácigo" ? " selected" : ""}>${t}</option>`).join("")}
+          ${tiposSiembra().map((t) => `<option${t === "Siembra almácigo" ? " selected" : ""}>${esc(t)}</option>`).join("")}
         </select>
 
         <div id="bloque-bandejas">
@@ -467,7 +497,7 @@ const plantillas = {
             <div>
               <label>Alvéolos por bandeja</label>
               <select name="tipo_bandeja">
-                ${TIPOS_BANDEJA.map((v) => `<option>${v}</option>`).join("")}
+                ${tiposBandeja().map((v) => `<option>${v}</option>`).join("")}
               </select>
             </div>
           </div>
@@ -577,7 +607,7 @@ const plantillas = {
 
         <label>Importancia</label>
         <div class="chips">
-          ${IMPORTANCIAS.map((i) => `<label class="chip">
+          ${importancias().map((i) => `<label class="chip">
             <input type="radio" name="importancia" value="${i}"${i === "Media" ? " checked" : ""}>
             <span><span class="punto-imp imp-${i}"></span>${i}</span>
           </label>`).join("")}
@@ -626,42 +656,45 @@ const plantillas = {
   },
 
   plan() {
-    if (!TEMP) return tarjetaSinPlan();
-    const ch = TEMP.chacra;
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!hayConfig()) return tarjetaSinConfig();
+    const b = CFG.bancal || {}, m2 = bancalM2();
+    const plan = CFG.plan || [];
     const porCultivo = resumen?.kg_por_cultivo || kgLocalesPorCultivo();
     return `
     <div class="tarjeta">
-      <h2>Plan de la temporada <small>${TEMP.plan.length} cultivos</small></h2>
-      ${TEMP.plan.map((p) => {
+      <h2>Plan de la temporada <small>${plan.length} cultivos</small></h2>
+      ${plan.length ? plan.map((p) => {
         const logrado = porCultivo[p.cultivo] || 0;
         const pct = p.cosecha_esperada_kg ? (logrado / p.cosecha_esperada_kg) * 100 : 0;
-        const bancales = ch.bancal_m2 ? p.superficie_m2 / ch.bancal_m2 : 0;
+        const perf = perfil(p.cultivo);
         return `<div class="plan-fila">
           <div class="plan-cab">
             <b>${esc(p.cultivo)}</b>
             <span>${num(logrado)} / ${num(p.cosecha_esperada_kg)} kg</span>
           </div>
           <div class="plan-detalle">
-            ${num(p.superficie_m2)} m² (${num(bancales, 1)} bancales) ·
-            ${esc(p.tipo_siembra)} · ${num(p.lineas)} líneas a ${num(p.distancia_cm)} cm ·
-            ${num(p.plantas)} plantas
+            ${num(p.superficie_m2)} m²${m2 ? ` (${num(p.superficie_m2 / m2, 1)} bancales)` : ""}
+            ${perf.tipo_siembra ? ` · ${esc(perf.tipo_siembra)}` : ""}
+            ${perf.lineas_bancal ? ` · ${num(perf.lineas_bancal)} líneas a ${num(perf.distancia_cm)} cm` : ""}
+            ${perf.dias_a_cosecha ? ` · ${perf.dias_a_cosecha} días a cosecha` : ""}
           </div>
           ${barra(pct)}
         </div>`;
-      }).join("")}
+      }).join("") : `<p class="nota">Todavía no hay cultivos planificados.</p>`}
     </div>
 
     <div class="tarjeta">
       <h2>Sectores de riego</h2>
-      ${TEMP.sectores.map((s) => `<div class="registro">
+      ${sectores().map((s) => `<div class="registro">
         <div><div class="detalle">Sector ${esc(s.sector)}</div>
           <div class="cuando">${esc(s.tipo_riego)}</div></div>
         <span class="etiqueta ok">${s.bancales} bancales</span>
       </div>`).join("")}
       <p class="nota" style="margin-top:10px">
-        Bancal de ${num(ch.largo_bancal_m, 1)} × ${num(ch.ancho_bancal_m, 1)} m
-        (${num(ch.bancal_m2, 1)} m²) · pasillo ${num(ch.pasillo_m, 1)} m ·
-        ${num(ch.n_bancales)} bancales en la chacra
+        Bancal de ${num(b.largo_m, 1)} × ${num(b.ancho_m, 1)} m (${num(m2, 1)} m²)
+        ${b.pasillo_m ? ` · pasillo ${num(b.pasillo_m, 1)} m` : ""}
+        · ${num(b.n_bancales)} bancales en total
       </p>
     </div>
 
@@ -670,10 +703,140 @@ const plantillas = {
       <div class="chips-nombres">
         ${integrantes().map((n) => `<span class="chip-nombre">${esc(n)}</span>`).join("")}
       </div>
-      <p class="nota" style="margin-top:10px">
-        El plan se actualiza desde la app de escritorio con
-        <code>python tools/exportar_temporada.py</code>.
-      </p>
+    </div>
+
+    <div class="tarjeta">
+      <button class="secundario" id="btn-ir-config">Editar la configuración</button>
+      <p class="nota" style="margin-top:8px">Todo esto se carga y se corrige desde el
+      teléfono. Los cultivos disponibles son los mismos para todas las chacras, para
+      que después se puedan comparar.</p>
+    </div>`;
+  },
+
+  // Cada chacra carga acá lo suyo. Los cultivos NO se editan: salen del catálogo
+  // común, que es lo que después permite comparar entre chacras.
+  configuracion() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    const c = CFG || {};
+    const t = c.temporada || {};
+    const b = c.bancal || {};
+    const plan = c.plan || [];
+    const equipo = c.integrantes || [];
+    const secs = c.sectores || [];
+
+    return `
+    <div class="tarjeta">
+      <h2>&#127962; La chacra y la temporada</h2>
+      <form id="form-config-general">
+        <label>Nombre de la chacra</label>
+        <input type="text" name="nombre" value="${esc(c.nombre || chacraActual().nombre)}"
+               maxlength="60" required>
+
+        <div class="fila">
+          <div>
+            <label>Temporada</label>
+            <input type="text" name="temporada" value="${esc(t.nombre || "")}"
+                   placeholder="Ej: 2026-27" maxlength="20" required>
+          </div>
+          <div>
+            <label>Empieza el</label>
+            <input type="date" name="inicio" value="${esc(t.inicio || "")}">
+          </div>
+        </div>
+
+        <h3 class="sub">Medidas del bancal</h3>
+        <div class="fila">
+          <div>
+            <label>Largo (m)</label>
+            <input type="text" name="largo" inputmode="decimal" value="${b.largo_m || ""}"
+                   placeholder="Ej: 30">
+          </div>
+          <div>
+            <label>Ancho (m)</label>
+            <input type="text" name="ancho" inputmode="decimal" value="${b.ancho_m || ""}"
+                   placeholder="Ej: 1">
+          </div>
+          <div>
+            <label>Pasillo (m)</label>
+            <input type="text" name="pasillo" inputmode="decimal" value="${b.pasillo_m || ""}"
+                   placeholder="Ej: 0,6">
+          </div>
+        </div>
+        <div class="calculo" id="calculo-bancal"></div>
+
+        <button class="principal">Guardar</button>
+      </form>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Sectores <small>${secs.length}</small></h2>
+      <p class="nota">Cada sector con cuántos bancales tiene. Es lo que aparece
+      después al cargar siembras y cosechas.</p>
+      <div id="lista-sectores">
+        ${secs.length ? secs.map((s, i) => filaSector(s, i)).join("")
+                      : `<p class="nota">Todavía no cargaste ninguno.</p>`}
+      </div>
+      <form id="form-sector" class="alta">
+        <div class="fila">
+          <div>
+            <label>Sector</label>
+            <input type="text" name="sector" maxlength="12" placeholder="Ej: A" required>
+          </div>
+          <div>
+            <label>Bancales</label>
+            <input type="number" name="bancales" min="1" max="200" value="10" required>
+          </div>
+          <div>
+            <label>Riego</label>
+            <select name="tipo_riego">
+              ${tiposRiego().map((r) => `<option>${esc(r)}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <button class="secundario">Agregar sector</button>
+      </form>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Quiénes trabajan <small>${equipo.length}</small></h2>
+      <div class="chips-nombres" id="lista-integrantes">
+        ${equipo.length ? equipo.map((n) => `<span class="chip-nombre">${esc(n)}
+            <button type="button" class="quitar" data-integrante="${esc(n)}"
+                    aria-label="Quitar">&times;</button></span>`).join("")
+                        : `<p class="nota">Todavía no cargaste a nadie.</p>`}
+      </div>
+      <form id="form-integrante" class="alta">
+        <label>Nombre</label>
+        <input type="text" name="nombre" maxlength="40" placeholder="Ej: Marto" required>
+        <button class="secundario">Agregar</button>
+      </form>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Plan de cultivos <small>${plan.length}</small></h2>
+      <p class="nota">Cuánta superficie le vas a dar a cada cultivo y cuántos kilos
+      esperás. Los cultivos salen de una lista común a todas las chacras: si falta
+      alguno, escribime y lo agregamos.</p>
+      <div id="lista-plan">
+        ${plan.length ? plan.map((p, i) => filaPlan(p, i)).join("")
+                      : `<p class="nota">Todavía no planificaste ningún cultivo.</p>`}
+      </div>
+      <form id="form-plan" class="alta">
+        <label>Cultivo</label>
+        ${buscador("cultivo", (CAT?.cultivos || []), { placeholder: "Buscá el cultivo…" })}
+        <div class="fila">
+          <div>
+            <label>Superficie (m²)</label>
+            <input type="text" name="superficie" inputmode="decimal" placeholder="Ej: 150" required>
+          </div>
+          <div>
+            <label>Kg esperados</label>
+            <input type="text" name="kg" inputmode="decimal" placeholder="Ej: 720" required>
+          </div>
+        </div>
+        <div class="calculo" id="calculo-plan"></div>
+        <button class="secundario">Agregar al plan</button>
+      </form>
     </div>`;
   },
 
@@ -681,6 +844,15 @@ const plantillas = {
     return `
     <div class="tarjeta">
       <h2>&#9881; Ajustes</h2>
+      <label>Chacra</label>
+      <select id="aj-chacra">
+        <option value="" disabled${chacraCodigo() ? "" : " selected"}>Elegí tu chacra…</option>
+        ${CHACRAS.map((c) => `<option value="${esc(c.codigo)}"${c.codigo === chacraCodigo() ? " selected" : ""}>
+          ${esc(c.nombre)}</option>`).join("")}
+      </select>
+      <p class="nota" style="margin-top:6px">Cambiarla hace que los registros vayan a
+      la planilla de otra chacra. Se elige una vez y no se toca más.</p>
+
       <label>Tu nombre (queda en cada registro que cargues)</label>
       <select id="aj-nombre">${opcionesIntegrante(leer(LS.nombre, ""))}</select>
 
@@ -703,18 +875,52 @@ const plantillas = {
       <p class="nota">MonAgric — monitoreo agrícola para emprendimientos agroecológicos.
       Los registros se guardan en este teléfono (funciona sin señal) y se envían a la
       planilla de la chacra cuando hay conexión.</p>
-      <p class="nota" style="margin-top:8px">Plan cargado: ${TEMP
-        ? `temporada ${esc(TEMP.temporada.nombre)}, generado ${fechaCorta((TEMP.generado || "").slice(0, 10))}`
-        : "ninguno"}.</p>
+      <p class="nota" style="margin-top:8px">
+        Chacra: ${esc(chacraActual()?.nombre || "sin elegir")} ·
+        ${hayConfig() ? `temporada ${esc(CFG.temporada?.nombre || "")},
+          ${(CFG.plan || []).length} cultivos` : "sin configurar"} ·
+        catálogo de ${(CAT?.cultivos || []).length} cultivos.</p>
     </div>`;
   },
 };
 
-function tarjetaSinPlan() {
+const filaSector = (s, i) => `<div class="registro">
+  <div><div class="detalle">Sector ${esc(s.sector)}</div>
+    <div class="cuando">${esc(s.tipo_riego || "sin riego indicado")}</div></div>
+  <span class="etiqueta ok">${s.bancales} bancales</span>
+  <button type="button" class="quitar" data-sector="${i}" aria-label="Quitar">&times;</button>
+</div>`;
+
+const filaPlan = (p, i) => {
+  const b = bancalM2();
+  return `<div class="registro">
+    <div><div class="detalle">${esc(p.cultivo)}</div>
+      <div class="cuando">${num(p.superficie_m2)} m²${b ? ` · ${num(p.superficie_m2 / b, 1)} bancales` : ""}</div></div>
+    <span class="etiqueta ok">${num(p.cosecha_esperada_kg)} kg</span>
+    <button type="button" class="quitar" data-plan="${i}" aria-label="Quitar">&times;</button>
+  </div>`;
+};
+
+function tarjetaElegirChacra() {
   return `<div class="tarjeta">
-    <h2>Falta el plan de la temporada</h2>
-    <p class="nota">No se pudo leer <code>temporada.json</code>. Generalo desde la app de
-    escritorio con <code>python tools/exportar_temporada.py</code> y subilo junto a la app.</p>
+    <h2>¿De qué chacra sos?</h2>
+    <p class="nota">Se elige una sola vez en este teléfono. Cada chacra guarda sus
+    datos en su propia planilla.</p>
+    <div class="chips" style="margin-top:12px">
+      ${CHACRAS.map((c) => `<button type="button" class="chip-chacra" data-chacra="${esc(c.codigo)}">
+        ${esc(c.nombre)}</button>`).join("")}
+    </div>
+  </div>`;
+}
+
+function tarjetaSinConfig() {
+  return `<div class="tarjeta">
+    <h2>Falta configurar la temporada</h2>
+    <p class="nota">Antes de empezar hay que cargar los sectores, los bancales, quiénes
+    trabajan y qué se planifica sembrar. Se hace una vez y se puede corregir cuando
+    quieras.</p>
+    <button class="principal" id="btn-ir-config" style="margin-top:12px">
+      Configurar la temporada</button>
   </div>`;
 }
 
@@ -781,12 +987,31 @@ function render(vista) {
     t.classList.toggle("activa", t.dataset.vista === vista));
 
   ({ siembras: prepararSiembras, horas: prepararHoras, cosechas: prepararCosechas,
-     tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes
+     tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes,
+     configuracion: prepararConfiguracion, plan: prepararInicio
    }[vista] || (() => {}))();
+
+  prepararComunes();
 
   // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
   const activa = document.querySelector(".tabs-medio .tab.activa");
   if (activa) activa.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+}
+
+// Botones que pueden aparecer en cualquier vista.
+function prepararComunes() {
+  document.querySelectorAll(".chip-chacra").forEach((b) => {
+    b.onclick = () => {
+      escribir(LS.chacra, b.dataset.chacra);
+      CFG = null;
+      escribir(LS.config, null);
+      refrescarEstado();
+      render("configuracion");
+      sincronizar();
+    };
+  });
+  const irConfig = $("#btn-ir-config");
+  if (irConfig) irConfig.onclick = () => render("configuracion");
 }
 
 function prepararInicio() {
@@ -868,6 +1093,140 @@ function prepararSiembras() {
   };
 }
 
+// ---- Configuración de la chacra ----
+// Se guarda entera cada vez: la app manda la configuración completa y el
+// servicio reescribe la hoja Config. Así no hay estados a medias.
+function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
+  CFG = Object.assign({
+    nombre: chacraActual()?.nombre || "", temporada: {}, bancal: {},
+    sectores: [], integrantes: [], plan: [],
+  }, CFG || {}, cambios);
+  escribir(LS.config, CFG);
+  guardarRegistro("config", CFG, mensaje);
+  render("configuracion");
+}
+
+function prepararConfiguracion() {
+  const general = $("#form-config-general");
+  if (!general) return;
+
+  const calculoBancal = $("#calculo-bancal");
+  const verBancal = () => {
+    const m2 = aNumero(general.largo.value) * aNumero(general.ancho.value);
+    calculoBancal.innerHTML = m2 > 0
+      ? `Cada bancal mide <b>${num(m2, 1)} m²</b>`
+      : "Cargá largo y ancho para ver la superficie del bancal.";
+  };
+  general.addEventListener("input", verBancal);
+  verBancal();
+
+  general.onsubmit = (e) => {
+    e.preventDefault();
+    guardarConfig({
+      nombre: general.nombre.value.trim(),
+      temporada: { nombre: general.temporada.value.trim(), inicio: general.inicio.value, fin: "" },
+      bancal: {
+        largo_m: aNumero(general.largo.value) || 0,
+        ancho_m: aNumero(general.ancho.value) || 0,
+        pasillo_m: aNumero(general.pasillo.value) || 0,
+        n_bancales: (CFG?.sectores || []).reduce((a, s) => a + (s.bancales || 0), 0),
+      },
+    });
+  };
+
+  // ---- sectores
+  const fSector = $("#form-sector");
+  fSector.onsubmit = (e) => {
+    e.preventDefault();
+    const nombre = fSector.sector.value.trim().toUpperCase();
+    if (!nombre) return aviso("Ponele un nombre al sector.", true);
+    const secs = [...(CFG?.sectores || [])];
+    if (secs.some((s) => s.sector === nombre)) return aviso(`El sector ${nombre} ya está.`, true);
+    secs.push({ sector: nombre, bancales: parseInt(fSector.bancales.value, 10) || 1,
+                tipo_riego: fSector.tipo_riego.value });
+    secs.sort((a, b) => a.sector.localeCompare(b.sector));
+    guardarConfig({ sectores: secs, bancal: Object.assign({}, CFG?.bancal,
+      { n_bancales: secs.reduce((a, s) => a + s.bancales, 0) }) }, `Sector ${nombre} agregado ✓`);
+  };
+
+  // ---- integrantes
+  const fInt = $("#form-integrante");
+  fInt.onsubmit = (e) => {
+    e.preventDefault();
+    const nombre = fInt.nombre.value.trim();
+    if (!nombre) return;
+    const equipo = [...(CFG?.integrantes || [])];
+    if (equipo.includes(nombre)) return aviso(`${nombre} ya está en la lista.`, true);
+    equipo.push(nombre);
+    guardarConfig({ integrantes: equipo }, `${nombre} agregado ✓`);
+  };
+
+  // ---- plan de cultivos
+  const fPlan = $("#form-plan");
+  enlazarBuscadores(fPlan);
+  const calculoPlan = $("#calculo-plan");
+  const verPlan = () => {
+    const sup = aNumero(fPlan.superficie.value);
+    const b = bancalM2();
+    const p = perfil(fPlan.cultivo.value);
+    const partes = [];
+    if (sup > 0 && b > 0) partes.push(`<b>${num(sup / b, 1)}</b> bancales`);
+    if (sup > 0 && p.rinde_ref_kg_m2) {
+      partes.push(`referencia: <b>${num(sup * p.rinde_ref_kg_m2)} kg</b>`);
+    }
+    if (p.dias_a_cosecha) partes.push(`${p.dias_a_cosecha} días a cosecha`);
+    calculoPlan.innerHTML = partes.length ? partes.join(" · ")
+      : "Elegí el cultivo y la superficie para ver la referencia.";
+  };
+  fPlan.addEventListener("input", verPlan);
+  fPlan.addEventListener("change", verPlan);
+  verPlan();
+
+  fPlan.onsubmit = (e) => {
+    e.preventDefault();
+    const cultivo = fPlan.cultivo.value;
+    if (!cultivo) return aviso("Elegí el cultivo.", true);
+    const sup = aNumero(fPlan.superficie.value), kg = aNumero(fPlan.kg.value);
+    if (!(sup > 0)) return aviso("La superficie tiene que ser mayor a cero.", true);
+    const plan = [...(CFG?.plan || [])].filter((p) => p.cultivo !== cultivo);
+    plan.push({ cultivo, superficie_m2: sup, cosecha_esperada_kg: kg > 0 ? kg : 0 });
+    plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
+    guardarConfig({ plan }, `${cultivo} agregado al plan ✓`);
+  };
+
+  // ---- quitar cosas
+  document.querySelectorAll(".quitar").forEach((b) => {
+    b.onclick = () => {
+      if (b.dataset.sector !== undefined) {
+        const secs = (CFG.sectores || []).filter((_, i) => i !== Number(b.dataset.sector));
+        guardarConfig({ sectores: secs }, "Sector quitado");
+      } else if (b.dataset.plan !== undefined) {
+        const plan = (CFG.plan || []).filter((_, i) => i !== Number(b.dataset.plan));
+        guardarConfig({ plan }, "Cultivo quitado del plan");
+      } else if (b.dataset.integrante) {
+        const equipo = (CFG.integrantes || []).filter((n) => n !== b.dataset.integrante);
+        guardarConfig({ integrantes: equipo }, "Integrante quitado");
+      }
+    };
+  });
+}
+
+// Trae del servicio la configuración de esta chacra.
+async function traerConfig() {
+  if (!chacraCodigo() || !navigator.onLine) return;
+  try {
+    const d = await (await fetch(
+      `${urlServicio()}?config=1&chacra=${encodeURIComponent(chacraCodigo())}`)).json();
+    // Si hay cosas esperando enviarse, lo del teléfono es más nuevo: no se pisa.
+    if (d.ok && d.config && !pendientes.some((r) => r.tipo === "config")) {
+      if (d.config.sectores?.length || d.config.plan?.length) {
+        CFG = d.config;
+        escribir(LS.config, CFG);
+      }
+    }
+  } catch { /* sin conexión: se usa la última configuración guardada */ }
+}
+
 // ---- Tareas ----
 // Se juntan las que ya están en la planilla con las que se cargaron en este
 // teléfono y todavía no viajaron, y se aplican las marcas de "hecha" que están
@@ -944,7 +1303,8 @@ function prepararTareas() {
 async function traerTareas() {
   if (!navigator.onLine) return;
   try {
-    const d = await (await fetch(urlServicio() + "?tareas=1")).json();
+    const d = await (await fetch(
+      `${urlServicio()}?tareas=1&chacra=${encodeURIComponent(chacraCodigo())}`)).json();
     if (Array.isArray(d.tareas)) escribir(LS.tareas, d.tareas);
   } catch { /* sin conexión: se usa la última lista guardada */ }
 }
@@ -978,7 +1338,7 @@ function prepararCosechas() {
 
   const actualizar = () => {
     const kg = aNumero(f.kg.value);
-    const m2 = TEMP?.chacra?.bancal_m2 || 0;
+    const m2 = bancalM2();
     if (!kg || !m2) { calculo.innerHTML = "Cargá los kilos para ver el rinde del bancal."; return; }
     const rinde = kg / m2;
     const ref = perfil(f.cultivo.value).rinde_ref_kg_m2 || 0;
@@ -1011,6 +1371,15 @@ function prepararAjustes() {
   const esScript = (u) => !u || u.startsWith("https://script.google.com/");
 
   $("#btn-guardar-ajustes").onclick = () => {
+    const nuevaChacra = $("#aj-chacra").value;
+    if (nuevaChacra && nuevaChacra !== chacraCodigo()) {
+      escribir(LS.chacra, nuevaChacra);
+      CFG = null;
+      escribir(LS.config, null);
+      escribir(LS.tareas, []);
+      resumen = null;
+      escribir(LS.resumen, null);
+    }
     escribir(LS.nombre, $("#aj-nombre").value);
     const url = $("#aj-url").value.trim();
     const urlH = $("#aj-url-horas").value.trim();
@@ -1051,13 +1420,17 @@ $("#btn-ajustes").addEventListener("click", () => render("ajustes"));
 window.addEventListener("online", () => sincronizar());
 
 (async function iniciar() {
+  // El catálogo es igual para todas las chacras y viaja con la app.
   try {
-    const r = await fetch("temporada.json", { cache: "no-cache" });
-    if (r.ok) TEMP = await r.json();
-  } catch { /* sin plan: la app avisa y sigue permitiendo cargar horas */ }
-  render("inicio");
+    const r = await fetch("catalogo.json", { cache: "no-cache" });
+    if (r.ok) CAT = await r.json();
+  } catch { /* sin catálogo la app igual arranca, con las listas vacías */ }
+
+  render(chacraActual() ? "inicio" : "inicio");
   refrescarEstado();
-  await traerDatosHoras();     // nombres del equipo antes del primer formulario
+  if (horasVanAparte()) await traerDatosHoras();   // nombres del equipo del proyecto
+  await traerConfig();
+  if (["inicio", "plan"].includes(vistaActual)) render(vistaActual);
   sincronizar();
 })();
 

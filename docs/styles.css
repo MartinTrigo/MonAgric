@@ -273,6 +273,45 @@ button.secundario {
   font-weight: 600;
 }
 
+.chip-nombre .quitar,
+.registro .quitar {
+  border: none;
+  background: none;
+  color: var(--tenue);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0 2px 0 8px;
+  cursor: pointer;
+}
+.chip-nombre .quitar:active,
+.registro .quitar:active { color: #c0392b; }
+
+/* ---- configuración ---- */
+h3.sub {
+  font-size: .88rem;
+  color: var(--sage-dark);
+  margin: 18px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sage-suave);
+}
+form.alta {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sage-light);
+}
+.chip-chacra {
+  border: 1.5px solid var(--sage);
+  background: #fff;
+  color: var(--sage-dark);
+  border-radius: 22px;
+  padding: 11px 20px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chip-chacra:active { background: var(--sage-suave); }
+
 /* ---- buscador de listas largas (cultivos) ---- */
 .buscador { position: relative; }
 .buscador-lista {

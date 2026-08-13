@@ -3,13 +3,13 @@
 // Estrategia "red primero, caché de respaldo": con señal siempre se usa la
 // última versión publicada (así las mejoras llegan solas a los celulares) y sin
 // señal se sirve la última copia guardada, que es lo que importa en el campo.
-const CACHE = "monagric-v3";
+const CACHE = "monagric-v4";
 const ARCHIVOS = [
   ".",
   "index.html",
   "styles.css",
   "app.js",
-  "temporada.json",
+  "catalogo.json",
   "manifest.webmanifest",
   "img/icon-192.png",
   "img/icon-512.png",
