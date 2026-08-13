@@ -176,13 +176,10 @@ var CONFIG_COLS = CONFIG_ENCABEZADOS.length;
 
 function hojaConfig(libro) {
   var hoja = libro.getSheetByName("Config");
-  if (!hoja) {
-    hoja = libro.insertSheet("Config");
-    hoja.appendRow(CONFIG_ENCABEZADOS);
-    hoja.getRange(1, 1, 1, CONFIG_ENCABEZADOS.length)
-        .setFontWeight("bold").setBackground("#DCE9DD");
-    hoja.setFrozenRows(1);
-  }
+  if (!hoja) hoja = libro.insertSheet("Config");
+  // El encabezado se rehace siempre: la configuracion se reescribe entera, asi
+  // que no hay datos que se puedan correr de lugar.
+  ponerEncabezados(hoja, CONFIG_ENCABEZADOS);
   return hoja;
 }
 
@@ -386,12 +383,27 @@ function obtenerHoja(libro, def) {
   var hoja = libro.getSheetByName(def.nombre);
   if (!hoja) {
     hoja = libro.insertSheet(def.nombre);
-    hoja.appendRow(def.encabezados);
-    hoja.getRange(1, 1, 1, def.encabezados.length).setFontWeight("bold").setBackground("#DCE9DD");
-    hoja.setFrozenRows(1);
+    ponerEncabezados(hoja, def.encabezados);
     hoja.autoResizeColumns(1, def.encabezados.length);
+    return hoja;
+  }
+  // Si las columnas cambiaron y la hoja todavia no tiene datos, se rehace el
+  // encabezado: si no, las filas nuevas entrarian corridas de lugar.
+  if (hoja.getLastRow() <= 1) {
+    var actuales = hoja.getLastColumn()
+      ? hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0].join("|") : "";
+    if (actuales !== def.encabezados.join("|")) {
+      hoja.clear();
+      ponerEncabezados(hoja, def.encabezados);
+    }
   }
   return hoja;
+}
+
+function ponerEncabezados(hoja, encabezados) {
+  hoja.getRange(1, 1, 1, encabezados.length).setValues([encabezados])
+      .setFontWeight("bold").setBackground("#DCE9DD");
+  hoja.setFrozenRows(1);
 }
 
 function idsExistentes(hoja) {
