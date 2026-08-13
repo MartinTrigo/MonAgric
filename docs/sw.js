@@ -1,6 +1,9 @@
 // MonAgric — service worker: deja la app usable sin conexión.
-// Cachea el "cascarón" (HTML/CSS/JS/plan/íconos); los datos viajan aparte.
-const CACHE = "monagric-v2";
+//
+// Estrategia "red primero, caché de respaldo": con señal siempre se usa la
+// última versión publicada (así las mejoras llegan solas a los celulares) y sin
+// señal se sirve la última copia guardada, que es lo que importa en el campo.
+const CACHE = "monagric-v3";
 const ARCHIVOS = [
   ".",
   "index.html",
@@ -27,24 +30,19 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;                       // los envíos no se cachean
+  if (e.request.method !== "GET") return;                  // los envíos no se cachean
   const url = new URL(e.request.url);
-  if (url.origin !== self.location.origin) return;              // la planilla siempre va a la red
+  if (url.origin !== self.location.origin) return;         // las planillas van siempre a la red
 
-  // El plan de la temporada cambia: se busca primero en la red y, si no hay
-  // señal, se usa la copia guardada.
-  if (url.pathname.endsWith("temporada.json")) {
-    e.respondWith(
-      fetch(e.request)
-        .then((resp) => {
+  e.respondWith(
+    fetch(e.request)
+      .then((resp) => {
+        if (resp.ok) {
           const copia = resp.clone();
           caches.open(CACHE).then((c) => c.put(e.request, copia));
-          return resp;
-        })
-        .catch(() => caches.match(e.request))
-    );
-    return;
-  }
-
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+        }
+        return resp;
+      })
+      .catch(() => caches.match(e.request).then((hit) => hit || caches.match("index.html")))
+  );
 });

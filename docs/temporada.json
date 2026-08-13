@@ -1,5 +1,5 @@
 {
-  "generado": "2026-08-12T23:49:11",
+  "generado": "2026-08-13T00:21:44",
   "temporada": {
     "nombre": "2026-27",
     "inicio": "2026-07-07",
@@ -287,11 +287,11 @@
   ],
   "integrantes": [
     {
-      "nombre": "Gonza",
-      "rol": "Encargado"
+      "nombre": "Belu",
+      "rol": "Administrador"
     },
     {
-      "nombre": "Juanfra",
+      "nombre": "Luis",
       "rol": "Operario"
     },
     {
@@ -299,9 +299,28 @@
       "rol": "Administrador"
     },
     {
-      "nombre": "Martín",
+      "nombre": "Marto",
+      "rol": "Administrador"
+    },
+    {
+      "nombre": "Nati",
+      "rol": "Operario"
+    },
+    {
+      "nombre": "Tomi",
       "rol": "Administrador"
     }
+  ],
+  "actividades": [
+    "Planificación",
+    "Siembra",
+    "Trasplante",
+    "Manejo productivo",
+    "Cosecha y acondicionado",
+    "Administración",
+    "Comercialización",
+    "Comunicación",
+    "Mantenimiento"
   ],
   "cultivos": [
     "Acelga",

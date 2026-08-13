@@ -176,8 +176,11 @@ DEFAULT_PASILLO_M = 0.5
 
 TIPOS_RIEGO = ["Aspersión", "Goteo", "Surco", "Superficie"]
 
-ACTIVIDADES_TRABAJO = ["Siembras", "Trasplantes", "Cosecha y poscosecha", "Desyuyes",
-                       "Poda", "Conducción", "Aplicaciones"]
+# Las mismas actividades que usa la planilla de horas del proyecto, para que los
+# registros cargados desde el celular y desde la PC sean comparables.
+ACTIVIDADES_TRABAJO = ["Planificación", "Siembra", "Trasplante", "Manejo productivo",
+                       "Cosecha y acondicionado", "Administración", "Comercialización",
+                       "Comunicación", "Mantenimiento"]
 ROLES_INTEGRANTE = ["Administrador", "Encargado", "Operario", "Otro"]
 
 # ============================================================================

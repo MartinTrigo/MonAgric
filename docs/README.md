@@ -17,6 +17,9 @@ Ya está creada en tu Drive:
 [**MonAgric Datos 2026-27**](https://docs.google.com/spreadsheets/d/1PrP0FDXG-45iSYWwx8osn5tgVaxiBgbbBDOf8PC7uYQ/edit).
 Las pestañas (Siembras, Horas, Cosechas) se crean solas con el primer registro.
 
+> Esto es solo para **siembras y cosechas**. Las horas ya funcionan: van a la
+> planilla del proyecto, que tiene su propio servicio publicado desde julio.
+
 ### Paso 2 — Publicar el servicio (Apps Script)
 
 1. Abrí la planilla y andá a **Extensiones → Apps Script**.
@@ -50,9 +53,25 @@ carpeta `docs/` de la rama `main`; se actualiza sola con cada `git push`).
 |---|---|
 | **Inicio** | Temporada activa, m² y kg planificados, y cuánto se lleva cosechado |
 | **Siembras** | Fecha, cultivo, variedad, tipo, generación, bandejas o sector/bancal |
-| **Horas** | Quién trabajó, cuántas horas y en qué actividades |
+| **Horas** | Quién trabajó, cuántas horas y en qué actividad |
 | **Cosechas** | Kilos por cultivo y bancal, con el rinde en kg/m² |
 | **Plan** | Los 28 cultivos planificados, sectores de riego e integrantes |
+
+## Las horas van a la planilla de siempre
+
+La sección de horas reemplaza a la app **bioma-horas**: escribe en la **misma
+planilla** del proyecto ([Registro_Horas_Proyecto_Bioma_T26-27](https://docs.google.com/spreadsheets/d/1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg/edit)),
+con las mismas columnas y a través del mismo servicio de Apps Script. El
+historial cargado desde julio sigue intacto y las filas nuevas se suman abajo,
+sin importar si se cargaron desde la app vieja o desde MonAgric.
+
+Por eso **la sección de horas funciona desde el primer momento**, sin configurar
+nada: la dirección del servicio ya viene puesta.
+
+**La lista de nombres sale de esa planilla**, de la pestaña `Config` (columna A),
+y se completa con los integrantes de la temporada. Para sacar a alguien del
+desplegable hay que borrarlo de esa pestaña; para sumar a alguien alcanza con
+cargarlo en la app de escritorio y volver a exportar la temporada.
 
 En siembras de almácigo la app calcula **los plantines** (bandejas × alvéolos) y
 estima la **fecha de trasplante y de cosecha** según el perfil del cultivo. En

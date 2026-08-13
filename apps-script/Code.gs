@@ -1,13 +1,20 @@
 // ==========================================================
 // MonAgric — servicio Apps Script
 //
-// Recibe los registros de la app web y los escribe en esta planilla de
-// Google Sheets (una pestaña por tipo de registro). Además devuelve el
-// resumen de la temporada (lo logrado por toda la chacra) para que la app
-// pueda comparar lo planificado con lo cosechado.
+// Recibe las siembras y cosechas de la app web y las escribe en esta planilla
+// (una pestaña por tipo). Ademas devuelve el resumen de la temporada —lo
+// logrado por toda la chacra— para que la app compare el plan con lo cosechado.
+//
+// Las horas NO pasan por aca: siguen yendo a la planilla del proyecto, la misma
+// desde julio. Este servicio solo la lee para sumar las horas al resumen.
 //
 // Cómo publicarlo: ver web/README.md (paso 2).
 // ==========================================================
+
+// Las horas del proyecto se cargan en su propia planilla desde julio (la que
+// usaba la app bioma-horas) y ahi siguen. Este servicio solo la lee para el
+// resumen; si se deja vacio, el resumen no informa horas.
+var PLANILLA_HORAS_ID = "1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg";
 
 var HOJAS = {
   siembras: {
@@ -22,16 +29,6 @@ var HOJAS = {
               d.bandejas || "", d.tipo_bandeja || "", d.plantines || "", d.sector || "", d.bancal || "",
               d.trasplante_estimado || "", d.cosecha_estimada || "", d.operador || "",
               d.observaciones || "", r.dispositivo || "", new Date()];
-    },
-  },
-  horas: {
-    nombre: "Horas",
-    encabezados: ["Id", "Temporada", "Fecha", "Integrante", "Horas", "Actividades", "Detalle",
-                  "Cargado por", "Recibido"],
-    fila: function (r) {
-      var d = r.datos;
-      return [r.id, r.temporada || "", d.fecha, d.integrante, d.horas, d.actividades || "",
-              d.detalle || "", r.dispositivo || "", new Date()];
     },
   },
   cosechas: {
@@ -125,21 +122,37 @@ function calcularResumen() {
     s.forEach(function (f) { res.plantines += Number(f[0]) || 0; });
   }
 
-  var horas = libro.getSheetByName("Horas");
-  if (horas && horas.getLastRow() > 1) {
-    // Columnas: 4 = Integrante, 5 = Horas
-    var h = horas.getRange(2, 4, horas.getLastRow() - 1, 2).getValues();
-    h.forEach(function (f) {
-      var n = Number(f[1]) || 0;
-      res.horas += n;
-      res.horas_por_integrante[f[0]] = (res.horas_por_integrante[f[0]] || 0) + n;
-    });
-  }
+  sumarHorasDelProyecto(res);
 
   res.kg_cosechados = Math.round(res.kg_cosechados * 100) / 100;
   res.horas = Math.round(res.horas * 100) / 100;
   cache.put("resumen", JSON.stringify(res), 300);   // 5 minutos
   return res;
+}
+
+// Lee la planilla de horas del proyecto (columnas: Marca temporal, Fecha,
+// Trabajador, Horas, Actividad, Observaciones) y suma los totales.
+function sumarHorasDelProyecto(res) {
+  if (!PLANILLA_HORAS_ID) return;
+  try {
+    var hojas = SpreadsheetApp.openById(PLANILLA_HORAS_ID).getSheets();
+    var hoja = null;
+    for (var i = 0; i < hojas.length; i++) {
+      if (hojas[i].getName().indexOf("Respuestas de formulario") === 0) { hoja = hojas[i]; break; }
+    }
+    if (!hoja || hoja.getLastRow() < 2) return;
+
+    var filas = hoja.getRange(2, 3, hoja.getLastRow() - 1, 2).getValues();  // Trabajador, Horas
+    filas.forEach(function (f) {
+      var quien = String(f[0]).trim();
+      var n = Number(f[1]) || 0;
+      if (!quien || !n) return;
+      res.horas += n;
+      res.horas_por_integrante[quien] = (res.horas_por_integrante[quien] || 0) + n;
+    });
+  } catch (err) {
+    res.horas_error = String(err);   // la planilla no se pudo abrir: el resto sigue
+  }
 }
 
 // ---------- Auxiliares ----------

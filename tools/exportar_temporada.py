@@ -21,6 +21,12 @@ RAIZ = Path(__file__).resolve().parent.parent
 DB_PATH = RAIZ / "monagric.sqlite3"
 SALIDA = RAIZ / "docs" / "temporada.json"
 
+# Las actividades de trabajo viven en la app de escritorio: se copian aca para no
+# tener que importarla (arrastraria todo Kivy solo para leer una lista).
+ACTIVIDADES_TRABAJO = ["Planificación", "Siembra", "Trasplante", "Manejo productivo",
+                       "Cosecha y acondicionado", "Administración", "Comercialización",
+                       "Comunicación", "Mantenimiento"]
+
 
 def conectar() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -129,6 +135,7 @@ def main() -> None:
         "sectores": sectores,
         "plan": plan,
         "integrantes": integrantes,
+        "actividades": ACTIVIDADES_TRABAJO,
         "cultivos": del_plan + otros,
         "perfiles": perfiles,
     }

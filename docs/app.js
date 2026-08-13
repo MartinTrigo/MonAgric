@@ -11,10 +11,18 @@
 
 const TIPOS_SIEMBRA = ["Siembra directa", "Siembra almácigo", "Trasplante", "Esqueje"];
 const TIPOS_BANDEJA = [72, 98, 128, 162];
-const ACTIVIDADES = ["Siembras", "Trasplantes", "Cosecha y poscosecha", "Desyuyes",
-                     "Poda", "Conducción", "Aplicaciones"];
 // Los tipos que nacen en bandeja: el formulario pide bandejas en vez de bancal.
 const EN_BANDEJA = new Set(["Siembra almácigo", "Esqueje"]);
+
+// Las horas siguen yendo a la planilla del proyecto donde ya están cargadas
+// desde julio (la que usaba la app bioma-horas), para no partir el historial.
+// Ese servicio recibe un registro por vez, con sus propios nombres de campo.
+const URL_HORAS_POR_DEFECTO =
+  "https://script.google.com/macros/s/AKfycbyHBMsZAyLOACCgWclgHGDB6e6M8tw2VX_zonELRuFobPp3TdakCr4Wkh2b8TqtB7P2bw/exec";
+
+const ACTIVIDADES_RESPALDO = ["Planificación", "Siembra", "Trasplante", "Manejo productivo",
+                              "Cosecha y acondicionado", "Administración", "Comercialización",
+                              "Comunicación", "Mantenimiento"];
 
 // ---- Almacenamiento en el teléfono ----
 const LS = {
@@ -22,7 +30,10 @@ const LS = {
   enviados: "monagric_enviados",
   nombre: "monagric_nombre",
   scriptUrl: "monagric_script_url",
+  urlHoras: "monagric_url_horas",
   resumen: "monagric_resumen",
+  nombresPlanilla: "monagric_nombres_planilla",
+  ultimasHoras: "monagric_ultimas_horas",
 };
 
 const leer = (k, def) => {
@@ -36,6 +47,8 @@ let enviados = leer(LS.enviados, []);
 let resumen = leer(LS.resumen, null);   // totales de toda la chacra (desde la planilla)
 let TEMP = null;                        // contenido de temporada.json
 let vistaActual = "inicio";
+
+const urlHoras = () => leer(LS.urlHoras, "") || URL_HORAS_POR_DEFECTO;
 
 // ---- Utilidades ----
 const $ = (sel) => document.querySelector(sel);
@@ -51,6 +64,9 @@ const num = (n, dec = 0) => (isFinite(n) ? n : 0).toLocaleString("es-AR",
   { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// En el campo se escribe "5,5" tanto como "5.5": las dos formas valen.
+const aNumero = (txt) => parseFloat(String(txt ?? "").replace(",", ".").trim());
 
 function sumarDias(fechaISO, dias) {
   if (!fechaISO || !dias) return "";
@@ -76,45 +92,111 @@ function aviso(msg, esError = false) {
 
 const perfil = (cultivo) => (TEMP?.perfiles || {})[cultivo] || {};
 const enPlan = (cultivo) => (TEMP?.plan || []).find((p) => p.cultivo === cultivo);
-const integrantes = () => (TEMP?.integrantes || []).map((i) => i.nombre);
 const sectores = () => TEMP?.sectores || [];
+const actividades = () => TEMP?.actividades || ACTIVIDADES_RESPALDO;
+
+// La lista de integrantes sale de las dos fuentes: la planilla de horas del
+// proyecto (que manda, porque es donde está el historial) y la configuración de
+// la temporada, para que alguien nuevo aparezca apenas se lo carga en la app de
+// escritorio, sin esperar a que lo agreguen a la planilla.
+function integrantes() {
+  const dePlanilla = leer(LS.nombresPlanilla, []);
+  const deTemporada = (TEMP?.integrantes || []).map((i) => i.nombre);
+  return [...new Set([...dePlanilla, ...deTemporada])];
+}
 
 // ---- Estado de sincronización ----
 function refrescarEstado() {
   const el = $("#estado-sync");
   const t = TEMP?.temporada;
   const base = t ? `Temporada ${t.nombre}` : "Sin plan de temporada";
-  if (!leer(LS.scriptUrl, "")) el.textContent = `${base} · sin conectar a la planilla`;
-  else if (pendientes.length) el.textContent = `${base} · ${pendientes.length} por enviar`;
+  if (pendientes.length) el.textContent = `${base} · ${pendientes.length} por enviar`;
+  else if (!leer(LS.scriptUrl, "")) el.textContent = `${base} · falta conectar siembras y cosechas`;
   else el.textContent = `${base} · al día ✓`;
 }
 
-// ---- Envío a la planilla ----
+// ---- Envío a las planillas ----
+// Las horas van a la planilla del proyecto y el resto a la de MonAgric, así que
+// cada grupo se envía por su lado y lo que falle queda en la cola.
 async function sincronizar(silencioso = true) {
-  const url = leer(LS.scriptUrl, "");
-  if (!url) { refrescarEstado(); return; }
+  if (!navigator.onLine) { refrescarEstado(); return; }
 
-  if (pendientes.length && navigator.onLine) {
+  const enviadosAhora = [];
+  const fallaron = [];
+
+  const horas = pendientes.filter((r) => r.tipo === "horas");
+  for (const r of horas) {
+    try {
+      await enviarHora(r);
+      enviadosAhora.push(r);
+    } catch {
+      fallaron.push(r);
+      break;   // si el servicio no responde, el resto espera al próximo intento
+    }
+  }
+
+  const otros = pendientes.filter((r) => r.tipo !== "horas");
+  const url = leer(LS.scriptUrl, "");
+  if (otros.length && url) {
     try {
       const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ registros: pendientes }),
+        body: JSON.stringify({ registros: otros }),
       });
       const datos = await resp.json();
       if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
-      enviados = pendientes.map((r) => ({ ...r, enviado_en: ahora() })).concat(enviados).slice(0, 60);
-      pendientes = [];
-      escribir(LS.pendientes, pendientes);
-      escribir(LS.enviados, enviados);
-      if (!silencioso) aviso("Registros enviados a la planilla ✓");
+      enviadosAhora.push(...otros);
     } catch (e) {
+      fallaron.push(...otros);
       if (!silencioso) aviso("No se pudo enviar: " + e.message, true);
     }
   }
-  await traerResumen();
+
+  if (enviadosAhora.length) {
+    const ids = new Set(enviadosAhora.map((r) => r.id));
+    enviados = enviadosAhora.map((r) => ({ ...r, enviado_en: ahora() })).concat(enviados).slice(0, 60);
+    pendientes = pendientes.filter((r) => !ids.has(r.id));
+    escribir(LS.pendientes, pendientes);
+    escribir(LS.enviados, enviados);
+    if (!silencioso) aviso(`${enviadosAhora.length} registro(s) enviado(s) ✓`);
+  } else if (!silencioso && fallaron.length) {
+    aviso("No se pudo enviar. Revisá la señal y los Ajustes.", true);
+  }
+
+  await Promise.all([traerResumen(), traerDatosHoras()]);
   refrescarEstado();
-  if (vistaActual === "inicio" || vistaActual === "plan") render(vistaActual);
+  if (["inicio", "plan", "horas"].includes(vistaActual)) render(vistaActual);
+}
+
+// El servicio de la planilla de horas recibe un registro por vez y con sus
+// propios nombres de campo (los mismos que usaba la app anterior).
+async function enviarHora(r) {
+  const d = r.datos;
+  const resp = await fetch(urlHoras(), {
+    method: "POST",
+    body: JSON.stringify({
+      marca: r.creado_en,
+      fecha: d.fecha,
+      nombre: d.integrante,
+      horas: d.horas,
+      actividad: d.actividad,
+      obs: d.observaciones || "",
+    }),
+  });
+  const datos = await resp.json();
+  if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
+}
+
+// Nombres del equipo y últimos registros, de la planilla de horas.
+async function traerDatosHoras() {
+  if (!navigator.onLine) return;
+  try {
+    const r = await fetch(urlHoras());
+    const d = await r.json();
+    if (Array.isArray(d.nombres) && d.nombres.length) escribir(LS.nombresPlanilla, d.nombres);
+    if (Array.isArray(d.ultimas)) escribir(LS.ultimasHoras, d.ultimas);
+  } catch { /* sin conexión: se usa lo último guardado */ }
 }
 
 // Totales de toda la chacra (lo que cargaron todos los teléfonos).
@@ -314,6 +396,8 @@ const plantillas = {
 
   horas() {
     const yo = leer(LS.nombre, "");
+    const equipo = leer(LS.ultimasHoras, []);
+    const pendientesHoras = pendientes.filter((r) => r.tipo === "horas");
     return `
     <div class="tarjeta">
       <h2>&#9201; Registrar horas de trabajo</h2>
@@ -321,27 +405,48 @@ const plantillas = {
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
 
-        <label>Integrante</label>
+        <label>¿Quién trabajó?</label>
         <select name="integrante" required>${opcionesIntegrante(yo)}</select>
 
         <label>Horas trabajadas</label>
-        <input type="number" name="horas" min="0.25" max="24" step="0.25" inputmode="decimal"
-               placeholder="Ej: 6.5" required>
+        <!-- texto y no "number": con type=number el navegador descarta "5,5" y
+             en el celular el teclado en español ofrece coma. -->
+        <input type="text" name="horas" inputmode="decimal" autocomplete="off"
+               placeholder="Ej: 4 o 2,5" required>
 
-        <label>Actividades</label>
+        <label>¿Qué actividad hiciste más?</label>
         <div class="chips">
-          ${ACTIVIDADES.map((a, i) => `<label class="chip">
-            <input type="checkbox" name="act" value="${esc(a)}" id="act${i}"><span>${esc(a)}</span>
+          ${actividades().map((a, i) => `<label class="chip">
+            <input type="radio" name="actividad" value="${esc(a)}" id="act${i}" required>
+            <span>${esc(a)}</span>
           </label>`).join("")}
         </div>
 
-        <label>Detalle (opcional)</label>
-        <textarea name="detalle" rows="2" placeholder="Ej: sector B, bancales 3 a 7"></textarea>
+        <label>Observaciones (opcional)</label>
+        <textarea name="observaciones" rows="2" placeholder="Ej: cosecha de tomates, sector B"></textarea>
 
         <button class="principal">Guardar horas</button>
       </form>
     </div>
-    ${historialDe("horas")}`;
+
+    <div class="tarjeta">
+      <h2>Últimos registros del equipo <small>planilla del proyecto</small></h2>
+      ${pendientesHoras.map((r) => `<div class="registro">
+        <div><div class="detalle">${esc(r.datos.integrante)} — ${r.datos.horas} h</div>
+          <div class="cuando">${fechaCorta(r.datos.fecha)} · ${esc(r.datos.actividad)}</div></div>
+        <span class="etiqueta espera">Por enviar</span>
+      </div>`).join("")}
+      ${equipo.length
+        ? equipo.map((f) => `<div class="registro">
+            <div><div class="detalle">${esc(f.nombre)} — ${esc(String(f.horas))} h</div>
+              <div class="cuando">${esc(f.fecha)} · ${esc(f.actividad)}</div></div>
+          </div>`).join("")
+        : (pendientesHoras.length ? "" : `<p class="nota">Cuando haya conexión se van a ver
+            acá los últimos registros de todo el equipo.</p>`)}
+      <a class="enlace-planilla" target="_blank" rel="noopener"
+         href="https://docs.google.com/spreadsheets/d/1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg/edit">
+        Ver la planilla de horas completa</a>
+    </div>`;
   },
 
   cosechas() {
@@ -357,8 +462,8 @@ const plantillas = {
         <select name="cultivo" required>${opcionesCultivo()}</select>
 
         <label>Kilos cosechados</label>
-        <input type="number" name="kg" min="0.01" step="0.01" inputmode="decimal"
-               placeholder="Ej: 12.5" required>
+        <input type="text" name="kg" inputmode="decimal" autocomplete="off"
+               placeholder="Ej: 12,5" required>
 
         ${camposSectorBancal()}
 
@@ -433,9 +538,15 @@ const plantillas = {
       <label>Tu nombre (queda en cada registro que cargues)</label>
       <select id="aj-nombre">${opcionesIntegrante(leer(LS.nombre, ""))}</select>
 
-      <label>Dirección del servicio (Apps Script)</label>
+      <label>Servicio de siembras y cosechas <small>(planilla MonAgric)</small></label>
       <input type="url" id="aj-url" value="${esc(leer(LS.scriptUrl, ""))}"
              placeholder="https://script.google.com/macros/s/…/exec">
+
+      <label>Servicio de horas <small>(planilla del proyecto)</small></label>
+      <input type="url" id="aj-url-horas" value="${esc(leer(LS.urlHoras, ""))}"
+             placeholder="ya viene configurado — dejalo vacío">
+      <p class="nota" style="margin-top:6px">Las horas siguen yendo a la misma planilla
+      de siempre. Solo tocá esto si cambia el servicio.</p>
 
       <button class="principal" id="btn-guardar-ajustes">Guardar ajustes</button>
       <button class="secundario" id="btn-probar">Probar conexión</button>
@@ -496,7 +607,7 @@ function filaRegistro(r) {
   let titulo, detalle;
   if (r.tipo === "horas") {
     titulo = "Horas";
-    detalle = `${esc(d.integrante)}: ${d.horas} h${d.actividades ? " · " + esc(d.actividades) : ""}`;
+    detalle = `${esc(d.integrante)}: ${d.horas} h${d.actividad ? " · " + esc(d.actividad) : ""}`;
   } else if (r.tipo === "cosechas") {
     titulo = "Cosecha";
     detalle = `${esc(d.cultivo)}: ${d.kg} kg (${esc(d.sector)}${d.bancal})`;
@@ -607,19 +718,20 @@ function prepararHoras() {
   const f = $("#form-horas");
   f.onsubmit = (e) => {
     e.preventDefault();
-    const horas = parseFloat(f.horas.value);
-    if (!(horas > 0 && horas <= 24)) return aviso("Las horas deben estar entre 0 y 24.", true);
-    const marcadas = [...f.querySelectorAll("input[name=act]:checked")].map((c) => c.value);
-    const detalle = f.detalle.value.trim();
-    if (!leer(LS.nombre, "")) escribir(LS.nombre, f.integrante.value);
+    const horas = aNumero(f.horas.value);
+    if (!(horas > 0 && horas <= 24)) return aviso("Las horas deben ser un número entre 0 y 24.", true);
+    const actividad = f.querySelector("input[name=actividad]:checked");
+    if (!actividad) return aviso("Elegí una actividad.", true);
+    // El nombre elegido queda como el de este teléfono: la próxima vez viene puesto.
+    escribir(LS.nombre, f.integrante.value);
     guardarRegistro("horas", {
       fecha: f.fecha.value,
       integrante: f.integrante.value,
       horas,
-      actividades: marcadas.join(", "),
-      detalle,
+      actividad: actividad.value,
+      observaciones: f.observaciones.value.trim(),
     });
-    render("inicio");
+    render("horas");
   };
 }
 
@@ -629,7 +741,7 @@ function prepararCosechas() {
   enlazarSectorBancal(f);
 
   const actualizar = () => {
-    const kg = parseFloat(f.kg.value);
+    const kg = aNumero(f.kg.value);
     const m2 = TEMP?.chacra?.bancal_m2 || 0;
     if (!kg || !m2) { calculo.innerHTML = "Cargá los kilos para ver el rinde del bancal."; return; }
     const rinde = kg / m2;
@@ -643,8 +755,8 @@ function prepararCosechas() {
 
   f.onsubmit = (e) => {
     e.preventDefault();
-    const kg = parseFloat(f.kg.value);
-    if (!(kg > 0)) return aviso("Los kilos deben ser mayores a cero.", true);
+    const kg = aNumero(f.kg.value);
+    if (!(kg > 0)) return aviso("Los kilos deben ser un número mayor a cero.", true);
     if (f.operador.value && !leer(LS.nombre, "")) escribir(LS.nombre, f.operador.value);
     guardarRegistro("cosechas", {
       fecha: f.fecha.value,
@@ -659,27 +771,40 @@ function prepararCosechas() {
 }
 
 function prepararAjustes() {
+  const esScript = (u) => !u || u.startsWith("https://script.google.com/");
+
   $("#btn-guardar-ajustes").onclick = () => {
     escribir(LS.nombre, $("#aj-nombre").value);
     const url = $("#aj-url").value.trim();
-    if (url && !url.startsWith("https://script.google.com/")) {
-      return aviso("La dirección debe ser la de tu Apps Script (script.google.com).", true);
+    const urlH = $("#aj-url-horas").value.trim();
+    if (!esScript(url) || !esScript(urlH)) {
+      return aviso("Las direcciones deben ser de Apps Script (script.google.com).", true);
     }
     escribir(LS.scriptUrl, url);
+    escribir(LS.urlHoras, urlH);
     refrescarEstado();
     aviso("Ajustes guardados ✓");
     sincronizar();
   };
+
   $("#btn-probar").onclick = async () => {
-    const url = leer(LS.scriptUrl, "");
-    if (!url) return aviso("Primero guardá la dirección del servicio.", true);
+    const partes = [];
     try {
-      const r = await fetch(url);
-      const d = await r.json();
-      aviso(d.ok ? "Conexión OK: la planilla responde ✓" : "El servicio respondió con error.", !d.ok);
-    } catch {
-      aviso("No se pudo conectar. Revisá la dirección y tu señal.", true);
+      const d = await (await fetch(urlHoras())).json();
+      partes.push(Array.isArray(d.nombres) ? `horas ✓ (${d.nombres.length} integrantes)` : "horas ✓");
+    } catch { partes.push("horas ✗"); }
+
+    const url = leer(LS.scriptUrl, "");
+    if (!url) partes.push("siembras/cosechas: falta la dirección");
+    else {
+      try {
+        const d = await (await fetch(url)).json();
+        partes.push(d.ok ? "siembras/cosechas ✓" : "siembras/cosechas ✗");
+      } catch { partes.push("siembras/cosechas ✗"); }
     }
+    const hayFalla = partes.some((p) => p.includes("✗") || p.includes("falta"));
+    aviso(partes.join(" · "), hayFalla);
+    sincronizar();
   };
 }
 
@@ -698,6 +823,7 @@ window.addEventListener("online", () => sincronizar());
   } catch { /* sin plan: la app avisa y sigue permitiendo cargar horas */ }
   render("inicio");
   refrescarEstado();
+  await traerDatosHoras();     // nombres del equipo antes del primer formulario
   sincronizar();
 })();
 
