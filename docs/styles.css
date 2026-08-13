@@ -284,6 +284,20 @@ button.secundario {
 }
 .registro .editar:active { color: var(--sage-dark); }
 
+/* ---- renglones de cosecha (varios cultivos de una vez) ---- */
+.renglon-cosecha {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px dashed var(--sage-light);
+}
+.renglon-cosecha:first-child { padding-top: 0; margin-top: 0; border-top: none; }
+.renglon-cab { display: flex; align-items: center; justify-content: space-between; }
+.renglon-cab label { margin-bottom: 0; }
+button.mas {
+  margin-top: 12px;
+  border-style: dashed;
+}
+
 #avanzado-plan { margin-top: 12px; }
 #avanzado-plan summary {
   font-size: .88rem;

@@ -306,17 +306,34 @@ function cultivosOrdenados() {
   return { lista: [...delPlan, ...otros], delPlan };
 }
 
-function buscadorCultivo(valor = "") {
+function buscadorCultivo(valor = "", nombre = "cultivo") {
   const { lista, delPlan } = cultivosOrdenados();
-  return buscador("cultivo", lista, {
+  return buscador(nombre, lista, {
     placeholder: "Elegí el cultivo (escribí para buscar)…",
     valor, destacadas: delPlan,
   });
 }
 
+// Un cultivo con sus kilos. Se pueden apilar varios en una misma cosecha.
+function renglonCosecha(i) {
+  return `<div class="renglon-cosecha" data-renglon="${i}">
+    <div class="renglon-cab">
+      <label>Cultivo</label>
+      ${i > 0 ? `<button type="button" class="quitar" data-quitar-renglon="${i}"
+                         aria-label="Quitar este cultivo">&times;</button>` : ""}
+    </div>
+    ${buscadorCultivo("", "cultivo_" + i)}
+    <label>Kilos cosechados</label>
+    <input type="text" name="kg_${i}" inputmode="decimal" autocomplete="off"
+           placeholder="Ej: 12,5">
+  </div>`;
+}
+
 // Enciende todos los buscadores que haya en un formulario.
 function enlazarBuscadores(form) {
   form.querySelectorAll("[data-buscador]").forEach((caja) => {
+    if (caja.dataset.encendido) return;    // ya tiene sus eventos (renglones nuevos)
+    caja.dataset.encendido = "1";
     const texto = caja.querySelector(".buscador-texto");
     const oculto = caja.querySelector("input[type=hidden]");
     const lista = caja.querySelector(".buscador-lista");
@@ -564,12 +581,10 @@ const plantillas = {
                placeholder="Ej: 4 o 2,5" required>
 
         <label>¿Qué actividad hiciste más?</label>
-        <div class="chips">
-          ${actividades().map((a, i) => `<label class="chip">
-            <input type="radio" name="actividad" value="${esc(a)}" id="act${i}" required>
-            <span>${esc(a)}</span>
-          </label>`).join("")}
-        </div>
+        <select name="actividad" required>
+          <option value="" disabled selected>Elegí la actividad…</option>
+          ${actividades().map((a) => `<option>${esc(a)}</option>`).join("")}
+        </select>
 
         <label>Observaciones (opcional)</label>
         <textarea name="observaciones" rows="2" placeholder="Ej: cosecha de tomates, sector B"></textarea>
@@ -655,18 +670,16 @@ const plantillas = {
     return `
     <div class="tarjeta">
       <h2>&#127807; Registrar cosecha</h2>
+      <p class="nota">Los kilos totales de cada cultivo, de todos los bancales juntos.
+      Podés cargar varios cultivos de una vez con el botón +.</p>
       <form id="form-cosechas">
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
 
-        <label>Cultivo</label>
-        ${buscadorCultivo()}
+        <div id="renglones-cosecha">${renglonCosecha(0)}</div>
 
-        <label>Kilos cosechados</label>
-        <input type="text" name="kg" inputmode="decimal" autocomplete="off"
-               placeholder="Ej: 12,5" required>
-
-        ${camposSectorBancal()}
+        <button type="button" class="secundario mas" id="btn-mas-cultivo">
+          + Agregar otro cultivo</button>
 
         <div class="calculo" id="calculo-cosecha"></div>
 
@@ -730,7 +743,7 @@ const plantillas = {
     </div>
 
     <div class="tarjeta">
-      <button class="secundario" id="btn-ir-config">Editar la configuración</button>
+      <button class="secundario" id="btn-ir-config">&#128736;&#65039; Configuración</button>
       <p class="nota" style="margin-top:8px">Todo esto se carga y se corrige desde el
       teléfono. Los cultivos disponibles son los mismos para todas las chacras, para
       que después se puedan comparar.</p>
@@ -806,21 +819,23 @@ const plantillas = {
 
     <div class="tarjeta">
       <h2>Sectores <small>${secs.length}</small></h2>
-      <p class="nota">Cada sector con cuántos bancales tiene. Es lo que aparece
-      después al cargar siembras y cosechas.</p>
+      <p class="nota">Cada sector con cuántos bancales tiene. Es lo que aparece después
+      al cargar las siembras. El nombre lo elegís vos: puede ser una letra, un número
+      o un nombre (Verano, Otoño…).</p>
       <div id="lista-sectores">
         ${secs.length ? secs.map((s, i) => filaSector(s, i)).join("")
                       : `<p class="nota">Todavía no cargaste ninguno.</p>`}
       </div>
       <form id="form-sector" class="alta">
+        <div id="titulo-sector"></div>
         <div class="fila">
           <div>
-            <label>Sector</label>
-            <input type="text" name="sector" maxlength="12" placeholder="Ej: A" required>
+            <label>Nombre</label>
+            <input type="text" name="sector" maxlength="24" placeholder="Ej: A o Verano" required>
           </div>
           <div>
             <label>Bancales</label>
-            <input type="number" name="bancales" min="1" max="200" value="10" required>
+            <input type="number" name="bancales" min="1" max="500" value="10" required>
           </div>
           <div>
             <label>Riego</label>
@@ -829,7 +844,8 @@ const plantillas = {
             </select>
           </div>
         </div>
-        <button class="secundario">Agregar sector</button>
+        <button class="secundario" id="btn-sector">Agregar sector</button>
+        <button type="button" class="secundario" id="btn-cancelar-sector" hidden>Cancelar</button>
       </form>
     </div>
 
@@ -940,9 +956,10 @@ const plantillas = {
 };
 
 const filaSector = (s, i) => `<div class="registro">
-  <div><div class="detalle">Sector ${esc(s.sector)}</div>
+  <div><div class="detalle">${esc(s.sector)}</div>
     <div class="cuando">${esc(s.tipo_riego || "sin riego indicado")}</div></div>
   <span class="etiqueta ok">${s.bancales} bancales</span>
+  <button type="button" class="editar" data-editar-sector="${i}" aria-label="Editar">&#9998;</button>
   <button type="button" class="quitar" data-sector="${i}" aria-label="Quitar">&times;</button>
 </div>`;
 
@@ -1034,7 +1051,7 @@ function filaRegistro(r) {
     detalle = `${esc(d.integrante)}: ${d.horas} h${d.actividad ? " · " + esc(d.actividad) : ""}`;
   } else if (r.tipo === "cosechas") {
     titulo = "Cosecha";
-    detalle = `${esc(d.cultivo)}: ${d.kg} kg (${esc(d.sector)}${d.bancal})`;
+    detalle = `${esc(d.cultivo)}: ${num(d.kg, 1)} kg`;
   } else {
     titulo = "Siembra";
     const cant = d.plantines ? `${num(d.plantines)} plantines` : `${esc(d.sector)}${d.bancal || ""}`;
@@ -1228,20 +1245,62 @@ function prepararConfiguracion() {
     });
   };
 
-  // ---- sectores
+  // ---- sectores (agregar y editar)
   const fSector = $("#form-sector");
+  let editandoSector = -1;
+
+  const salirDeSector = () => {
+    fSector.reset();
+    editandoSector = -1;
+    $("#titulo-sector").innerHTML = "";
+    $("#btn-sector").textContent = "Agregar sector";
+    $("#btn-cancelar-sector").hidden = true;
+  };
+  $("#btn-cancelar-sector").onclick = salirDeSector;
+
   fSector.onsubmit = (e) => {
     e.preventDefault();
-    const nombre = fSector.sector.value.trim().toUpperCase();
+    // El nombre queda como lo escriben: puede ser "A", "3" o "Verano".
+    const nombre = fSector.sector.value.trim();
     if (!nombre) return aviso("Ponele un nombre al sector.", true);
     const secs = [...(CFG?.sectores || [])];
-    if (secs.some((s) => s.sector === nombre)) return aviso(`El sector ${nombre} ya está.`, true);
-    secs.push({ sector: nombre, bancales: parseInt(fSector.bancales.value, 10) || 1,
-                tipo_riego: fSector.tipo_riego.value });
-    secs.sort((a, b) => a.sector.localeCompare(b.sector));
+    const repetido = secs.findIndex((s) =>
+      s.sector.toLowerCase() === nombre.toLowerCase());
+    if (repetido !== -1 && repetido !== editandoSector) {
+      return aviso(`Ya hay un sector que se llama ${nombre}.`, true);
+    }
+
+    const datos = { sector: nombre, bancales: parseInt(fSector.bancales.value, 10) || 1,
+                    tipo_riego: fSector.tipo_riego.value };
+    let mensaje;
+    if (editandoSector >= 0) {
+      const antes = secs[editandoSector].sector;
+      secs[editandoSector] = datos;
+      mensaje = `${antes === nombre ? nombre : `${antes} → ${nombre}`} actualizado ✓`;
+    } else {
+      secs.push(datos);
+      mensaje = `${nombre} agregado ✓`;
+    }
+    secs.sort((a, b) => a.sector.localeCompare(b.sector, "es", { numeric: true }));
     guardarConfig({ sectores: secs, bancal: Object.assign({}, CFG?.bancal,
-      { n_bancales: secs.reduce((a, s) => a + s.bancales, 0) }) }, `Sector ${nombre} agregado ✓`);
+      { n_bancales: secs.reduce((a, s) => a + s.bancales, 0) }) }, mensaje);
   };
+
+  document.querySelectorAll("[data-editar-sector]").forEach((b) => {
+    b.onclick = () => {
+      const i = Number(b.dataset.editarSector);
+      const s = (CFG.sectores || [])[i];
+      if (!s) return;
+      editandoSector = i;
+      fSector.sector.value = s.sector;
+      fSector.bancales.value = s.bancales;
+      fSector.tipo_riego.value = s.tipo_riego || tiposRiego()[0];
+      $("#titulo-sector").innerHTML = `<div class="editando">Editando <b>${esc(s.sector)}</b></div>`;
+      $("#btn-sector").textContent = "Guardar cambios";
+      $("#btn-cancelar-sector").hidden = false;
+      fSector.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+  });
 
   // ---- integrantes
   const fInt = $("#form-integrante");
@@ -1354,7 +1413,9 @@ function prepararConfiguracion() {
   };
 
   // ---- editar un cultivo del plan
-  document.querySelectorAll(".editar").forEach((b) => {
+  // Ojo: los sectores usan la misma clase pero otro atributo, así que se
+  // seleccionan por el atributo y no por la clase.
+  document.querySelectorAll("[data-editar]").forEach((b) => {
     b.onclick = () => {
       const p = (CFG.plan || [])[Number(b.dataset.editar)];
       if (!p) return;
@@ -1505,15 +1566,14 @@ function prepararHoras() {
     e.preventDefault();
     const horas = aNumero(f.horas.value);
     if (!(horas > 0 && horas <= 24)) return aviso("Las horas deben ser un número entre 0 y 24.", true);
-    const actividad = f.querySelector("input[name=actividad]:checked");
-    if (!actividad) return aviso("Elegí una actividad.", true);
+    if (!f.actividad.value) return aviso("Elegí una actividad.", true);
     // El nombre elegido queda como el de este teléfono: la próxima vez viene puesto.
     escribir(LS.nombre, f.integrante.value);
     guardarRegistro("horas", {
       fecha: f.fecha.value,
       integrante: f.integrante.value,
       horas,
-      actividad: actividad.value,
+      actividad: f.actividad.value,
       observaciones: f.observaciones.value.trim(),
     });
     render("horas");
@@ -1523,35 +1583,81 @@ function prepararHoras() {
 function prepararCosechas() {
   const f = $("#form-cosechas");
   const calculo = $("#calculo-cosecha");
-  enlazarSectorBancal(f);
+  const renglones = $("#renglones-cosecha");
+  let proximo = 1;
+
   enlazarBuscadores(f);
 
+  // Lee los renglones cargados: cada uno es un cultivo con sus kilos.
+  const leerRenglones = () => [...renglones.querySelectorAll(".renglon-cosecha")]
+    .map((div) => {
+      const i = div.dataset.renglon;
+      return { cultivo: f["cultivo_" + i]?.value || "", kg: aNumero(f["kg_" + i]?.value) || 0 };
+    })
+    .filter((r) => r.cultivo || r.kg);
+
   const actualizar = () => {
-    const kg = aNumero(f.kg.value);
-    const m2 = bancalM2();
-    if (!kg || !m2) { calculo.innerHTML = "Cargá los kilos para ver el rinde del bancal."; return; }
-    const rinde = kg / m2;
-    const ref = perfil(f.cultivo.value).rinde_ref_kg_m2 || 0;
-    calculo.innerHTML = `Rinde: <b>${num(rinde, 2)} kg/m²</b> en ${num(m2, 1)} m² de bancal`
-      + (ref ? ` · referencia del cultivo: ${num(ref, 1)} kg/m² (${num((rinde / ref) * 100)}%)` : "");
+    const cargados = leerRenglones().filter((r) => r.cultivo && r.kg > 0);
+    if (!cargados.length) {
+      calculo.innerHTML = "Cargá el cultivo y los kilos. Con el + sumás más cultivos.";
+      return;
+    }
+    const total = cargados.reduce((a, r) => a + r.kg, 0);
+    const detalle = cargados.map((r) => {
+      const plan = enPlan(r.cultivo);
+      if (!plan?.cosecha_esperada_kg) return `${esc(r.cultivo)} ${num(r.kg, 1)} kg`;
+      return `${esc(r.cultivo)} ${num(r.kg, 1)} kg (${num((r.kg / plan.cosecha_esperada_kg) * 100, 1)}% de lo esperado)`;
+    }).join(" · ");
+    calculo.innerHTML = `<b>${num(total, 1)} kg</b> en ${cargados.length} cultivo(s)
+      <div class="nota" style="margin-top:4px">${detalle}</div>`;
   };
+
   f.addEventListener("input", actualizar);
   f.addEventListener("change", actualizar);
   actualizar();
 
+  const engancharQuitar = () => {
+    renglones.querySelectorAll("[data-quitar-renglon]").forEach((b) => {
+      b.onclick = () => {
+        b.closest(".renglon-cosecha").remove();
+        actualizar();
+      };
+    });
+  };
+  engancharQuitar();
+
+  $("#btn-mas-cultivo").onclick = () => {
+    renglones.insertAdjacentHTML("beforeend", renglonCosecha(proximo++));
+    enlazarBuscadores(f);          // enciende solo el buscador nuevo
+    engancharQuitar();
+    actualizar();
+    renglones.lastElementChild.querySelector(".buscador-texto").focus();
+  };
+
   f.onsubmit = (e) => {
     e.preventDefault();
-    const kg = aNumero(f.kg.value);
-    if (!f.cultivo.value) return aviso("Elegí el cultivo.", true);
-    if (!(kg > 0)) return aviso("Los kilos deben ser un número mayor a cero.", true);
+    const cargados = leerRenglones();
+    if (!cargados.length) return aviso("Cargá al menos un cultivo con sus kilos.", true);
+
+    const incompleto = cargados.find((r) => !r.cultivo || !(r.kg > 0));
+    if (incompleto) {
+      return aviso(incompleto.cultivo
+        ? `Faltan los kilos de ${incompleto.cultivo}.`
+        : "Hay un renglón sin cultivo elegido.", true);
+    }
+    // Un mismo cultivo dos veces sería confuso al analizar: se suma.
+    const porCultivo = {};
+    cargados.forEach((r) => { porCultivo[r.cultivo] = (porCultivo[r.cultivo] || 0) + r.kg; });
+
     if (f.operador.value && !leer(LS.nombre, "")) escribir(LS.nombre, f.operador.value);
-    guardarRegistro("cosechas", {
-      fecha: f.fecha.value,
-      cultivo: f.cultivo.value,
-      kg,
-      sector: f.sector ? f.sector.value : "",
-      bancal: f.bancal ? parseInt(f.bancal.value, 10) : 0,
-      operador: f.operador.value,
+    // Una fila por cultivo, todas con la misma fecha y la misma persona.
+    Object.entries(porCultivo).forEach(([cultivo, kg]) => {
+      guardarRegistro("cosechas", {
+        fecha: f.fecha.value,
+        cultivo,
+        kg: Math.round(kg * 100) / 100,
+        operador: f.operador.value,
+      }, `Cosecha guardada: ${Object.keys(porCultivo).length} cultivo(s) ✓`);
     });
     render("inicio");
   };

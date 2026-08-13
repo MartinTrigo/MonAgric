@@ -42,10 +42,9 @@ MAPAS = {
     },
     "cosechas": {
         "tabla": "cosechas",
-        "columnas": {
-            "Fecha": "fecha", "Cultivo": "cultivo", "Kg": "kg",
-            "Sector": "sector", "Bancal": "bancal",
-        },
+        # Sin sector ni bancal: se cosecha de varios bancales a la vez y lo que
+        # se registra son los kilos totales de cada cultivo.
+        "columnas": {"Fecha": "fecha", "Cultivo": "cultivo", "Kg": "kg"},
     },
     "tareas": {
         "tabla": "tareas",

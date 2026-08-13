@@ -51,13 +51,15 @@ var HOJAS = {
               r.dispositivo || "", new Date()];
     },
   },
+  // Se cosecha de varios bancales a la vez, asi que se registran los kilos
+  // totales por cultivo; el rendimiento sale despues contra el plan.
   cosechas: {
     nombre: "Cosechas",
-    encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Kg", "Sector", "Bancal", "Cosechó",
+    encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Kg", "Cosechó",
                   "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
-      return [r.id, r.temporada || "", d.fecha, d.cultivo, d.kg, d.sector || "", d.bancal || "",
+      return [r.id, r.temporada || "", d.fecha, d.cultivo, d.kg,
               d.operador || "", r.dispositivo || "", new Date()];
     },
   },
