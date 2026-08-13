@@ -23,12 +23,19 @@
 
 <main id="vista"></main>
 
+<!-- Inicio y Plan quedan fijos en las puntas; el medio se desliza con el dedo
+     para ir sumando secciones sin que la barra se apriete. -->
 <nav class="tabs">
-  <button data-vista="inicio" class="tab activa"><span class="tab-icono">&#9737;</span>Inicio</button>
-  <button data-vista="siembras" class="tab"><span class="tab-icono">&#127793;</span>Siembras</button>
-  <button data-vista="horas" class="tab"><span class="tab-icono">&#9201;</span>Horas</button>
-  <button data-vista="cosechas" class="tab"><span class="tab-icono">&#127807;</span>Cosechas</button>
-  <button data-vista="plan" class="tab"><span class="tab-icono">&#9776;</span>Plan</button>
+  <button data-vista="inicio" class="tab fija activa"><span class="tab-icono">&#9737;</span>Inicio</button>
+
+  <div class="tabs-medio" id="tabs-medio">
+    <button data-vista="horas" class="tab"><span class="tab-icono">&#9201;</span>Horas</button>
+    <button data-vista="tareas" class="tab"><span class="tab-icono">&#9745;</span>Tareas</button>
+    <button data-vista="siembras" class="tab"><span class="tab-icono">&#127793;</span>Siembras</button>
+    <button data-vista="cosechas" class="tab"><span class="tab-icono">&#127807;</span>Cosechas</button>
+  </div>
+
+  <button data-vista="plan" class="tab fija"><span class="tab-icono">&#9776;</span>Plan</button>
 </nav>
 
 <div id="aviso" class="aviso oculto"></div>

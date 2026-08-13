@@ -226,6 +226,22 @@ button.secundario {
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 5;
 }
+/* El medio se desliza; Inicio y Plan no se mueven de las puntas. */
+.tabs-medio {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  border-left: 1px solid var(--sage-light);
+  border-right: 1px solid var(--sage-light);
+}
+.tabs-medio::-webkit-scrollbar { display: none; }
+.tabs-medio .tab { flex: 0 0 auto; min-width: 78px; scroll-snap-align: center; }
+
+.tab.fija { flex: 0 0 auto; min-width: 68px; }
+
 .tab {
   flex: 1;
   min-width: 0;
@@ -245,6 +261,81 @@ button.secundario {
 .tab .tab-icono { font-size: 1.25rem; line-height: 1; }
 .tab.activa { color: var(--sage-dark); }
 .tab.activa .tab-icono { transform: scale(1.08); }
+
+/* ---- nombres del equipo ---- */
+.chips-nombres { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip-nombre {
+  background: var(--sage-suave);
+  color: var(--sage-dark);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: .92rem;
+  font-weight: 600;
+}
+
+/* ---- buscador de listas largas (cultivos) ---- */
+.buscador { position: relative; }
+.buscador-lista {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0; right: 0;
+  max-height: 232px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1.5px solid var(--sage);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.16);
+  z-index: 20;
+}
+.buscador-lista[hidden] { display: none; }
+.buscador-op {
+  padding: 11px 14px;
+  font-size: 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--sage-suave);
+}
+.buscador-op:last-child { border-bottom: none; }
+.buscador-op.marcada { background: var(--sage-suave); }
+.buscador-op .del-plan { float: right; font-size: .72rem; color: var(--tenue); }
+.buscador-vacio { padding: 12px 14px; font-size: .9rem; color: var(--tenue); }
+
+/* ---- tareas ---- */
+.tarea {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--sage-suave);
+}
+.tarea:last-child { border-bottom: none; }
+.tarea-check {
+  flex: 0 0 auto;
+  width: 27px; height: 27px;
+  border: 2px solid var(--sage);
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  padding: 0;
+  font-size: .95rem;
+  line-height: 1;
+  color: var(--sage-dark);
+}
+.tarea-check.hecha { background: var(--sage); color: #fff; border-color: var(--sage-dark); }
+.tarea-texto { flex: 1; min-width: 0; }
+.tarea-texto .titulo { font-weight: 600; line-height: 1.35; }
+.tarea.lista .tarea-texto .titulo { text-decoration: line-through; color: var(--tenue); }
+.tarea-meta { font-size: .78rem; color: var(--tenue); margin-top: 2px; }
+.punto-imp {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: baseline;
+}
+.imp-Alta { background: #c0392b; }
+.imp-Media { background: var(--ambar); }
+.imp-Baja { background: var(--sage); }
+.tarea.vencida .tarea-meta { color: #c0392b; font-weight: 600; }
 
 /* ---- aviso flotante ---- */
 .aviso {

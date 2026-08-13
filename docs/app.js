@@ -34,7 +34,10 @@ const LS = {
   resumen: "monagric_resumen",
   nombresPlanilla: "monagric_nombres_planilla",
   ultimasHoras: "monagric_ultimas_horas",
+  tareas: "monagric_tareas",
 };
+
+const IMPORTANCIAS = ["Alta", "Media", "Baja"];
 
 const leer = (k, def) => {
   try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); }
@@ -164,9 +167,9 @@ async function sincronizar(silencioso = true) {
     aviso("No se pudo enviar. Revisá la señal y los Ajustes.", true);
   }
 
-  await Promise.all([traerResumen(), traerDatosHoras()]);
+  await Promise.all([traerResumen(), traerDatosHoras(), traerTareas()]);
   refrescarEstado();
-  if (["inicio", "plan", "horas"].includes(vistaActual)) render(vistaActual);
+  if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) render(vistaActual);
 }
 
 // El servicio de la planilla de horas recibe un registro por vez y con sus
@@ -226,13 +229,101 @@ function guardarRegistro(tipo, datos) {
 }
 
 // ---- Componentes reutilizables ----
-function opcionesCultivo(seleccionado = "") {
+// Buscador para listas largas: se escribe para filtrar y se toca para ver todo.
+// El valor elegido queda en un campo oculto, así el formulario lo lee como
+// cualquier otro campo.
+function buscador(nombre, opciones, { placeholder = "Buscá o tocá para ver la lista…",
+                                      valor = "", destacadas = [] } = {}) {
+  return `<div class="buscador" data-buscador="${nombre}">
+    <input type="text" class="buscador-texto" autocomplete="off" enterkeyhint="done"
+           placeholder="${esc(placeholder)}" value="${esc(valor)}">
+    <input type="hidden" name="${nombre}" value="${esc(valor)}">
+    <div class="buscador-lista" hidden
+         data-opciones="${esc(JSON.stringify(opciones))}"
+         data-destacadas="${esc(JSON.stringify(destacadas))}"></div>
+  </div>`;
+}
+
+function cultivosOrdenados() {
   const delPlan = (TEMP?.plan || []).map((p) => p.cultivo);
   const otros = (TEMP?.cultivos || []).filter((c) => !delPlan.includes(c));
-  const op = (c) => `<option${c === seleccionado ? " selected" : ""}>${esc(c)}</option>`;
-  return `<option value="" disabled${seleccionado ? "" : " selected"}>Elegí el cultivo…</option>
-    ${delPlan.length ? `<optgroup label="Del plan de la temporada">${delPlan.map(op).join("")}</optgroup>` : ""}
-    ${otros.length ? `<optgroup label="Otros cultivos">${otros.map(op).join("")}</optgroup>` : ""}`;
+  return { lista: [...delPlan, ...otros], delPlan };
+}
+
+function buscadorCultivo(valor = "") {
+  const { lista, delPlan } = cultivosOrdenados();
+  return buscador("cultivo", lista, {
+    placeholder: "Elegí el cultivo (escribí para buscar)…",
+    valor, destacadas: delPlan,
+  });
+}
+
+// Enciende todos los buscadores que haya en un formulario.
+function enlazarBuscadores(form) {
+  form.querySelectorAll("[data-buscador]").forEach((caja) => {
+    const texto = caja.querySelector(".buscador-texto");
+    const oculto = caja.querySelector("input[type=hidden]");
+    const lista = caja.querySelector(".buscador-lista");
+    const opciones = JSON.parse(lista.dataset.opciones);
+    const destacadas = new Set(JSON.parse(lista.dataset.destacadas));
+    let marcada = -1;
+
+    // Sin tildes ni mayúsculas: "morron" encuentra "Morrón". El rango ̀-ͯ
+    // son las tildes que quedan sueltas al separar con NFD.
+    const plano = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+    const pintar = (filtro = "") => {
+      const f = plano(filtro.trim());
+      const hallados = opciones.filter((o) => plano(o).includes(f));
+      marcada = hallados.length ? 0 : -1;
+      lista.innerHTML = hallados.length
+        ? hallados.map((o, i) => `<div class="buscador-op${i === 0 ? " marcada" : ""}" data-valor="${esc(o)}">
+             ${esc(o)}${destacadas.has(o) ? '<span class="del-plan">del plan</span>' : ""}
+           </div>`).join("")
+        : `<div class="buscador-vacio">No hay ningún cultivo con ese nombre.</div>`;
+      lista.hidden = false;
+    };
+
+    const elegir = (valor) => {
+      texto.value = valor;
+      oculto.value = valor;
+      lista.hidden = true;
+      form.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+
+    texto.addEventListener("focus", () => pintar(""));
+    texto.addEventListener("input", () => { oculto.value = ""; pintar(texto.value); });
+    texto.addEventListener("keydown", (e) => {
+      const ops = [...lista.querySelectorAll(".buscador-op")];
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!ops.length) return;
+        marcada = (marcada + (e.key === "ArrowDown" ? 1 : -1) + ops.length) % ops.length;
+        ops.forEach((o, i) => o.classList.toggle("marcada", i === marcada));
+        ops[marcada].scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (ops[marcada]) elegir(ops[marcada].dataset.valor);
+      } else if (e.key === "Escape") {
+        lista.hidden = true;
+      }
+    });
+    lista.addEventListener("mousedown", (e) => {
+      const op = e.target.closest(".buscador-op");
+      if (op) { e.preventDefault(); elegir(op.dataset.valor); }
+    });
+    // Al salir del campo: si lo escrito coincide con una opción, se toma.
+    texto.addEventListener("blur", () => {
+      setTimeout(() => {
+        lista.hidden = true;
+        if (!oculto.value) {
+          const exacta = opciones.find((o) => plano(o) === plano(texto.value));
+          if (exacta) elegir(exacta);
+          else texto.value = "";
+        }
+      }, 150);
+    });
+  });
 }
 
 function opcionesIntegrante(seleccionado = "") {
@@ -345,7 +436,7 @@ const plantillas = {
         <input type="date" name="fecha" value="${hoy()}" required>
 
         <label>Cultivo</label>
-        <select name="cultivo" required>${opcionesCultivo()}</select>
+        ${buscadorCultivo()}
 
         <div class="fila">
           <div>
@@ -449,6 +540,58 @@ const plantillas = {
     </div>`;
   },
 
+  tareas() {
+    const yo = leer(LS.nombre, "");
+    const lista = tareasParaMostrar();
+    const pendientes_ = lista.filter((t) => !t.hecha);
+    const hechas = lista.filter((t) => t.hecha).slice(0, 8);
+    return `
+    <div class="tarjeta">
+      <h2>&#9745; Tareas pendientes <small>${pendientes_.length}</small></h2>
+      ${pendientes_.length
+        ? pendientes_.map(filaTarea).join("")
+        : `<p class="nota">No hay tareas pendientes. Agregá una acá abajo.</p>`}
+    </div>
+
+    <div class="tarjeta">
+      <h2>Anotar una tarea</h2>
+      <form id="form-tareas">
+        <label>¿Qué hay que hacer?</label>
+        <input type="text" name="tarea" maxlength="140" autocomplete="off"
+               placeholder="Ej: desyuyar el sector B" required>
+
+        <div class="fila">
+          <div>
+            <label>¿Para cuándo?</label>
+            <input type="date" name="fecha" value="${hoy()}" required>
+          </div>
+          <div>
+            <label>Personas</label>
+            <input type="number" name="personas" value="1" min="1" max="30" inputmode="numeric">
+          </div>
+        </div>
+
+        <label>Importancia</label>
+        <div class="chips">
+          ${IMPORTANCIAS.map((i) => `<label class="chip">
+            <input type="radio" name="importancia" value="${i}"${i === "Media" ? " checked" : ""}>
+            <span><span class="punto-imp imp-${i}"></span>${i}</span>
+          </label>`).join("")}
+        </div>
+
+        <label>Quién la anota</label>
+        <select name="creada_por" required>${opcionesIntegrante(yo)}</select>
+
+        <button class="principal">Agregar tarea</button>
+      </form>
+    </div>
+
+    ${hechas.length ? `<div class="tarjeta">
+      <h2>Hechas hace poco</h2>
+      ${hechas.map(filaTarea).join("")}
+    </div>` : ""}`;
+  },
+
   cosechas() {
     const yo = leer(LS.nombre, "");
     return `
@@ -459,7 +602,7 @@ const plantillas = {
         <input type="date" name="fecha" value="${hoy()}" required>
 
         <label>Cultivo</label>
-        <select name="cultivo" required>${opcionesCultivo()}</select>
+        ${buscadorCultivo()}
 
         <label>Kilos cosechados</label>
         <input type="text" name="kg" inputmode="decimal" autocomplete="off"
@@ -519,11 +662,10 @@ const plantillas = {
     </div>
 
     <div class="tarjeta">
-      <h2>Integrantes</h2>
-      ${TEMP.integrantes.map((i) => `<div class="registro">
-        <div class="detalle">${esc(i.nombre)}</div>
-        <span class="etiqueta ok">${esc(i.rol)}</span>
-      </div>`).join("")}
+      <h2>Integrantes <small>${integrantes().length}</small></h2>
+      <div class="chips-nombres">
+        ${integrantes().map((n) => `<span class="chip-nombre">${esc(n)}</span>`).join("")}
+      </div>
       <p class="nota" style="margin-top:10px">
         El plan se actualiza desde la app de escritorio con
         <code>python tools/exportar_temporada.py</code>.
@@ -634,7 +776,12 @@ function render(vista) {
     t.classList.toggle("activa", t.dataset.vista === vista));
 
   ({ siembras: prepararSiembras, horas: prepararHoras, cosechas: prepararCosechas,
-     inicio: prepararInicio, ajustes: prepararAjustes }[vista] || (() => {}))();
+     tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes
+   }[vista] || (() => {}))();
+
+  // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
+  const activa = document.querySelector(".tabs-medio .tab.activa");
+  if (activa) activa.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
 }
 
 function prepararInicio() {
@@ -648,6 +795,7 @@ function prepararSiembras() {
   const lugar = $("#bloque-lugar");
   const calculo = $("#calculo-siembra");
   enlazarSectorBancal(f);
+  enlazarBuscadores(f);
 
   const actualizar = () => {
     const tipo = f.tipo.value;
@@ -680,6 +828,7 @@ function prepararSiembras() {
     const tipo = f.tipo.value;
     const conBandeja = EN_BANDEJA.has(tipo);
     const gen = parseInt(f.generacion.value, 10);
+    if (!f.cultivo.value) return aviso("Elegí el cultivo.", true);
     if (!(gen >= 1)) return aviso("La generación debe ser 1 o mayor.", true);
 
     const datos = {
@@ -714,6 +863,88 @@ function prepararSiembras() {
   };
 }
 
+// ---- Tareas ----
+// Se juntan las que ya están en la planilla con las que se cargaron en este
+// teléfono y todavía no viajaron, y se aplican las marcas de "hecha" que están
+// esperando. Así la lista se ve al día aunque no haya señal.
+function tareasParaMostrar() {
+  const deLaPlanilla = leer(LS.tareas, []);
+  const nuevasLocales = pendientes.filter((r) => r.tipo === "tareas")
+    .map((r) => ({ ...r.datos, id: r.id, sinEnviar: true }));
+  const hechasLocales = new Set(
+    pendientes.filter((r) => r.tipo === "tareas_hecha").map((r) => r.datos.tarea_id));
+
+  const todas = [...nuevasLocales, ...deLaPlanilla]
+    .filter((t, i, arr) => arr.findIndex((o) => o.id === t.id) === i)
+    .map((t) => ({ ...t, hecha: t.hecha || hechasLocales.has(t.id) }));
+
+  const peso = { Alta: 0, Media: 1, Baja: 2 };
+  return todas.sort((a, b) =>
+    (a.fecha || "").localeCompare(b.fecha || "") ||
+    (peso[a.importancia] ?? 1) - (peso[b.importancia] ?? 1));
+}
+
+function filaTarea(t) {
+  const vencida = !t.hecha && t.fecha && t.fecha < hoy();
+  const cuando = t.fecha === hoy() ? "hoy" : fechaCorta(t.fecha);
+  const meta = [
+    `<span class="punto-imp imp-${esc(t.importancia || "Media")}"></span>${esc(t.importancia || "Media")}`,
+    vencida ? `atrasada desde el ${cuando}` : `para ${cuando}`,
+    (t.personas > 1 ? `${t.personas} personas` : ""),
+    (t.hecha && t.hecha_por ? `hecha por ${esc(t.hecha_por)}` : ""),
+    (t.sinEnviar ? "sin enviar" : ""),
+  ].filter(Boolean).join(" · ");
+
+  return `<div class="tarea${t.hecha ? " lista" : ""}${vencida ? " vencida" : ""}">
+    <button class="tarea-check${t.hecha ? " hecha" : ""}" data-tarea="${esc(t.id)}"
+            ${t.hecha ? "disabled" : ""} aria-label="Marcar como hecha">${t.hecha ? "&#10003;" : ""}</button>
+    <div class="tarea-texto">
+      <div class="titulo">${esc(t.tarea)}</div>
+      <div class="tarea-meta">${meta}</div>
+    </div>
+  </div>`;
+}
+
+function prepararTareas() {
+  const f = $("#form-tareas");
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const texto = f.tarea.value.trim();
+    if (!texto) return aviso("Escribí qué hay que hacer.", true);
+    escribir(LS.nombre, f.creada_por.value);
+    guardarRegistro("tareas", {
+      tarea: texto,
+      fecha: f.fecha.value,
+      importancia: f.querySelector("input[name=importancia]:checked").value,
+      personas: parseInt(f.personas.value, 10) || 1,
+      creada_por: f.creada_por.value,
+      hecha: false,
+    });
+    render("tareas");
+  };
+
+  document.querySelectorAll(".tarea-check").forEach((b) => {
+    b.onclick = () => {
+      guardarRegistro("tareas_hecha", {
+        tarea_id: b.dataset.tarea,
+        hecha_el: hoy(),
+        hecha_por: leer(LS.nombre, ""),
+      });
+      render("tareas");
+    };
+  });
+}
+
+// Trae del servicio la lista de tareas del equipo.
+async function traerTareas() {
+  const url = leer(LS.scriptUrl, "");
+  if (!url || !navigator.onLine) return;
+  try {
+    const d = await (await fetch(url + "?tareas=1")).json();
+    if (Array.isArray(d.tareas)) escribir(LS.tareas, d.tareas);
+  } catch { /* sin conexión: se usa la última lista guardada */ }
+}
+
 function prepararHoras() {
   const f = $("#form-horas");
   f.onsubmit = (e) => {
@@ -739,6 +970,7 @@ function prepararCosechas() {
   const f = $("#form-cosechas");
   const calculo = $("#calculo-cosecha");
   enlazarSectorBancal(f);
+  enlazarBuscadores(f);
 
   const actualizar = () => {
     const kg = aNumero(f.kg.value);
@@ -756,6 +988,7 @@ function prepararCosechas() {
   f.onsubmit = (e) => {
     e.preventDefault();
     const kg = aNumero(f.kg.value);
+    if (!f.cultivo.value) return aviso("Elegí el cultivo.", true);
     if (!(kg > 0)) return aviso("Los kilos deben ser un número mayor a cero.", true);
     if (f.operador.value && !leer(LS.nombre, "")) escribir(LS.nombre, f.operador.value);
     guardarRegistro("cosechas", {

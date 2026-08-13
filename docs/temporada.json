@@ -1,5 +1,5 @@
 {
-  "generado": "2026-08-13T00:21:44",
+  "generado": "2026-08-13T11:03:23",
   "temporada": {
     "nombre": "2026-27",
     "inicio": "2026-07-07",
@@ -17,17 +17,22 @@
   "sectores": [
     {
       "sector": "A",
-      "bancales": 10,
+      "bancales": 25,
       "tipo_riego": "Aspersión"
     },
     {
       "sector": "B",
-      "bancales": 10,
+      "bancales": 25,
       "tipo_riego": "Aspersión"
     },
     {
       "sector": "C",
-      "bancales": 15,
+      "bancales": 25,
+      "tipo_riego": "Aspersión"
+    },
+    {
+      "sector": "D",
+      "bancales": 25,
       "tipo_riego": "Aspersión"
     }
   ],
@@ -287,28 +292,22 @@
   ],
   "integrantes": [
     {
-      "nombre": "Belu",
-      "rol": "Administrador"
+      "nombre": "Belu"
     },
     {
-      "nombre": "Luis",
-      "rol": "Operario"
+      "nombre": "Luis"
     },
     {
-      "nombre": "Luna",
-      "rol": "Administrador"
+      "nombre": "Luna"
     },
     {
-      "nombre": "Marto",
-      "rol": "Administrador"
+      "nombre": "Marto"
     },
     {
-      "nombre": "Nati",
-      "rol": "Operario"
+      "nombre": "Nati"
     },
     {
-      "nombre": "Tomi",
-      "rol": "Administrador"
+      "nombre": "Tomi"
     }
   ],
   "actividades": [

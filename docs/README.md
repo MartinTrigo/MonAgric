@@ -49,13 +49,36 @@ carpeta `docs/` de la rama `main`; se actualiza sola con cada `git push`).
 
 ## Qué hace cada sección
 
+La barra de abajo deja **Inicio** y **Plan** fijos en las puntas; el medio se
+desliza con el dedo, así se pueden ir sumando secciones (trasplantes, manejo,
+sanidad) sin que quede todo apretado.
+
 | Sección | Para qué sirve |
 |---|---|
 | **Inicio** | Temporada activa, m² y kg planificados, y cuánto se lleva cosechado |
-| **Siembras** | Fecha, cultivo, variedad, tipo, generación, bandejas o sector/bancal |
 | **Horas** | Quién trabajó, cuántas horas y en qué actividad |
+| **Tareas** | Lo que hay que hacer, con importancia y fecha. Se marcan como hechas y todo el equipo ve la misma lista |
+| **Siembras** | Fecha, cultivo, variedad, tipo, generación, bandejas o sector/bancal |
 | **Cosechas** | Kilos por cultivo y bancal, con el rinde en kg/m² |
 | **Plan** | Los 28 cultivos planificados, sectores de riego e integrantes |
+
+En los campos de cultivo hay un **buscador**: se escribe para filtrar (sin
+importar tildes ni mayúsculas) o se toca para ver la lista completa, con los del
+plan de la temporada primero.
+
+## Traer los datos a la app de escritorio
+
+La app web escribe en la planilla y la de escritorio trabaja con su propia base,
+así que **no se sincronizan solas**. Para bajar a la base lo que se cargó desde
+los celulares:
+
+```
+python tools/importar_de_planilla.py https://script.google.com/macros/s/.../exec
+```
+
+La primera vez se le pasa la dirección del servicio y queda guardada; después
+alcanza con `python tools/importar_de_planilla.py`. Se puede correr las veces
+que haga falta: cada registro trae el id que le puso el celular y no se duplica.
 
 ## Las horas van a la planilla de siempre
 

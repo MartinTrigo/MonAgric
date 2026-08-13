@@ -31,6 +31,17 @@ var HOJAS = {
               d.observaciones || "", r.dispositivo || "", new Date()];
     },
   },
+  tareas: {
+    nombre: "Tareas",
+    encabezados: ["Id", "Temporada", "Para cuándo", "Tarea", "Importancia", "Personas",
+                  "Estado", "Anotó", "Hecha el", "Hecha por", "Cargado por", "Recibido"],
+    fila: function (r) {
+      var d = r.datos;
+      return [r.id, r.temporada || "", d.fecha, d.tarea, d.importancia || "Media",
+              d.personas || 1, "Pendiente", d.creada_por || "", "", "",
+              r.dispositivo || "", new Date()];
+    },
+  },
   cosechas: {
     nombre: "Cosechas",
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Kg", "Sector", "Bancal", "Cosechó",
@@ -46,7 +57,10 @@ var HOJAS = {
 // ---------- Entradas del servicio ----------
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.resumen) return respuesta(calcularResumen());
+  var p = (e && e.parameter) || {};
+  if (p.resumen) return respuesta(calcularResumen());
+  if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas() });
+  if (p.exportar) return respuesta({ ok: true, hoja: p.exportar, filas: exportarHoja(p.exportar) });
   return respuesta({ ok: true, servicio: "MonAgric", hora: new Date().toISOString() });
 }
 
@@ -59,7 +73,12 @@ function doPost(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
-      // Se agrupan por tipo para escribir cada hoja de una sola vez.
+      // Marcar tareas como hechas no agrega filas: corrige la que ya está.
+      registros.forEach(function (r) {
+        if (r.tipo === "tareas_hecha") { marcarTareaHecha(r); guardados++; }
+      });
+
+      // El resto se agrupa por tipo para escribir cada hoja de una sola vez.
       var porTipo = {};
       registros.forEach(function (r) {
         if (!HOJAS[r.tipo]) return;
@@ -153,6 +172,75 @@ function sumarHorasDelProyecto(res) {
   } catch (err) {
     res.horas_error = String(err);   // la planilla no se pudo abrir: el resto sigue
   }
+}
+
+// ---------- Tareas ----------
+
+// Columnas de la hoja Tareas: 1 Id · 3 Para cuándo · 4 Tarea · 5 Importancia
+// 6 Personas · 7 Estado · 8 Anotó · 9 Hecha el · 10 Hecha por
+function marcarTareaHecha(r) {
+  var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HOJAS.tareas.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return;
+  var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) !== String(r.datos.tarea_id)) continue;
+    var fila = i + 2;
+    if (String(hoja.getRange(fila, 7).getValue()) === "Hecha") return;   // ya estaba
+    hoja.getRange(fila, 7, 1, 4).setValues([["Hecha", hoja.getRange(fila, 8).getValue(),
+                                             r.datos.hecha_el || "", r.datos.hecha_por || ""]]);
+    return;
+  }
+}
+
+// Las pendientes, más las hechas de los últimos días para poder verlas.
+function listaDeTareas() {
+  var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HOJAS.tareas.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var valores = hoja.getRange(2, 1, hoja.getLastRow() - 1, 10).getValues();
+  var texto = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+  var lista = [];
+  valores.forEach(function (f) {
+    if (!f[0]) return;
+    var hecha = String(f[6]) === "Hecha";
+    if (hecha && texto(f[8]) < corrimientoDias(-10)) return;   // hechas viejas: no viajan
+    lista.push({
+      id: String(f[0]), fecha: texto(f[2]), tarea: String(f[3]),
+      importancia: String(f[4] || "Media"), personas: Number(f[5]) || 1,
+      hecha: hecha, creada_por: String(f[7] || ""),
+      hecha_el: texto(f[8]), hecha_por: String(f[9] || ""),
+    });
+  });
+  return lista;
+}
+
+function corrimientoDias(dias) {
+  var d = new Date();
+  d.setDate(d.getDate() + dias);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+// ---------- Exportar a la app de escritorio ----------
+// Devuelve una hoja entera como objetos {encabezado: valor}, para que
+// tools/importar_de_planilla.py meta en la base lo que se cargó desde el celular.
+function exportarHoja(cual) {
+  var def = HOJAS[String(cual).toLowerCase()];
+  if (!def) return [];
+  var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(def.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var datos = hoja.getRange(1, 1, hoja.getLastRow(), def.encabezados.length).getValues();
+  var cabeceras = datos.shift();
+  return datos.map(function (f) {
+    var obj = {};
+    cabeceras.forEach(function (c, i) {
+      var v = f[i];
+      obj[c] = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v;
+    });
+    return obj;
+  });
 }
 
 // ---------- Auxiliares ----------

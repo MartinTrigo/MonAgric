@@ -88,10 +88,11 @@ def main() -> None:
         )
     ]
 
-    # Solo nombre y rol: el repositorio de la app web es publico.
+    # Solo los nombres: el repositorio de la app web es publico, y ademas el rol
+    # y el valor hora no se usan en ningun lado.
     integrantes = [
-        {"nombre": r["nombre"], "rol": r["rol"] or ""}
-        for r in conn.execute("SELECT nombre, rol FROM integrantes ORDER BY nombre")
+        {"nombre": r["nombre"]}
+        for r in conn.execute("SELECT nombre FROM integrantes ORDER BY nombre")
     ]
 
     perfiles = {
