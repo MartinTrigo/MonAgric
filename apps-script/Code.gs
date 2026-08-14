@@ -25,6 +25,14 @@
 var PLANILLA_HORAS_TICA = "1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg";
 var CHACRA_CON_HORAS_APARTE = "tica";
 
+// Los puntajes del juego (Pac-Farm) van a su propia planilla, aparte de los
+// datos productivos: es un juego, no tiene por que mezclarse con la produccion.
+// Todas las chacras escriben ahi, cada fila dice de cual es, y el ranking de
+// cada chacra sale filtrando por esa columna.
+var PLANILLA_JUEGO_ID = "1FdOqQXgnHbNUOq8-v2vgBYqGIjhpxT-NLhNU1dWJOJU";
+var JUEGO_ENCABEZADOS = ["Id", "Chacra", "Jugador", "Puntos", "Nivel", "Fecha",
+                         "Cargado por", "Recibido"];
+
 var HOJAS = {
   siembras: {
     nombre: "Siembras",
@@ -61,17 +69,6 @@ var HOJAS = {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.kg,
               d.operador || "", r.dispositivo || "", new Date()];
-    },
-  },
-  // Los puntajes del juego (Pac-Farm). Van a la planilla de la chacra como
-  // cualquier otro registro, asi el ranking es entre los del proyecto.
-  puntajes: {
-    nombre: "Puntajes",
-    encabezados: ["Id", "Jugador", "Puntos", "Nivel", "Fecha", "Cargado por", "Recibido"],
-    fila: function (r) {
-      var d = r.datos;
-      return [r.id, d.jugador, Number(d.puntos) || 0, Number(d.nivel) || 1,
-              d.fecha, r.dispositivo || "", new Date()];
     },
   },
   horas: {
@@ -137,6 +134,7 @@ function doPost(e) {
       registros.forEach(function (r) {
         if (r.tipo === "tareas_hecha") { marcarTareaHecha(libro, r); guardados++; }
         else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
+        else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
       });
 
       var porTipo = {};
@@ -375,27 +373,53 @@ function corrimientoDias(dias) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
 }
 
-// ---------- Ranking del juego ----------
-// El mejor puntaje de cada jugador, de mayor a menor. Se guardan todas las
-// partidas, pero en el ranking cada uno figura una sola vez, con su record.
+// ---------- El juego (Pac-Farm) ----------
+
+function hojaDelJuego() {
+  var libro = SpreadsheetApp.openById(PLANILLA_JUEGO_ID);
+  var hoja = libro.getSheetByName("Puntajes");
+  if (!hoja) {
+    // Si la planilla esta recien creada, se aprovecha su hoja vacia en vez de
+    // dejarla ahi al lado sin usar.
+    var primera = libro.getSheets()[0];
+    hoja = (libro.getSheets().length === 1 && primera.getLastRow() === 0)
+      ? primera.setName("Puntajes")
+      : libro.insertSheet("Puntajes");
+    ponerEncabezados(hoja, JUEGO_ENCABEZADOS);
+    hoja.autoResizeColumns(1, JUEGO_ENCABEZADOS.length);
+  }
+  return hoja;
+}
+
+function guardarPuntaje(chacra, r) {
+  var hoja = hojaDelJuego();
+  var d = r.datos;
+  hoja.appendRow([r.id, chacra, String(d.jugador), Number(d.puntos) || 0,
+                  Number(d.nivel) || 1, d.fecha, r.dispositivo || "", new Date()]);
+}
+
+// El mejor puntaje de cada jugador de esa chacra, de mayor a menor. Se guardan
+// todas las partidas, pero en el ranking cada uno figura una sola vez.
 function rankingDelJuego(chacra) {
-  var hoja = planillaDe(chacra).getSheetByName(HOJAS.puntajes.nombre);
+  var hoja = SpreadsheetApp.openById(PLANILLA_JUEGO_ID).getSheetByName("Puntajes");
   if (!hoja || hoja.getLastRow() < 2) return [];
   var tz = Session.getScriptTimeZone();
   var mejores = {};
 
-  hoja.getRange(2, 2, hoja.getLastRow() - 1, 4).getValues().forEach(function (f) {
-    var jugador = String(f[0]).trim();
-    var puntos = Number(f[1]) || 0;
+  // Columnas: 2 Chacra · 3 Jugador · 4 Puntos · 5 Nivel · 6 Fecha
+  hoja.getRange(2, 2, hoja.getLastRow() - 1, 5).getValues().forEach(function (f) {
+    if (String(f[0]).toLowerCase() !== String(chacra).toLowerCase()) return;
+    var jugador = String(f[1]).trim();
+    var puntos = Number(f[2]) || 0;
     if (!jugador) return;
-    var fecha = (f[3] instanceof Date) ? Utilities.formatDate(f[3], tz, "yyyy-MM-dd")
-                                       : String(f[3] || "");
+    var fecha = (f[4] instanceof Date) ? Utilities.formatDate(f[4], tz, "yyyy-MM-dd")
+                                       : String(f[4] || "");
     if (!mejores[jugador]) mejores[jugador] = { jugador: jugador, puntos: 0, nivel: 1,
                                                 fecha: "", partidas: 0 };
     mejores[jugador].partidas++;
     if (puntos > mejores[jugador].puntos) {
       mejores[jugador].puntos = puntos;
-      mejores[jugador].nivel = Number(f[2]) || 1;
+      mejores[jugador].nivel = Number(f[3]) || 1;
       mejores[jugador].fecha = fecha;
     }
   });
