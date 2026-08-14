@@ -63,6 +63,17 @@ var HOJAS = {
               d.operador || "", r.dispositivo || "", new Date()];
     },
   },
+  // Los puntajes del juego (Pac-Farm). Van a la planilla de la chacra como
+  // cualquier otro registro, asi el ranking es entre los del proyecto.
+  puntajes: {
+    nombre: "Puntajes",
+    encabezados: ["Id", "Jugador", "Puntos", "Nivel", "Fecha", "Cargado por", "Recibido"],
+    fila: function (r) {
+      var d = r.datos;
+      return [r.id, d.jugador, Number(d.puntos) || 0, Number(d.nivel) || 1,
+              d.fecha, r.dispositivo || "", new Date()];
+    },
+  },
   horas: {
     nombre: "Horas",
     encabezados: ["Id", "Temporada", "Fecha", "Integrante", "Horas", "Actividad",
@@ -103,6 +114,7 @@ function doGet(e) {
   if (p.config) return respuesta({ ok: true, config: leerConfig(chacra) });
   if (p.resumen) return respuesta(calcularResumen(chacra));
   if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
+  if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
   if (p.exportar) return respuesta({ ok: true, hoja: p.exportar,
                                      filas: exportarHoja(chacra, p.exportar) });
   return respuesta({ ok: true, servicio: "MonAgric", chacras: chacrasConocidas(),
@@ -355,6 +367,35 @@ function corrimientoDias(dias) {
   var d = new Date();
   d.setDate(d.getDate() + dias);
   return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+// ---------- Ranking del juego ----------
+// El mejor puntaje de cada jugador, de mayor a menor. Se guardan todas las
+// partidas, pero en el ranking cada uno figura una sola vez, con su record.
+function rankingDelJuego(chacra) {
+  var hoja = planillaDe(chacra).getSheetByName(HOJAS.puntajes.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var mejores = {};
+
+  hoja.getRange(2, 2, hoja.getLastRow() - 1, 4).getValues().forEach(function (f) {
+    var jugador = String(f[0]).trim();
+    var puntos = Number(f[1]) || 0;
+    if (!jugador) return;
+    var fecha = (f[3] instanceof Date) ? Utilities.formatDate(f[3], tz, "yyyy-MM-dd")
+                                       : String(f[3] || "");
+    if (!mejores[jugador]) mejores[jugador] = { jugador: jugador, puntos: 0, nivel: 1,
+                                                fecha: "", partidas: 0 };
+    mejores[jugador].partidas++;
+    if (puntos > mejores[jugador].puntos) {
+      mejores[jugador].puntos = puntos;
+      mejores[jugador].nivel = Number(f[2]) || 1;
+      mejores[jugador].fecha = fecha;
+    }
+  });
+
+  return Object.keys(mejores).map(function (k) { return mejores[k]; })
+    .sort(function (a, b) { return b.puntos - a.puntos; });
 }
 
 // ---------- Exportar a la app de escritorio ----------
