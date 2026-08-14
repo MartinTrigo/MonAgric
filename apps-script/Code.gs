@@ -115,6 +115,8 @@ function doGet(e) {
   if (p.resumen) return respuesta(calcularResumen(chacra));
   if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
   if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
+  if (p.ultimos) return respuesta({ ok: true, hoja: p.ultimos,
+                                    filas: ultimosDeHoja(chacra, p.ultimos, Number(p.n) || 15) });
   if (p.exportar) return respuesta({ ok: true, hoja: p.exportar,
                                      filas: exportarHoja(chacra, p.exportar) });
   return respuesta({ ok: true, servicio: "MonAgric", chacras: chacrasConocidas(),
@@ -196,8 +198,12 @@ function hojaConfig(libro) {
 }
 
 function leerConfig(chacra) {
-  var hoja = planillaDe(chacra).getSheetByName("Config");
-  var cfg = { chacra: chacra, temporada: {}, bancal: {}, sectores: [], integrantes: [], plan: [] };
+  var libro = planillaDe(chacra);
+  var hoja = libro.getSheetByName("Config");
+  // La direccion de la planilla viaja con la configuracion: la app la usa para
+  // el enlace "ver todo en la planilla".
+  var cfg = { chacra: chacra, planilla: libro.getUrl(), temporada: {}, bancal: {},
+              sectores: [], integrantes: [], plan: [] };
   if (!hoja || hoja.getLastRow() < 2) return cfg;
 
   // Las fechas la planilla las guarda como fecha de verdad, no como texto: hay
@@ -396,6 +402,31 @@ function rankingDelJuego(chacra) {
 
   return Object.keys(mejores).map(function (k) { return mejores[k]; })
     .sort(function (a, b) { return b.puntos - a.puntos; });
+}
+
+// ---------- Los últimos movimientos de cada sección ----------
+// Para que en el celular se vea lo que viene cargando todo el equipo, no solo
+// lo de ese teléfono. Se leen nada más las últimas filas: no importa cuánto
+// crezca la planilla, siempre pesa lo mismo.
+function ultimosDeHoja(chacra, cual, cuantos) {
+  var def = HOJAS[String(cual).toLowerCase()];
+  if (!def) return [];
+  var hoja = planillaDe(chacra).getSheetByName(def.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return [];
+
+  var disponibles = hoja.getLastRow() - 1;
+  var n = Math.min(Math.max(cuantos, 1), Math.min(disponibles, 30));
+  var desde = hoja.getLastRow() - n + 1;
+  var tz = Session.getScriptTimeZone();
+
+  return hoja.getRange(desde, 1, n, def.encabezados.length).getValues().map(function (f) {
+    var obj = {};
+    def.encabezados.forEach(function (c, i) {
+      var v = f[i];
+      obj[c] = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v;
+    });
+    return obj;
+  }).reverse();          // el más nuevo primero
 }
 
 // ---------- Exportar a la app de escritorio ----------

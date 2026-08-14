@@ -52,6 +52,7 @@ const LS = {
   nombresPlanilla: "monagric_nombres_planilla",
   ultimasHoras: "monagric_ultimas_horas",
   tareas: "monagric_tareas",
+  ultimos: "monagric_ultimos",
 };
 
 const leer = (k, def) => {
@@ -211,6 +212,9 @@ async function sincronizar(silencioso = true) {
   }
 
   if (enviadosAhora.length) {
+    // Lo recién enviado ya está en la planilla: se vuelve a pedir para que
+    // aparezca en la lista de la chacra y no solo como "por enviar".
+    new Set(enviadosAhora.map((r) => r.tipo)).forEach((t) => traerUltimos(t, true));
     const ids = new Set(enviadosAhora.map((r) => r.id));
     enviados = enviadosAhora.map((r) => ({ ...r, enviado_en: ahora() })).concat(enviados).slice(0, 60);
     pendientes = pendientes.filter((r) => !ids.has(r.id));
@@ -593,8 +597,9 @@ const plantillas = {
       </form>
     </div>
 
+    ${horasVanAparte() ? `
     <div class="tarjeta">
-      <h2>Últimos registros del equipo <small>planilla del proyecto</small></h2>
+      <h2>Últimos movimientos <small>planilla del proyecto</small></h2>
       ${pendientesHoras.map((r) => `<div class="registro">
         <div><div class="detalle">${esc(r.datos.integrante)} — ${r.datos.horas} h</div>
           <div class="cuando">${fechaCorta(r.datos.fecha)} · ${esc(r.datos.actividad)}</div></div>
@@ -610,7 +615,7 @@ const plantillas = {
       <a class="enlace-planilla" target="_blank" rel="noopener"
          href="https://docs.google.com/spreadsheets/d/1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg/edit">
         Ver la planilla de horas completa</a>
-    </div>`;
+    </div>` : historialDe("horas")}`;
   },
 
   tareas() {
@@ -1035,11 +1040,78 @@ function kgLocalesPorCultivo() {
   return mapa;
 }
 
+// Cada sección muestra lo último que cargó TODO el equipo, no solo este
+// teléfono: primero lo que está esperando enviarse de acá, después lo que ya
+// está en la planilla. Para el detalle completo está la planilla.
 function historialDe(tipo) {
-  const filas = pendientes.concat(enviados).filter((r) => r.tipo === tipo).slice(0, 8);
-  if (!filas.length) return "";
-  return `<div class="tarjeta"><h2>Últimos registros <small>de este teléfono</small></h2>
-    ${filas.map(filaRegistro).join("")}</div>`;
+  const delEquipo = (leer(LS.ultimos, {})[tipo] || []).slice(0, 15);
+  const yaEnLaPlanilla = new Set(delEquipo.map((f) => String(f.Id)));
+
+  // Lo cargado en este teléfono que todavía no figura en la lista de la chacra:
+  // sea porque falta enviarlo o porque recién se envió y la planilla aún no lo
+  // devolvió. Si no, el registro parecía desaparecer apenas se guardaba.
+  const locales = pendientes.concat(enviados)
+    .filter((r) => r.tipo === tipo && !yaEnLaPlanilla.has(String(r.id)))
+    .slice(0, 5);
+
+  const cuerpo = locales.length || delEquipo.length
+    ? locales.map(filaRegistro).join("") + delEquipo.map((f) => filaEquipo(tipo, f)).join("")
+    : `<p class="nota">Todavía no hay registros cargados.</p>`;
+
+  return `<div class="tarjeta">
+    <h2>Últimos movimientos <small>de la chacra</small></h2>
+    ${cuerpo}
+    <a class="enlace-planilla" href="${esc(enlacePlanilla())}" target="_blank" rel="noopener">
+      Ver todo en la planilla</a>
+  </div>`;
+}
+
+// La dirección de la planilla la manda el servicio junto con la configuración.
+const enlacePlanilla = () => CFG?.planilla || "https://drive.google.com/drive/recent";
+
+// Una fila que ya está en la planilla. Las claves son los encabezados de la
+// hoja, así que se lee igual que se ve allá.
+function filaEquipo(tipo, f) {
+  let detalle, extra;
+  if (tipo === "siembras") {
+    const cant = f.Plantines ? `${num(f.Plantines)} plantines`
+      : (f.Sector ? `${esc(f.Sector)}${f.Bancal || ""}` : "");
+    detalle = `${esc(f.Cultivo)}${f.Variedad ? " " + esc(f.Variedad) : ""} · G${f["Generación"] || 1}`;
+    extra = [esc(f.Tipo), cant, f.Operador ? "por " + esc(f.Operador) : ""].filter(Boolean).join(" · ");
+  } else if (tipo === "cosechas") {
+    detalle = `${esc(f.Cultivo)} — ${num(f.Kg, 1)} kg`;
+    extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
+  } else if (tipo === "horas") {
+    detalle = `${esc(f.Integrante)} — ${num(f.Horas, 1)} h`;
+    extra = esc(f.Actividad || "");
+  } else {
+    detalle = esc(f.Tarea || f.Cultivo || "");
+    extra = "";
+  }
+  return `<div class="registro">
+    <div><div class="detalle">${detalle}</div>
+      <div class="cuando">${fechaCorta(f.Fecha)}${extra ? " · " + extra : ""}</div></div>
+  </div>`;
+}
+
+// Trae del servicio las últimas filas de una hoja y las guarda para verlas
+// aunque después no haya señal.
+const pedidoReciente = {};
+async function traerUltimos(tipo, forzar = false) {
+  if (!chacraCodigo() || !navigator.onLine) return;
+  // Sin esto, cada render pediría de nuevo y el redibujado se volvería un lazo.
+  if (!forzar && Date.now() - (pedidoReciente[tipo] || 0) < 20000) return;
+  pedidoReciente[tipo] = Date.now();
+  try {
+    const d = await (await fetch(`${urlServicio()}?ultimos=${encodeURIComponent(tipo)}` +
+      `&chacra=${encodeURIComponent(chacraCodigo())}&n=15`)).json();
+    if (!d.ok || !Array.isArray(d.filas)) return;
+    const guardado = leer(LS.ultimos, {});
+    const cambio = JSON.stringify(guardado[tipo] || []) !== JSON.stringify(d.filas);
+    guardado[tipo] = d.filas;
+    escribir(LS.ultimos, guardado);
+    if (cambio && vistaActual === tipo) render(tipo);
+  } catch { /* sin conexión: se muestra lo último que se bajó */ }
 }
 
 function filaRegistro(r) {
@@ -1080,6 +1152,9 @@ function render(vista) {
    }[vista] || (() => {}))();
 
   prepararComunes();
+
+  // Las secciones de registro muestran lo último de toda la chacra.
+  if (["siembras", "cosechas", "horas"].includes(vista)) traerUltimos(vista);
 
   // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
   const activa = document.querySelector(".tabs-medio .tab.activa");
