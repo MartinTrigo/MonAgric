@@ -448,12 +448,13 @@ function barra(porcentaje, clara = false) {
   return `<div class="barra${clara ? " clara" : ""}"><i style="width:${p}%"></i></div>`;
 }
 
-// El cosechador de Pac-Farm con su sombrero de paja, para el acceso al juego.
-const SVG_PACFARM = `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
-  <path d="M16 1.5 L23.5 9 L8.5 9 Z" fill="#e2c07c"/>
-  <path d="M3 9 H29 V11 H3 Z" fill="#e2c07c"/>
-  <path d="M3 11 H29 V11.9 H3 Z" fill="#a8814a"/>
-  <path d="M16 20 L25.6 14.4 A11 11 0 1 1 25.6 25.6 Z" fill="#f5b324"/>
+// El cosechador de Pac-Farm comiéndose un rabanito. El sombrero quedaba como
+// una barra suelta encima de la cabeza a este tamaño; el rabanito le da el
+// mismo aire de huerta y deja al cosechador limpio y bien redondo.
+const SVG_PACFARM = `<svg viewBox="0 0 40 32" width="42" height="34" aria-hidden="true">
+  <path d="M13 16 L24 9.1 A13 13 0 1 1 24 22.9 Z" fill="#f5b324"/>
+  <circle cx="34" cy="17" r="5" fill="#e4483c"/>
+  <path d="M31 11 L34 12.5 L37 11 L35 13.5 L33 13.5 Z" fill="#5fbf5a"/>
 </svg>`;
 
 // ==========================================================
