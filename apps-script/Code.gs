@@ -121,14 +121,23 @@ function chacrasConocidas() {
 
 // ---------- Entradas del servicio ----------
 
+// Todo va envuelto: si algo falla, Apps Script devuelve una pagina HTML de
+// error que no dice nada. Asi al menos vuelve el motivo en el JSON.
 function doGet(e) {
-  var p = (e && e.parameter) || {};
+  try {
+    return atender((e && e.parameter) || {});
+  } catch (err) {
+    return respuesta({ ok: false, error: String(err), donde: "doGet" });
+  }
+}
+
+function atender(p) {
   var chacra = p.chacra || "";
   if (p.config) return respuesta({ ok: true, config: leerConfig(chacra) });
   if (p.resumen) return respuesta(calcularResumen(chacra));
   if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
   if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
-  if (p.panel) return respuesta({ ok: true, chacras: actualizarPanel() });
+  if (p.panel) return respuesta(actualizarPanel(chacra));
   if (p.ultimos) return respuesta({ ok: true, hoja: p.ultimos,
                                     filas: ultimosDeHoja(chacra, p.ultimos, Number(p.n) || 15) });
   if (p.exportar) return respuesta({ ok: true, hoja: p.exportar,
@@ -214,7 +223,12 @@ function hojaConfig(libro) {
 }
 
 function leerConfig(chacra) {
-  var libro = planillaDe(chacra);
+  return leerConfigDe(planillaDe(chacra), chacra);
+}
+
+// Igual que leerConfig, pero con la planilla ya abierta. Abrirla una sola vez
+// hace toda la diferencia cuando hay que recorrer varias chacras seguidas.
+function leerConfigDe(libro, chacra) {
   var hoja = libro.getSheetByName("Config");
   // La direccion de la planilla viaja con la configuracion: la app la usa para
   // el enlace "ver todo en la planilla".
@@ -396,33 +410,42 @@ function corrimientoDias(dias) {
 // ---------- Panel compartido entre chacras ----------
 // Se puede llamar a mano (?panel=1) o con un activador diario desde el editor.
 
-function actualizarPanel() {
+// Con ?panel=1 se actualizan todas; con ?panel=1&chacra=tica, solo esa. Cada
+// chacra va en su propio try: si una falla, las demas igual se actualizan y el
+// motivo vuelve en la respuesta.
+function actualizarPanel(soloChacra) {
   var libro = SpreadsheetApp.openById(PLANILLA_PANEL_ID);
-  var chacras = chacrasConocidas();
-  var hechas = [];
+  var codigos = soloChacra ? [soloChacra] : chacrasConocidas();
+  var hechas = [], sinPlan = [], fallaron = {};
 
-  chacras.forEach(function (codigo) {
-    var cfg = leerConfig(codigo);
-    if (!cfg.plan || !cfg.plan.length) return;      // sin plan no hay nada que comparar
-    escribirHojaDeChacra(libro, codigo, cfg);
-    hechas.push(codigo);
+  codigos.forEach(function (codigo) {
+    try {
+      // La planilla de la chacra se abre UNA vez y se reusa: abrirla de nuevo
+      // en cada cuenta hacia que el panel tardara una eternidad.
+      var origen = planillaDe(codigo);
+      var cfg = leerConfigDe(origen, codigo);
+      if (!cfg.plan || !cfg.plan.length) { sinPlan.push(codigo); return; }
+      escribirHojaDeChacra(libro, codigo, cfg, origen);
+      hechas.push(codigo);
+    } catch (err) {
+      fallaron[codigo] = String(err);
+    }
   });
 
-  // La hoja vacía que trae toda planilla nueva, si quedó, estorba.
   var sobrante = libro.getSheetByName("Hoja 1") || libro.getSheetByName("Sheet1");
   if (sobrante && libro.getSheets().length > 1) libro.deleteSheet(sobrante);
 
-  return hechas;
+  return { ok: true, actualizadas: hechas, sin_plan: sinPlan, fallaron: fallaron };
 }
 
-function escribirHojaDeChacra(libro, codigo, cfg) {
+function escribirHojaDeChacra(libro, codigo, cfg, origen) {
   var titulo = cfg.nombre || codigo;
   var hoja = libro.getSheetByName(titulo) || libro.insertSheet(titulo);
   hoja.clear();
 
   var m2Bancal = (cfg.bancal.largo_m || 0) * (cfg.bancal.ancho_m || 0);
-  var kg = kgPorCultivo(codigo);
-  var siembras = siembrasPorCultivo(codigo);
+  var kg = kgPorCultivo(origen);
+  var siembras = siembrasPorCultivo(origen);
 
   var filas = cfg.plan.map(function (p) {
     var cosechado = kg[p.cultivo] || 0;
@@ -455,7 +478,7 @@ function escribirHojaDeChacra(libro, codigo, cfg) {
     "Cosechado", Math.round(totalCosechado) + " kg",
   ]]);
   hoja.getRange(3, 1, 1, 2).setValues([[
-    "Horas de trabajo", Math.round(horasTotales(codigo) * 10) / 10]]);
+    "Horas de trabajo", Math.round(horasTotales(codigo, origen) * 10) / 10]]);
   hoja.getRange(4, 1).setValue("Actualizado: " +
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"));
   hoja.getRange(2, 1, 3, 1).setFontWeight("bold");
@@ -466,8 +489,8 @@ function escribirHojaDeChacra(libro, codigo, cfg) {
   hoja.autoResizeColumns(1, PANEL_ENCABEZADOS.length);
 }
 
-function kgPorCultivo(chacra) {
-  var hoja = planillaDe(chacra).getSheetByName("Cosechas");
+function kgPorCultivo(origen) {
+  var hoja = origen.getSheetByName("Cosechas");
   var total = {};
   if (!hoja || hoja.getLastRow() < 2) return total;
   hoja.getRange(2, 4, hoja.getLastRow() - 1, 2).getValues().forEach(function (f) {
@@ -476,8 +499,8 @@ function kgPorCultivo(chacra) {
   return total;
 }
 
-function siembrasPorCultivo(chacra) {
-  var hoja = planillaDe(chacra).getSheetByName("Siembras");
+function siembrasPorCultivo(origen) {
+  var hoja = origen.getSheetByName("Siembras");
   var total = {};
   if (!hoja || hoja.getLastRow() < 2) return total;
   // Columnas: 4 Cultivo · 10 Plantines
@@ -491,9 +514,9 @@ function siembrasPorCultivo(chacra) {
   return total;
 }
 
-function horasTotales(chacra) {
+function horasTotales(chacra, origen) {
   var res = { horas: 0, horas_por_integrante: {} };
-  sumarHoras(chacra, planillaDe(chacra), res);
+  sumarHoras(chacra, origen, res);
   return res.horas;
 }
 
