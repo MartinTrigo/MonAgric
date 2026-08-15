@@ -1,0 +1,16 @@
+﻿{
+  "name": "Pac-Farm",
+  "short_name": "Pac-Farm",
+  "description": "Juego de laberinto con temática de huerta: cosechá verduras y escapá de las plagas",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1410",
+  "theme_color": "#0b1410",
+  "lang": "es",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1410">
+<title>Pac-Farm</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<div id="marco">
+  <canvas id="pantalla" width="224" height="288"></canvas>
+
+  <!-- El joystick: se apoya el dedo y se desliza hacia donde se quiere ir. -->
+  <div id="mandos">
+    <div id="rueda" role="application" aria-label="Rueda de dirección">
+      <span class="flecha arriba">&#9650;</span>
+      <span class="flecha abajo">&#9660;</span>
+      <span class="flecha izquierda">&#9664;</span>
+      <span class="flecha derecha">&#9654;</span>
+      <div id="perilla"></div>
+    </div>
+  </div>
+
+  <div id="barra">
+    <button id="btn-pausa" type="button">Pausa</button>
+    <button id="btn-sonido" type="button">Sonido: sí</button>
+    <button id="btn-ranking" type="button">Ranking</button>
+  </div>
+
+  <a id="volver" href="../">&#8592; Volver a MonAgric</a>
+
+  <!-- La tabla del equipo: el mejor puntaje de cada uno -->
+  <section id="ranking" hidden>
+    <h2>Ranking de la chacra</h2>
+    <div id="tabla-ranking"></div>
+  </section>
+
+  <p id="ayuda">
+    Flechas o WASD para moverte · P para pausar · en el celular, deslizá el dedo
+    sobre la rueda o usá los botones de los costados.
+  </p>
+</div>
+
+<script src="juego.js"></script>
+</body>
+</html>

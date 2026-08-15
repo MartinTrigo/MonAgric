@@ -1,0 +1,200 @@
+/* Huerta-Man — pantalla retro, todo en pixeles enteros para que no se vea borroso */
+:root {
+  --fondo: #0b1410;
+  --tierra: #1b2a1f;
+  --verde: #7ec98a;
+  --ambar: #f5b324;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  background: var(--fondo);
+  color: var(--verde);
+  font-family: ui-monospace, "Courier New", monospace;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 8px;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+#marco {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+canvas {
+  display: block;
+  background: var(--fondo);
+  /* el canvas es de 224x288 y se agranda por múltiplos enteros: pixel art nítido */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 2px solid var(--tierra);
+  border-radius: 4px;
+  max-width: 100%;
+  touch-action: none;
+}
+
+/* ---- botones ---- */
+#barra { display: flex; gap: 8px; }
+
+button {
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--verde);
+  background: var(--tierra);
+  border: 2px solid #2f4a36;
+  border-radius: 6px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+button:active { background: #2f4a36; }
+
+/* ---- rueda de dirección para el celular ---- */
+/* Se apoya el dedo en cualquier parte de la rueda y se desliza hacia donde se
+   quiere ir; la perilla sigue al dedo para que se vea qué está tomando. */
+#mandos {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+#rueda {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  /* base metálica del joystick, con el hueco oscuro del centro */
+  background:
+    radial-gradient(circle at 50% 38%, #2b3f31 0 30%, transparent 31%),
+    radial-gradient(circle at 50% 50%, #0d1712 0 30%, #24382a 31% 78%, #16241a 79% 100%);
+  border: 3px solid #34513c;
+  box-shadow: inset 0 6px 14px rgba(0, 0, 0, .55), 0 3px 10px rgba(0, 0, 0, .4);
+  touch-action: none;
+  user-select: none;
+  flex: 0 0 auto;
+}
+#rueda .flecha {
+  position: absolute;
+  color: #3f6247;
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: color .1s;
+}
+#rueda .arriba    { top: 9px;  left: 50%; transform: translateX(-50%); }
+#rueda .abajo     { bottom: 9px; left: 50%; transform: translateX(-50%); }
+#rueda .izquierda { left: 9px;  top: 50%; transform: translateY(-50%); }
+#rueda .derecha   { right: 9px; top: 50%; transform: translateY(-50%); }
+#rueda .flecha.activa { color: var(--ambar); }
+
+/* la bola del joystick: sigue al dedo, con brillo arriba como las de arcade */
+#perilla {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, #ffe9a8 0 12%, #f5b324 32%, #c8811a 72%, #8f5c10 100%);
+  border: 2px solid #6d4409;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .5);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: transform .05s linear;
+  pointer-events: none;
+}
+/* el fuelle: el cuello negro sobre el que se apoya la bola.
+   Va en ::before para que quede detrás de la bola y no encima. */
+#rueda::before {
+  content: "";
+  position: absolute;
+  width: 94px;
+  height: 94px;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 50% 50%, #05090700 0 40%, #060b08 41% 100%);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, .8);
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  #mandos { display: flex; }
+  #ayuda { display: none; }
+}
+/* Pantallas angostas o bajas: la rueda se achica para que entre todo */
+@media (pointer: coarse) and (max-height: 720px) {
+  #rueda { width: 168px; height: 168px; }
+  #perilla { width: 66px; height: 66px; }
+  #rueda::before { width: 80px; height: 80px; }
+}
+
+/* ---- ranking del equipo ---- */
+#ranking {
+  width: 100%;
+  max-width: 430px;
+  background: var(--tierra);
+  border: 2px solid #2f4a36;
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+}
+#ranking h2 {
+  font-size: .82rem;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: #7fb98c;
+  margin-bottom: 10px;
+}
+.puesto {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 1px 10px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid #24382a;
+  font-size: .92rem;
+}
+.puesto:last-child { border-bottom: none; }
+.puesto .n { color: #5d7d64; font-weight: 700; }
+.puesto .quien { font-weight: 700; color: var(--verde); }
+.puesto .pts { font-weight: 700; color: var(--ambar); }
+.puesto .datos {
+  grid-column: 2 / -1;
+  font-size: .72rem;
+  color: #5d7d64;
+}
+/* el propio jugador, resaltado para encontrarse de un vistazo */
+.puesto.yo .quien { color: var(--ambar); }
+.puesto.yo .n { color: var(--ambar); }
+#ranking .vacio {
+  font-size: .82rem;
+  color: #5d7d64;
+  line-height: 1.6;
+}
+
+/* Vuelta a la app: el juego vive adentro de MonAgric */
+#volver {
+  color: #5d7d64;
+  font-size: .82rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 12px;
+}
+#volver:active { color: var(--verde); }
+
+#ayuda {
+  font-size: .72rem;
+  color: #5d7d64;
+  text-align: center;
+  max-width: 380px;
+  line-height: 1.5;
+}

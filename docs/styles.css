@@ -418,6 +418,25 @@ form.alta {
 .imp-Baja { background: var(--sage); }
 .tarea.vencida .tarea-meta { color: #c0392b; font-weight: 600; }
 
+/* ---- acceso al juego: discreto, al final del inicio ---- */
+.acceso-juego {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 4px auto 8px;
+  padding: 10px 16px;
+  border: 1.5px dashed var(--sage-light);
+  border-radius: 24px;
+  background: transparent;
+  color: var(--tenue);
+  font-size: .85rem;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+}
+.acceso-juego:active { background: var(--sage-suave); color: var(--sage-dark); }
+
 /* ---- aviso flotante ---- */
 .aviso {
   position: fixed;

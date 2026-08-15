@@ -448,6 +448,14 @@ function barra(porcentaje, clara = false) {
   return `<div class="barra${clara ? " clara" : ""}"><i style="width:${p}%"></i></div>`;
 }
 
+// El cosechador de Pac-Farm con su sombrero de paja, para el acceso al juego.
+const SVG_PACFARM = `<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+  <path d="M16 1.5 L23.5 9 L8.5 9 Z" fill="#e2c07c"/>
+  <path d="M3 9 H29 V11 H3 Z" fill="#e2c07c"/>
+  <path d="M3 11 H29 V11.9 H3 Z" fill="#a8814a"/>
+  <path d="M16 20 L25.6 14.4 A11 11 0 1 1 25.6 25.6 Z" fill="#f5b324"/>
+</svg>`;
+
 // ==========================================================
 // VISTAS
 // ==========================================================
@@ -463,7 +471,6 @@ const plantillas = {
     const local = totalesLocales();
     const kgLogrado = resumen ? resumen.kg_cosechados : local.kg;
     const pct = kgPlan ? (kgLogrado / kgPlan) * 100 : 0;
-    const ultimos = pendientes.concat(enviados).slice(0, 6);
 
     return `
     <div class="tarjeta temporada-cab">
@@ -496,11 +503,20 @@ const plantillas = {
     </div>
 
     <div class="tarjeta">
-      <h2>Últimos registros de este teléfono</h2>
-      ${ultimos.length
-        ? ultimos.map(filaRegistro).join("")
-        : `<p class="nota">Todavía no cargaste nada. Usá las pestañas de abajo.</p>`}
-    </div>`;
+      <h2>&#128172; ¿Qué mejorarías de la app?</h2>
+      <p class="nota">Lo que te falte, lo que te moleste o algo que se te ocurra.
+      Lo leo yo y lo vamos arreglando.</p>
+      <form id="form-sugerencia">
+        <textarea name="texto" rows="3" maxlength="600"
+                  placeholder="Ej: estaría bueno poder anotar el riego de cada sector"></textarea>
+        <button class="secundario">Enviar</button>
+      </form>
+    </div>
+
+    <a class="acceso-juego" href="juego/" aria-label="Jugar a Pac-Farm">
+      ${SVG_PACFARM}
+      <span>Un rato de Pac-Farm</span>
+    </a>`;
   },
 
   siembras() {
@@ -1114,24 +1130,42 @@ async function traerUltimos(tipo, forzar = false) {
   } catch { /* sin conexión: se muestra lo último que se bajó */ }
 }
 
+// Un registro de este teléfono. Cada tipo se arma aparte: antes todo lo que no
+// fuera horas ni cosechas caía en "Siembra", así que los guardados de
+// configuración aparecían como "Siembra — Gundefined".
 function filaRegistro(r) {
   const d = r.datos;
   const esperando = !r.enviado_en;
-  let titulo, detalle;
+  let titulo = "", detalle = "";
+
   if (r.tipo === "horas") {
     titulo = "Horas";
     detalle = `${esc(d.integrante)}: ${d.horas} h${d.actividad ? " · " + esc(d.actividad) : ""}`;
   } else if (r.tipo === "cosechas") {
     titulo = "Cosecha";
     detalle = `${esc(d.cultivo)}: ${num(d.kg, 1)} kg`;
-  } else {
+  } else if (r.tipo === "siembras") {
     titulo = "Siembra";
-    const cant = d.plantines ? `${num(d.plantines)} plantines` : `${esc(d.sector)}${d.bancal || ""}`;
-    detalle = `${esc(d.cultivo)} G${d.generacion} · ${esc(d.tipo)} · ${cant}`;
+    const cant = d.plantines ? `${num(d.plantines)} plantines`
+      : (d.sector ? `${esc(d.sector)}${d.bancal || ""}` : "");
+    detalle = [esc(d.cultivo), d.generacion ? "G" + d.generacion : "", esc(d.tipo), cant]
+      .filter(Boolean).join(" · ");
+  } else if (r.tipo === "tareas") {
+    titulo = "Tarea";
+    detalle = esc(d.tarea);
+  } else if (r.tipo === "tareas_hecha") {
+    titulo = "Tarea hecha";
+    detalle = "";
+  } else if (r.tipo === "sugerencia") {
+    titulo = "Sugerencia";
+    detalle = esc((d.texto || "").slice(0, 60));
+  } else {
+    return "";        // config y demás: no son movimientos, no se listan
   }
+
   return `<div class="registro">
-    <div><div class="detalle">${titulo} — ${detalle}</div>
-      <div class="cuando">${fechaCorta(d.fecha)}</div></div>
+    <div><div class="detalle">${[titulo, detalle].filter(Boolean).join(" — ")}</div>
+      <div class="cuando">${fechaCorta(d.fecha || d.hecha_el || "")}</div></div>
     <span class="etiqueta ${esperando ? "espera" : "ok"}">${esperando ? "Por enviar" : "Enviado"}</span>
   </div>`;
 }
@@ -1190,6 +1224,21 @@ function prepararComunes() {
 function prepararInicio() {
   const b = $("#btn-enviar");
   if (b) b.onclick = () => sincronizar(false);
+
+  const f = $("#form-sugerencia");
+  if (f) {
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      const texto = f.texto.value.trim();
+      if (texto.length < 5) return aviso("Contame un poco más, así se entiende.", true);
+      guardarRegistro("sugerencia", {
+        texto,
+        quien: leer(LS.nombre, ""),
+        fecha: hoy(),
+      }, "¡Gracias! Tu sugerencia va en camino ✓");
+      f.texto.value = "";
+    };
+  }
 }
 
 function prepararSiembras() {

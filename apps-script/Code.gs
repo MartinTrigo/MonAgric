@@ -33,6 +33,12 @@ var PLANILLA_JUEGO_ID = "1FdOqQXgnHbNUOq8-v2vgBYqGIjhpxT-NLhNU1dWJOJU";
 var JUEGO_ENCABEZADOS = ["Id", "Chacra", "Jugador", "Puntos", "Nivel", "Fecha",
                          "Cargado por", "Recibido"];
 
+// Lo que la gente propone mejorar de la app, de todas las chacras juntas: es
+// para leerlo y arreglar, no es un dato productivo.
+var PLANILLA_SUGERENCIAS_ID = "1h8_pLYZ3jkm_1qfT6c0_XBK-oPoOnwms3gb97zMLW0E";
+var SUGERENCIAS_ENCABEZADOS = ["Id", "Chacra", "Quién", "Fecha", "Qué mejoraría",
+                               "Cargado por", "Recibido"];
+
 var HOJAS = {
   siembras: {
     nombre: "Siembras",
@@ -135,6 +141,7 @@ function doPost(e) {
         if (r.tipo === "tareas_hecha") { marcarTareaHecha(libro, r); guardados++; }
         else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
         else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
+        else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
       });
 
       var porTipo = {};
@@ -375,18 +382,33 @@ function corrimientoDias(dias) {
 
 // ---------- El juego (Pac-Farm) ----------
 
+// ---------- Sugerencias ----------
+
+function guardarSugerencia(chacra, r) {
+  var hoja = hojaSuelta(PLANILLA_SUGERENCIAS_ID, "Sugerencias", SUGERENCIAS_ENCABEZADOS);
+  var d = r.datos;
+  hoja.appendRow([r.id, chacra, String(d.quien || ""), d.fecha, String(d.texto || ""),
+                  r.dispositivo || "", new Date()]);
+}
+
+// ---------- El juego (Pac-Farm) ----------
+
 function hojaDelJuego() {
-  var libro = SpreadsheetApp.openById(PLANILLA_JUEGO_ID);
-  var hoja = libro.getSheetByName("Puntajes");
+  return hojaSuelta(PLANILLA_JUEGO_ID, "Puntajes", JUEGO_ENCABEZADOS);
+}
+
+// Una hoja en una planilla que no es la de la chacra (el juego, las
+// sugerencias): si la planilla esta recien creada se aprovecha su hoja vacia.
+function hojaSuelta(planillaId, nombre, encabezados) {
+  var libro = SpreadsheetApp.openById(planillaId);
+  var hoja = libro.getSheetByName(nombre);
   if (!hoja) {
-    // Si la planilla esta recien creada, se aprovecha su hoja vacia en vez de
-    // dejarla ahi al lado sin usar.
     var primera = libro.getSheets()[0];
     hoja = (libro.getSheets().length === 1 && primera.getLastRow() === 0)
-      ? primera.setName("Puntajes")
-      : libro.insertSheet("Puntajes");
-    ponerEncabezados(hoja, JUEGO_ENCABEZADOS);
-    hoja.autoResizeColumns(1, JUEGO_ENCABEZADOS.length);
+      ? primera.setName(nombre)
+      : libro.insertSheet(nombre);
+    ponerEncabezados(hoja, encabezados);
+    hoja.autoResizeColumns(1, encabezados.length);
   }
   return hoja;
 }

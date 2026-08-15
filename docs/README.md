@@ -66,6 +66,22 @@ En los campos de cultivo hay un **buscador**: se escribe para filtrar (sin
 importar tildes ni mayúsculas) o se toca para ver la lista completa, con los del
 plan de la temporada primero.
 
+## El juego
+
+Abajo del inicio hay un acceso discreto a **Pac-Farm**, que vive en `docs/juego/`
+y se juega en `.../MonAgric/juego/`. Reconoce solo quién sos y de qué chacra,
+porque comparte el dominio con la app, y el ranking es entre los de tu chacra.
+Los puntajes van a una planilla propia del juego, no a la de la producción.
+
+El original está en [pac-farm](https://github.com/MartinTrigo/pac-farm); acá hay
+una copia con un enlace para volver a la app.
+
+## Sugerencias
+
+En el inicio hay un cuadro **"¿Qué mejorarías de la app?"**. Lo que se escribe
+ahí cae en la planilla *MonAgric · Sugerencias*, con la chacra y quién lo mandó.
+Es la misma planilla para todas las chacras, para leer todo junto.
+
 ## Varias chacras
 
 Un mismo enlace sirve para todas las chacras. Cada persona elige la suya la
