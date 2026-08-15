@@ -76,6 +76,23 @@ Los puntajes van a una planilla propia del juego, no a la de la producción.
 El original está en [pac-farm](https://github.com/MartinTrigo/pac-farm); acá hay
 una copia con un enlace para volver a la app.
 
+## El panel compartido
+
+Cada chacra ve solo lo suyo dentro de la app, pero quien las administra ve
+todas las planillas. Esa asimetría incomoda, con razón. El **panel compartido**
+la empareja: una planilla con **una hoja por chacra**, la misma para todos, que
+se comparte **como lectores** con los productores de las tres.
+
+Va lo comparable, que es lo que sirve para aprender de las otras: por cultivo,
+bancales, m², kg esperados, kg cosechados, % logrado, rinde real, siembras y
+plantines; y arriba el total de la chacra con sus horas de trabajo.
+
+**No va el detalle de las personas**: quién trabajó cuántas horas es asunto de
+cada chacra y no sale de su planilla.
+
+Se actualiza llamando a `?panel=1`, o solo, si en el editor de Apps Script se
+agrega un activador diario para `actualizarPanel`.
+
 ## Sugerencias
 
 En el inicio hay un cuadro **"¿Qué mejorarías de la app?"**. Lo que se escribe

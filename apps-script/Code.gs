@@ -39,6 +39,16 @@ var PLANILLA_SUGERENCIAS_ID = "1h8_pLYZ3jkm_1qfT6c0_XBK-oPoOnwms3gb97zMLW0E";
 var SUGERENCIAS_ENCABEZADOS = ["Id", "Chacra", "Quién", "Fecha", "Qué mejoraría",
                                "Cargado por", "Recibido"];
 
+// El panel que ven TODAS las chacras, una hoja por cada una. Va solo lo
+// comparable —lo planificado contra lo cosechado, por cultivo— y nunca el
+// detalle de las personas: quien trabajo cuantas horas es asunto de cada
+// chacra. Se comparte como lectores, para que nadie dependa de que otro le
+// pase los numeros.
+var PLANILLA_PANEL_ID = "1JMFhJIeTB9aPhTwQLqKolChh23WdMgaWEtqOz-yabx0";
+var PANEL_ENCABEZADOS = ["Cultivo", "Bancales", "m² planificados", "Kg esperados",
+                         "Kg cosechados", "% de lo esperado", "Rinde real kg/m²",
+                         "Siembras", "Plantines"];
+
 var HOJAS = {
   siembras: {
     nombre: "Siembras",
@@ -118,6 +128,7 @@ function doGet(e) {
   if (p.resumen) return respuesta(calcularResumen(chacra));
   if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
   if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
+  if (p.panel) return respuesta({ ok: true, chacras: actualizarPanel() });
   if (p.ultimos) return respuesta({ ok: true, hoja: p.ultimos,
                                     filas: ultimosDeHoja(chacra, p.ultimos, Number(p.n) || 15) });
   if (p.exportar) return respuesta({ ok: true, hoja: p.exportar,
@@ -381,6 +392,115 @@ function corrimientoDias(dias) {
 }
 
 // ---------- El juego (Pac-Farm) ----------
+
+// ---------- Panel compartido entre chacras ----------
+// Se puede llamar a mano (?panel=1) o con un activador diario desde el editor.
+
+function actualizarPanel() {
+  var libro = SpreadsheetApp.openById(PLANILLA_PANEL_ID);
+  var chacras = chacrasConocidas();
+  var hechas = [];
+
+  chacras.forEach(function (codigo) {
+    var cfg = leerConfig(codigo);
+    if (!cfg.plan || !cfg.plan.length) return;      // sin plan no hay nada que comparar
+    escribirHojaDeChacra(libro, codigo, cfg);
+    hechas.push(codigo);
+  });
+
+  // La hoja vacía que trae toda planilla nueva, si quedó, estorba.
+  var sobrante = libro.getSheetByName("Hoja 1") || libro.getSheetByName("Sheet1");
+  if (sobrante && libro.getSheets().length > 1) libro.deleteSheet(sobrante);
+
+  return hechas;
+}
+
+function escribirHojaDeChacra(libro, codigo, cfg) {
+  var titulo = cfg.nombre || codigo;
+  var hoja = libro.getSheetByName(titulo) || libro.insertSheet(titulo);
+  hoja.clear();
+
+  var m2Bancal = (cfg.bancal.largo_m || 0) * (cfg.bancal.ancho_m || 0);
+  var kg = kgPorCultivo(codigo);
+  var siembras = siembrasPorCultivo(codigo);
+
+  var filas = cfg.plan.map(function (p) {
+    var cosechado = kg[p.cultivo] || 0;
+    var s = siembras[p.cultivo] || { veces: 0, plantines: 0 };
+    return [
+      p.cultivo,
+      m2Bancal ? Math.round((p.superficie_m2 / m2Bancal) * 10) / 10 : "",
+      p.superficie_m2,
+      p.cosecha_esperada_kg,
+      Math.round(cosechado * 100) / 100,
+      p.cosecha_esperada_kg ? Math.round((cosechado / p.cosecha_esperada_kg) * 1000) / 10 : "",
+      p.superficie_m2 ? Math.round((cosechado / p.superficie_m2) * 100) / 100 : "",
+      s.veces, s.plantines,
+    ];
+  });
+
+  var totalEsperado = 0, totalCosechado = 0, totalM2 = 0;
+  cfg.plan.forEach(function (p) {
+    totalEsperado += p.cosecha_esperada_kg || 0;
+    totalM2 += p.superficie_m2 || 0;
+    totalCosechado += kg[p.cultivo] || 0;
+  });
+
+  // Encabezado de la chacra: el resumen de un vistazo
+  hoja.getRange(1, 1, 1, 2).setValues([[titulo, "temporada " + (cfg.temporada.nombre || "")]]);
+  hoja.getRange(1, 1).setFontWeight("bold").setFontSize(13);
+  hoja.getRange(2, 1, 1, 6).setValues([[
+    "Superficie", totalM2 + " m²",
+    "Esperado", Math.round(totalEsperado) + " kg",
+    "Cosechado", Math.round(totalCosechado) + " kg",
+  ]]);
+  hoja.getRange(3, 1, 1, 2).setValues([[
+    "Horas de trabajo", Math.round(horasTotales(codigo) * 10) / 10]]);
+  hoja.getRange(4, 1).setValue("Actualizado: " +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"));
+  hoja.getRange(2, 1, 3, 1).setFontWeight("bold");
+
+  ponerEncabezadosEn(hoja, 6, PANEL_ENCABEZADOS);
+  if (filas.length) hoja.getRange(7, 1, filas.length, PANEL_ENCABEZADOS.length).setValues(filas);
+  hoja.setFrozenRows(6);
+  hoja.autoResizeColumns(1, PANEL_ENCABEZADOS.length);
+}
+
+function kgPorCultivo(chacra) {
+  var hoja = planillaDe(chacra).getSheetByName("Cosechas");
+  var total = {};
+  if (!hoja || hoja.getLastRow() < 2) return total;
+  hoja.getRange(2, 4, hoja.getLastRow() - 1, 2).getValues().forEach(function (f) {
+    if (f[0]) total[f[0]] = (total[f[0]] || 0) + (Number(f[1]) || 0);
+  });
+  return total;
+}
+
+function siembrasPorCultivo(chacra) {
+  var hoja = planillaDe(chacra).getSheetByName("Siembras");
+  var total = {};
+  if (!hoja || hoja.getLastRow() < 2) return total;
+  // Columnas: 4 Cultivo · 10 Plantines
+  hoja.getRange(2, 4, hoja.getLastRow() - 1, 7).getValues().forEach(function (f) {
+    var c = f[0];
+    if (!c) return;
+    if (!total[c]) total[c] = { veces: 0, plantines: 0 };
+    total[c].veces++;
+    total[c].plantines += Number(f[6]) || 0;
+  });
+  return total;
+}
+
+function horasTotales(chacra) {
+  var res = { horas: 0, horas_por_integrante: {} };
+  sumarHoras(chacra, planillaDe(chacra), res);
+  return res.horas;
+}
+
+function ponerEncabezadosEn(hoja, fila, encabezados) {
+  hoja.getRange(fila, 1, 1, encabezados.length).setValues([encabezados])
+      .setFontWeight("bold").setBackground("#DCE9DD");
+}
 
 // ---------- Sugerencias ----------
 
