@@ -21,6 +21,7 @@ const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
   { codigo: "milpa", nombre: "La Milpa" },
   { codigo: "focoverde", nombre: "Foco Verde" },
+  { codigo: "huerma", nombre: "Huerma" },
 ];
 
 // Los tipos que nacen en bandeja: el formulario pide bandejas en vez de bancal.
