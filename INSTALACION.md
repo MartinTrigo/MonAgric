@@ -38,7 +38,12 @@ invisible no da error: hace que el servicio se cuelgue.
 
 ### 3. Sumarla a la app
 
-En `docs/app.js`, arriba de todo, agregá la chacra a la lista:
+> **Esto es trabajo de programación: lo más simple es pedirlo.** Pasá el nombre
+> de la chacra y el id de su planilla, y queda hecho y publicado. Chacra Tica,
+> La Milpa y Foco Verde ya están cargadas.
+
+Si querés hacerlo vos, es en `C:\MARTO\INFORMATICA\MonAgric\docs\app.js`, arriba
+de todo:
 
 ```js
 const CHACRAS = [
@@ -47,8 +52,20 @@ const CHACRAS = [
 ];
 ```
 
-El `codigo` tiene que ser **idéntico** al que pusiste en `CHACRAS` del script.
-Después, publicar los cambios.
+El `codigo` tiene que ser **idéntico** al que pusiste en la propiedad `CHACRAS`
+del script.
+
+**Editar el archivo no alcanza.** La app que usan los productores no se sirve
+desde tu computadora sino desde GitHub, así que el cambio hay que subirlo:
+
+```
+git add -A
+git commit -m "Suma la chacra tal"
+git push
+```
+
+Un par de minutos después aparece en los teléfonos. Si no se sube, vos ves la
+chacra nueva al abrir el archivo, pero ellos no.
 
 ### 4. Generar los códigos de invitación
 
