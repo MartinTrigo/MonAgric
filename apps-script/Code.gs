@@ -45,6 +45,30 @@ var SUGERENCIAS_ENCABEZADOS = ["Id", "Chacra", "Quién", "Fecha", "Qué mejorar�
 // chacra. Se comparte como lectores, para que nadie dependa de que otro le
 // pase los numeros.
 var PLANILLA_PANEL_ID = "1JMFhJIeTB9aPhTwQLqKolChh23WdMgaWEtqOz-yabx0";
+
+// ==========================================================
+// ACCESOS
+// Sin esto, cualquiera con la direccion del servicio —que esta en el codigo
+// publico— podia leer los datos de todas las chacras, inventar registros y
+// hasta borrar la configuracion de una temporada entera.
+//
+// Como funciona: cada persona canjea UNA VEZ un codigo de invitacion y su
+// telefono recibe una credencial larga y al azar. De ahi en mas cada pedido
+// viaja con esa credencial. Si un telefono se pierde o alguien se va, se pone
+// NO en su fila y ese telefono deja de poder cargar, sin tocar a los demas.
+//
+// De la credencial se guarda solo la huella (SHA-256): sirve para comprobarla
+// pero no permite reconstruirla.
+// ==========================================================
+var PLANILLA_ACCESOS_ID = "183J8UGFKGOOwZVWlA4qO_Mb7BMXS_i_435BR4hOBiYc";
+
+var INVITACIONES_ENCABEZADOS = ["Código", "Chacra", "Para quién", "Estado", "Creada",
+                                "Usada el", "Dispositivo"];
+var DISPOSITIVOS_ENCABEZADOS = ["Dispositivo", "Chacra", "Persona", "Activo", "Alta",
+                                "Última actividad", "Registros", "Huella"];
+
+// Entradas que puede usar cualquiera: solo dicen que el servicio esta vivo.
+var ABIERTAS = ["ping", "canjear"];
 var PANEL_ENCABEZADOS = ["Cultivo", "Bancales", "m² planificados", "Kg esperados",
                          "Kg cosechados", "% de lo esperado", "Rinde real kg/m²",
                          "Siembras", "Plantines"];
@@ -99,6 +123,113 @@ var HOJAS = {
   },
 };
 
+// ---------- Accesos: canje, validacion y bajas ----------
+
+function hojaAccesos(nombre, encabezados) {
+  return hojaSuelta(PLANILLA_ACCESOS_ID, nombre, encabezados);
+}
+
+// La huella: de la credencial sale siempre la misma, pero de la huella no se
+// puede volver a la credencial. Asi, ni leyendo la planilla se saca nada util.
+function huella(texto) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+                                      String(texto), Utilities.Charset.UTF_8);
+  return bytes.map(function (b) {
+    return ("0" + (b < 0 ? b + 256 : b).toString(16)).slice(-2);
+  }).join("");
+}
+
+function alAzar(largo) {
+  var letras = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // sin I, O, 0 ni 1: se confunden
+  var s = "";
+  for (var i = 0; i < largo; i++) s += letras.charAt(Math.floor(Math.random() * letras.length));
+  return s;
+}
+
+function esAdmin(clave) {
+  var guardada = PropertiesService.getScriptProperties().getProperty("CLAVE_ADMIN");
+  return !!guardada && String(clave || "") === guardada;
+}
+
+// Canjea el codigo por una credencial. El codigo queda usado y no sirve mas.
+function canjearInvitacion(chacra, codigo, persona, dispositivo) {
+  codigo = String(codigo || "").trim().toUpperCase();
+  if (!codigo || !chacra) return rechazo("Falta el código o la chacra.");
+  if (!dispositivo) return rechazo("Falta el identificador del teléfono.");
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hoja = hojaAccesos("Invitaciones", INVITACIONES_ENCABEZADOS);
+    if (hoja.getLastRow() < 2) return rechazo("Ese código no existe.");
+
+    var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, INVITACIONES_ENCABEZADOS.length)
+                    .getValues();
+    for (var i = 0; i < filas.length; i++) {
+      if (String(filas[i][0]).trim().toUpperCase() !== codigo) continue;
+
+      if (String(filas[i][1]).toLowerCase() !== String(chacra).toLowerCase()) {
+        return rechazo("Ese código es de otra chacra.");
+      }
+      if (String(filas[i][3]).toLowerCase() === "usado") {
+        return rechazo("Ese código ya se usó en otro teléfono.");
+      }
+
+      var credencial = alAzar(8) + "-" + alAzar(8) + "-" + alAzar(8);
+      var quien = persona || String(filas[i][2] || "");
+      registrarDispositivo(chacra, dispositivo, quien, credencial);
+
+      var fila = i + 2;
+      hoja.getRange(fila, 4, 1, 4).setValues([["Usado", filas[i][4], new Date(), dispositivo]]);
+      return { ok: true, credencial: credencial, persona: quien };
+    }
+    return rechazo("Ese código no existe.");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function registrarDispositivo(chacra, dispositivo, persona, credencial) {
+  var hoja = hojaAccesos("Dispositivos", DISPOSITIVOS_ENCABEZADOS);
+  hoja.appendRow([dispositivo, chacra, persona, "SÍ", new Date(), new Date(), 0,
+                  huella(credencial)]);
+}
+
+// Comprueba que el telefono este registrado, activo y sea de esa chacra.
+function permitido(chacra, credencial, dispositivo) {
+  if (!credencial) return rechazo("Este teléfono todavía no tiene acceso.");
+
+  var hoja = SpreadsheetApp.openById(PLANILLA_ACCESOS_ID).getSheetByName("Dispositivos");
+  if (!hoja || hoja.getLastRow() < 2) return rechazo("Este teléfono todavía no tiene acceso.");
+
+  var buscada = huella(credencial);
+  var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, DISPOSITIVOS_ENCABEZADOS.length)
+                  .getValues();
+  for (var i = 0; i < filas.length; i++) {
+    if (String(filas[i][7]) !== buscada) continue;
+    if (String(filas[i][1]).toLowerCase() !== String(chacra).toLowerCase()) {
+      return rechazo("Esa credencial no es de esta chacra.");
+    }
+    if (String(filas[i][3]).toUpperCase().indexOf("S") !== 0) {
+      return rechazo("Este teléfono fue dado de baja. Pedí un código nuevo.");
+    }
+    return { ok: true, fila: i + 2, persona: String(filas[i][2] || "") };
+  }
+  return rechazo("Credencial desconocida. Pedí un código nuevo.");
+}
+
+// Deja constancia de que ese telefono estuvo activo y cuanto cargo.
+function marcarActividad(fila, cuantos) {
+  try {
+    var hoja = SpreadsheetApp.openById(PLANILLA_ACCESOS_ID).getSheetByName("Dispositivos");
+    hoja.getRange(fila, 6).setValue(new Date());
+    if (cuantos) {
+      var previos = Number(hoja.getRange(fila, 7).getValue()) || 0;
+      hoja.getRange(fila, 7).setValue(previos + cuantos);
+    }
+  } catch (err) { /* que no se caiga el registro por no poder anotar la visita */ }
+}
+
 // ---------- A que planilla escribe cada chacra ----------
 
 function planillaDe(chacra) {
@@ -133,17 +264,43 @@ function doGet(e) {
 
 function atender(p) {
   var chacra = p.chacra || "";
-  if (p.config) return respuesta({ ok: true, config: leerConfig(chacra) });
-  if (p.resumen) return respuesta(calcularResumen(chacra));
-  if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
-  if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
-  if (p.panel) return respuesta(actualizarPanel(chacra));
-  if (p.ultimos) return respuesta({ ok: true, hoja: p.ultimos,
-                                    filas: ultimosDeHoja(chacra, p.ultimos, Number(p.n) || 15) });
-  if (p.exportar) return respuesta({ ok: true, hoja: p.exportar,
-                                     filas: exportarHoja(chacra, p.exportar) });
+
+  // Canjear el codigo de invitacion por la credencial de este telefono.
+  if (p.canjear) {
+    return respuesta(canjearInvitacion(chacra, p.canjear, p.persona || "", p.dispositivo || ""));
+  }
+
+  // El panel y exportar son cosa de la administracion: van con la clave de
+  // admin, que solo esta en las herramientas de escritorio de Martin.
+  if (p.panel || p.exportar) {
+    if (!esAdmin(p.clave)) return respuesta(rechazo("Esto es solo para la administración."));
+    if (p.panel) return respuesta(actualizarPanel(chacra));
+    return respuesta({ ok: true, hoja: p.exportar, filas: exportarHoja(chacra, p.exportar) });
+  }
+
+  // Todo lo que entregue datos de una chacra exige credencial de esa chacra.
+  // La clave de administracion tambien sirve: es la que usan las herramientas
+  // de escritorio, que no tienen un telefono asociado.
+  if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos) {
+    var permiso = esAdmin(p.clave) ? { ok: true }
+                                   : permitido(chacra, p.credencial, p.dispositivo);
+    if (!permiso.ok) return respuesta(permiso);
+
+    if (p.config) return respuesta({ ok: true, config: leerConfig(chacra) });
+    if (p.resumen) return respuesta(calcularResumen(chacra));
+    if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
+    if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
+    return respuesta({ ok: true, hoja: p.ultimos,
+                       filas: ultimosDeHoja(chacra, p.ultimos, Number(p.n) || 15) });
+  }
+
+  // Sin credencial solo se sabe que el servicio existe.
   return respuesta({ ok: true, servicio: "MonAgric", chacras: chacrasConocidas(),
                      hora: new Date().toISOString() });
+}
+
+function rechazo(motivo) {
+  return { ok: false, sin_permiso: true, error: motivo };
 }
 
 function doPost(e) {
@@ -151,6 +308,14 @@ function doPost(e) {
     var cuerpo = JSON.parse(e.postData.contents);
     var chacra = cuerpo.chacra || "";
     var registros = cuerpo.registros || [];
+
+    // Nada se escribe sin credencial. Antes, cualquiera con la direccion podia
+    // inventar registros o borrar la configuracion de una temporada entera.
+    var permiso = esAdmin(cuerpo.clave)
+      ? { ok: true, fila: 0 }
+      : permitido(chacra, cuerpo.credencial, cuerpo.dispositivo);
+    if (!permiso.ok) return respuesta(permiso);
+
     var libro = planillaDe(chacra);
     var guardados = 0;
 
@@ -190,6 +355,7 @@ function doPost(e) {
       lock.releaseLock();
     }
     CacheService.getScriptCache().remove("resumen_" + chacra);
+    if (permiso.fila) marcarActividad(permiso.fila, guardados);
     return respuesta({ ok: true, recibidos: registros.length, guardados: guardados });
   } catch (err) {
     return respuesta({ ok: false, error: String(err) });
@@ -262,8 +428,23 @@ function leerConfigDe(libro, chacra) {
   return cfg;
 }
 
-// Se reescribe entera: la app siempre manda la configuracion completa.
+// Se reescribe entera: la app siempre manda la configuracion completa. Por eso
+// antes se guarda una copia: si algo llega mal —o alguien manda una vacia— la
+// anterior queda a un clic, sin depender del historial de Google.
+function respaldarConfig(libro) {
+  try {
+    var hoja = libro.getSheetByName("Config");
+    if (!hoja || hoja.getLastRow() < 2) return;
+
+    var vieja = libro.getSheetByName("Config anterior");
+    if (vieja) libro.deleteSheet(vieja);
+    var copia = hoja.copyTo(libro).setName("Config anterior");
+    copia.hideSheet();
+  } catch (err) { /* si no se puede respaldar, igual se guarda la nueva */ }
+}
+
 function guardarConfig(libro, cfg) {
+  respaldarConfig(libro);
   var hoja = hojaConfig(libro);
   var filas = [];
   var vacios = function (fila) {                 // completa hasta CONFIG_COLS

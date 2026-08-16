@@ -22,6 +22,13 @@ from urllib import error, request
 RAIZ = Path(__file__).resolve().parent.parent
 CATALOGO = RAIZ / "docs" / "catalogo.json"
 URL_PATH = RAIZ / "tools" / "servicio.txt"
+CLAVE_PATH = RAIZ / "tools" / "clave_admin.txt"
+
+
+def clave_admin() -> str:
+    if not CLAVE_PATH.exists():
+        raise SystemExit("Falta tools/clave_admin.txt con la clave de administracion.")
+    return CLAVE_PATH.read_text(encoding="utf-8").strip()
 
 
 def pedir(url: str) -> dict:
@@ -54,7 +61,8 @@ def main() -> None:
     catalogo = json.loads(CATALOGO.read_text(encoding="utf-8"))
     perfiles = catalogo.get("perfiles", {})
 
-    respuesta = pedir(f"{url}?config=1&chacra={chacra}")
+    from urllib.parse import quote
+    respuesta = pedir(f"{url}?config=1&chacra={chacra}&clave={quote(clave_admin())}")
     if not respuesta.get("ok"):
         raise SystemExit(f"El servicio respondio con error: {respuesta}")
     config = respuesta["config"]
@@ -90,6 +98,7 @@ def main() -> None:
 
     resultado = enviar(url, {
         "chacra": chacra,
+        "clave": clave_admin(),
         "registros": [{"id": f"config-completar-{chacra}", "tipo": "config", "datos": config,
                        "temporada": config.get("temporada", {}).get("nombre", ""),
                        "dispositivo": "escritorio"}],

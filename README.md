@@ -1,5 +1,8 @@
 # MonAgric
 
+*Monitoreo agrícola para emprendimientos agroecológicos.*
+Libre bajo [AGPL-3.0](LICENSE) · [Términos de la beta](TERMINOS.md)
+
 Monitor agrícola para emprendimientos agroecológicos de pequeña a mediana
 escala. Permite registrar todo el proceso productivo de la temporada —siembras,
 trasplantes, riego, cosechas, horas de trabajo, stock y sanidad— para después

@@ -27,6 +27,20 @@ from urllib import error, request
 RAIZ = Path(__file__).resolve().parent.parent
 DB_PATH = RAIZ / "monagric.sqlite3"
 URL_PATH = RAIZ / "tools" / "servicio.txt"
+CLAVE_PATH = RAIZ / "tools" / "clave_admin.txt"
+
+
+def clave_admin() -> str:
+    """La clave que identifica a las herramientas de escritorio ante el servicio.
+
+    Vive en tools/clave_admin.txt, que no se publica. Es la misma que esta
+    cargada en la propiedad CLAVE_ADMIN del Apps Script.
+    """
+    if not CLAVE_PATH.exists():
+        raise SystemExit(
+            "Falta tools/clave_admin.txt con la clave de administracion.\n"
+            "Es la misma que pusiste en la propiedad CLAVE_ADMIN del Apps Script.")
+    return CLAVE_PATH.read_text(encoding="utf-8").strip()
 
 # Que hoja de la planilla va a que tabla, y como se llama cada columna aca.
 # (encabezado en la planilla -> columna en la base)
@@ -72,8 +86,10 @@ def leer_url() -> str:
 
 
 def pedir(url: str, hoja: str) -> list[dict]:
+    from urllib.parse import quote
     try:
-        with request.urlopen(f"{url}?exportar={hoja}", timeout=60) as r:
+        with request.urlopen(
+                f"{url}?exportar={hoja}&clave={quote(clave_admin())}", timeout=60) as r:
             datos = json.loads(r.read().decode("utf-8"))
     except error.URLError as e:
         raise SystemExit(f"No se pudo conectar con el servicio: {e}")

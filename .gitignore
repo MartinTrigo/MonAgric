@@ -21,8 +21,9 @@ __pycache__/
 
 # === Configuración local de la PC ===
 .claude/settings.local.json
-# La dirección del servicio permite escribir en la planilla: no se publica.
+# La dirección del servicio y la clave de administración: NUNCA se publican.
 tools/servicio.txt
+tools/clave_admin.txt
 
 # === Google Drive para escritorio ===
 # La carpeta está sincronizada con Drive: los .gsheet/.gdoc son accesos directos

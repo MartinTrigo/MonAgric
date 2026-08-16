@@ -44,6 +44,8 @@ const LS = {
   enviados: "monagric_enviados",
   nombre: "monagric_nombre",
   chacra: "monagric_chacra",
+  credencial: "monagric_credencial",
+  dispositivo: "monagric_dispositivo",
   config: "monagric_config",
   configLeida: "monagric_config_leida",
   scriptUrl: "monagric_script_url",
@@ -79,6 +81,46 @@ const urlHoras = () => leer(LS.urlHoras, "") || URL_HORAS_POR_DEFECTO;
 const urlServicio = () => leer(LS.scriptUrl, "") || URL_SERVICIO_POR_DEFECTO;
 
 const chacraCodigo = () => leer(LS.chacra, "");
+
+// ---- Acceso ----
+// Cada teléfono canjea una vez su código de invitación y guarda la credencial
+// que le devuelve el servicio. Desde ahí viaja con cada pedido: es lo que
+// distingue a alguien de la chacra de cualquiera que tenga el enlace.
+const credencial = () => leer(LS.credencial, "");
+const tieneAcceso = () => !!credencial();
+
+// El identificador de este teléfono. Se crea una sola vez y no cambia: sirve
+// para que en la planilla de accesos se vea cuántos aparatos hay cargando.
+function dispositivo() {
+  let id = leer(LS.dispositivo, "");
+  if (!id) {
+    id = "d-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+    escribir(LS.dispositivo, id);
+  }
+  return id;
+}
+
+// Lo que va en cada pedido para identificarse.
+const credenciales = () => ({
+  chacra: chacraCodigo(),
+  credencial: credencial(),
+  dispositivo: dispositivo(),
+});
+
+const conCredenciales = (params) =>
+  `${params}&chacra=${encodeURIComponent(chacraCodigo())}` +
+  `&credencial=${encodeURIComponent(credencial())}` +
+  `&dispositivo=${encodeURIComponent(dispositivo())}`;
+
+async function canjearCodigo(codigo, persona) {
+  const url = `${urlServicio()}?canjear=${encodeURIComponent(codigo)}` +
+    `&chacra=${encodeURIComponent(chacraCodigo())}` +
+    `&persona=${encodeURIComponent(persona || "")}` +
+    `&dispositivo=${encodeURIComponent(dispositivo())}`;
+  const d = await (await fetch(url)).json();
+  if (d.ok && d.credencial) escribir(LS.credencial, d.credencial);
+  return d;
+}
 const chacraActual = () => CHACRAS.find((c) => c.codigo === chacraCodigo()) || null;
 // Solo Chacra Tica manda las horas a la planilla del proyecto Bioma, donde está
 // el historial desde julio. Las demás las guardan en su propia hoja Horas.
@@ -166,6 +208,7 @@ function refrescarEstado() {
   const el = $("#estado-sync");
   const ch = chacraActual();
   if (!ch) { el.textContent = "Elegí tu chacra para empezar"; return; }
+  if (!tieneAcceso()) { el.textContent = `${ch.nombre} · falta activar el teléfono`; return; }
   const t = CFG?.temporada?.nombre;
   const base = t ? `${ch.nombre} · ${t}` : ch.nombre;
   if (pendientes.length) el.textContent = `${base} · ${pendientes.length} por enviar`;
@@ -177,6 +220,9 @@ function refrescarEstado() {
 // cada grupo se envía por su lado y lo que falle queda en la cola.
 async function sincronizar(silencioso = true) {
   if (!navigator.onLine) { refrescarEstado(); return; }
+  // Sin credencial no se manda nada: queda todo en la cola del teléfono hasta
+  // que se active con un código.
+  if (!tieneAcceso()) { refrescarEstado(); return; }
 
   const enviadosAhora = [];
   const fallaron = [];
@@ -200,9 +246,17 @@ async function sincronizar(silencioso = true) {
       const resp = await fetch(urlServicio(), {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ chacra: chacraCodigo(), registros: otros }),
+        body: JSON.stringify(Object.assign(credenciales(), { registros: otros })),
       });
       const datos = await resp.json();
+      // Si el teléfono fue dado de baja, lo cargado no se pierde: queda en la
+      // cola y se avisa que hay que activar de nuevo con un código.
+      if (datos.sin_permiso) {
+        escribir(LS.credencial, "");
+        aviso(datos.error || "Este teléfono ya no tiene acceso.", true);
+        refrescarEstado();
+        return;
+      }
       if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
       enviadosAhora.push(...otros);
     } catch (e) {
@@ -265,7 +319,7 @@ async function traerResumen() {
   if (!navigator.onLine) return;
   try {
     const r = await fetch(
-      `${urlServicio()}?resumen=1&chacra=${encodeURIComponent(chacraCodigo())}`);
+      `${urlServicio()}?${conCredenciales("resumen=1")}`);
     const d = await r.json();
     if (d.ok) { resumen = d; escribir(LS.resumen, resumen); }
   } catch { /* sin conexión: se sigue mostrando el último resumen guardado */ }
@@ -464,6 +518,7 @@ const plantillas = {
 
   inicio() {
     if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     if (!hayConfig()) return tarjetaSinConfig();
     const t = CFG.temporada || {};
     const plan = CFG.plan || [];
@@ -522,6 +577,7 @@ const plantillas = {
 
   siembras() {
     if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     if (!hayConfig()) return tarjetaSinConfig();
     const yo = leer(LS.nombre, "");
     return `
@@ -716,6 +772,7 @@ const plantillas = {
 
   plan() {
     if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     if (!hayConfig()) return tarjetaSinConfig();
     const b = CFG.bancal || {}, m2 = bancalM2();
     const plan = CFG.plan || [];
@@ -776,6 +833,7 @@ const plantillas = {
   // común, que es lo que después permite comparar entre chacras.
   configuracion() {
     if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     // Sin haber leído lo que la chacra tiene guardado no se muestran los
     // formularios: si alguien guardara con la pantalla en blanco, borraría todo.
     if (!configConfirmada) {
@@ -1023,6 +1081,30 @@ function tarjetaElegirChacra() {
   </div>`;
 }
 
+function tarjetaCanje() {
+  const ch = chacraActual();
+  return `<div class="tarjeta">
+    <h2>&#128273; Tu código de acceso</h2>
+    <p class="nota">Para cargar datos en <b>${esc(ch.nombre)}</b> hace falta el código
+    que te dieron. Se escribe una sola vez en este teléfono; después no te lo pide
+    más.</p>
+    <form id="form-canje">
+      <label>Código</label>
+      <input type="text" name="codigo" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" placeholder="Ej: TICA-4F2K" required>
+
+      <label>Tu nombre</label>
+      <input type="text" name="persona" autocomplete="off" maxlength="40"
+             placeholder="Ej: Luna" required>
+
+      <button class="principal">Activar este teléfono</button>
+    </form>
+    <p class="nota" style="margin-top:12px">¿No tenés código? Pedíselo a quien
+    administra la app. ¿Te equivocaste de chacra?
+    <a href="#" id="volver-a-chacra">Elegir otra</a>.</p>
+  </div>`;
+}
+
 function tarjetaSinConfig() {
   return `<div class="tarjeta">
     <h2>Falta configurar la temporada</h2>
@@ -1120,8 +1202,8 @@ async function traerUltimos(tipo, forzar = false) {
   if (!forzar && Date.now() - (pedidoReciente[tipo] || 0) < 20000) return;
   pedidoReciente[tipo] = Date.now();
   try {
-    const d = await (await fetch(`${urlServicio()}?ultimos=${encodeURIComponent(tipo)}` +
-      `&chacra=${encodeURIComponent(chacraCodigo())}&n=15`)).json();
+    const d = await (await fetch(
+      `${urlServicio()}?${conCredenciales("ultimos=" + encodeURIComponent(tipo))}&n=15`)).json();
     if (!d.ok || !Array.isArray(d.filas)) return;
     const guardado = leer(LS.ultimos, {});
     const cambio = JSON.stringify(guardado[tipo] || []) !== JSON.stringify(d.filas);
@@ -1209,17 +1291,58 @@ function prepararComunes() {
 
       // Primero se busca lo que la chacra ya tenga cargado. Recién después se
       // decide qué mostrar: si ya está configurada, el inicio; si no, Config.
-      $("#vista").innerHTML = `<div class="tarjeta">
-        <h2>Buscando la configuración de la chacra…</h2>
-        <p class="nota">Un segundo, estamos viendo qué hay cargado.</p></div>`;
-      if (horasVanAparte()) await traerDatosHoras();
-      await traerConfig();
-      render(hayConfig() ? "inicio" : "configuracion");
-      sincronizar();
+      // Cada chacra tiene su propio acceso: al cambiar, hay que canjear de nuevo.
+      escribir(LS.credencial, "");
+      render("inicio");     // muestra la pantalla del código
     };
   });
   const irConfig = $("#btn-ir-config");
   if (irConfig) irConfig.onclick = () => render("configuracion");
+
+  // ---- canje del código de invitación
+  const fc = $("#form-canje");
+  if (fc) {
+    fc.onsubmit = async (e) => {
+      e.preventDefault();
+      const codigo = fc.codigo.value.trim().toUpperCase();
+      const persona = fc.persona.value.trim();
+      if (!codigo || !persona) return aviso("Completá el código y tu nombre.", true);
+      if (!navigator.onLine) return aviso("Para activar el teléfono hace falta señal.", true);
+
+      const boton = fc.querySelector("button");
+      boton.disabled = true;
+      boton.textContent = "Activando…";
+      try {
+        const d = await canjearCodigo(codigo, persona);
+        if (!d.ok) {
+          aviso(d.error || "No se pudo activar.", true);
+          boton.disabled = false;
+          boton.textContent = "Activar este teléfono";
+          return;
+        }
+        escribir(LS.nombre, persona);
+        aviso(`¡Listo, ${persona}! Este teléfono ya puede cargar ✓`);
+        configConfirmada = false;
+        escribir(LS.configLeida, false);
+        await traerConfig();
+        render(hayConfig() ? "inicio" : "configuracion");
+        sincronizar();
+      } catch {
+        aviso("No se pudo conectar. Revisá la señal.", true);
+        boton.disabled = false;
+        boton.textContent = "Activar este teléfono";
+      }
+    };
+  }
+
+  const otraChacra = $("#volver-a-chacra");
+  if (otraChacra) {
+    otraChacra.onclick = (e) => {
+      e.preventDefault();
+      escribir(LS.chacra, "");
+      render("inicio");
+    };
+  }
 }
 
 function prepararInicio() {
@@ -1582,7 +1705,7 @@ async function traerConfig() {
   if (!chacraCodigo() || !navigator.onLine) return;
   try {
     const d = await (await fetch(
-      `${urlServicio()}?config=1&chacra=${encodeURIComponent(chacraCodigo())}`)).json();
+      `${urlServicio()}?${conCredenciales("config=1")}`)).json();
     if (!d.ok || !d.config) return;
 
     // Si hay cosas esperando enviarse, lo del teléfono es más nuevo: no se pisa.
@@ -1680,7 +1803,7 @@ async function traerTareas() {
   if (!navigator.onLine) return;
   try {
     const d = await (await fetch(
-      `${urlServicio()}?tareas=1&chacra=${encodeURIComponent(chacraCodigo())}`)).json();
+      `${urlServicio()}?${conCredenciales("tareas=1")}`)).json();
     if (Array.isArray(d.tareas)) escribir(LS.tareas, d.tareas);
   } catch { /* sin conexión: se usa la última lista guardada */ }
 }

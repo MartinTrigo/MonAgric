@@ -90,8 +90,13 @@ def main() -> None:
         ],
     }
 
+    clave_path = RAIZ / "tools" / "clave_admin.txt"
+    if not clave_path.exists():
+        raise SystemExit("Falta tools/clave_admin.txt con la clave de administracion.")
+
     cuerpo = json.dumps({
         "chacra": chacra,
+        "clave": clave_path.read_text(encoding="utf-8").strip(),
         "registros": [{"id": f"config-{chacra}", "tipo": "config", "datos": config,
                        "temporada": config["temporada"]["nombre"], "dispositivo": "escritorio"}],
     }).encode("utf-8")
