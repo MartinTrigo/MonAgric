@@ -13,6 +13,7 @@ const ARCHIVOS = [
   "manifest.webmanifest",
   "img/icon-192.png",
   "img/icon-512.png",
+  "img/pacfarm.png",
 ];
 
 self.addEventListener("install", (e) => {

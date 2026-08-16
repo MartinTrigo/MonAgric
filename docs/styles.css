@@ -436,6 +436,12 @@ form.alta {
   width: fit-content;
 }
 .acceso-juego:active { background: var(--sage-suave); color: var(--sage-dark); }
+/* El dibujo es pixel art: se agranda sin suavizar para que no se despeine. */
+.dibujo-pacfarm {
+  image-rendering: pixelated;
+  display: block;
+  flex: 0 0 auto;
+}
 
 /* ---- aviso flotante ---- */
 .aviso {

@@ -503,14 +503,11 @@ function barra(porcentaje, clara = false) {
   return `<div class="barra${clara ? " clara" : ""}"><i style="width:${p}%"></i></div>`;
 }
 
-// El cosechador de Pac-Farm comiéndose un rabanito. El sombrero quedaba como
-// una barra suelta encima de la cabeza a este tamaño; el rabanito le da el
-// mismo aire de huerta y deja al cosechador limpio y bien redondo.
-const SVG_PACFARM = `<svg viewBox="0 0 40 32" width="42" height="34" aria-hidden="true">
-  <path d="M13 16 L24 9.1 A13 13 0 1 1 24 22.9 Z" fill="#f5b324"/>
-  <circle cx="34" cy="17" r="5" fill="#e4483c"/>
-  <path d="M31 11 L34 12.5 L37 11 L35 13.5 L33 13.5 Z" fill="#5fbf5a"/>
-</svg>`;
+// El cosechador de Pac-Farm con su sombrero de paja, comiéndose la huerta.
+// Es pixel art, así que va como PNG y no como vector: un vector necesitaría un
+// rectángulo por píxel, pesaría más y se vería peor. Pesa 1,2 KB.
+const IMG_PACFARM =
+  `<img src="img/pacfarm.png" alt="" class="dibujo-pacfarm" width="65" height="39">`;
 
 // ==========================================================
 // VISTAS
@@ -571,7 +568,7 @@ const plantillas = {
     </div>
 
     <a class="acceso-juego" href="juego/" aria-label="Jugar a Pac-Farm">
-      ${SVG_PACFARM}
+      ${IMG_PACFARM}
       <span>Un rato de Pac-Farm</span>
     </a>`;
   },
