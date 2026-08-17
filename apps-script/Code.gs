@@ -90,13 +90,14 @@ var HOJAS = {
   },
   tareas: {
     nombre: "Tareas",
-    encabezados: ["Id", "Temporada", "Para cuándo", "Tarea", "Importancia", "Personas",
-                  "Estado", "Anotó", "Hecha el", "Hecha por", "Cargado por", "Recibido"],
+    encabezados: ["Id", "Temporada", "Proyecto", "Para cuándo", "Tarea", "Importancia",
+                  "Personas", "Estado", "Quién la toma", "Anotó", "Hecha el", "Hecha por",
+                  "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
-      return [r.id, r.temporada || "", d.fecha, d.tarea, d.importancia || "Media",
-              d.personas || 1, "Pendiente", d.creada_por || "", "", "",
-              r.dispositivo || "", new Date()];
+      return [r.id, r.temporada || "", d.proyecto || "", d.fecha, d.tarea,
+              d.importancia || "Media", d.personas || 1, "Pendiente", d.asignada || "",
+              d.creada_por || "", "", "", r.dispositivo || "", new Date()];
     },
   },
   // Se cosecha de varios bancales a la vez, asi que se registran los kilos
@@ -114,11 +115,11 @@ var HOJAS = {
   horas: {
     nombre: "Horas",
     encabezados: ["Id", "Temporada", "Fecha", "Integrante", "Horas", "Actividad",
-                  "Observaciones", "Cargado por", "Recibido"],
+                  "Proyecto", "Observaciones", "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.integrante, d.horas, d.actividad || "",
-              d.observaciones || "", r.dispositivo || "", new Date()];
+              d.proyecto || "", d.observaciones || "", r.dispositivo || "", new Date()];
     },
   },
 };
@@ -399,7 +400,7 @@ function leerConfigDe(libro, chacra) {
   // La direccion de la planilla viaja con la configuracion: la app la usa para
   // el enlace "ver todo en la planilla".
   var cfg = { chacra: chacra, planilla: libro.getUrl(), temporada: {}, bancal: {},
-              sectores: [], integrantes: [], plan: [] };
+              sectores: [], integrantes: [], proyectos: [], plan: [] };
   if (!hoja || hoja.getLastRow() < 2) return cfg;
 
   // Las fechas la planilla las guarda como fecha de verdad, no como texto: hay
@@ -418,6 +419,10 @@ function leerConfigDe(libro, chacra) {
     else if (seccion === "sector") {
       cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0, tipo_riego: String(f[3] || "") });
     } else if (seccion === "integrante") cfg.integrantes.push(clave);
+    else if (seccion === "proyecto") {
+      cfg.proyectos.push({ nombre: clave, tipo: String(f[2] || ""),
+                           estado: String(f[3] || "activo") });
+    }
     else if (seccion === "plan") {
       cfg.plan.push({ cultivo: clave, superficie_m2: Number(f[2]) || 0,
                       cosecha_esperada_kg: Number(f[3]) || 0,
@@ -464,6 +469,11 @@ function guardarConfig(libro, cfg) {
   });
   (cfg.integrantes || []).forEach(function (n) {
     filas.push(vacios(["integrante", n]));
+  });
+  // Los proyectos: las areas de trabajo de la chacra. Sirven para agrupar las
+  // tareas y para saber cuantas horas se lleva cada una.
+  (cfg.proyectos || []).forEach(function (p) {
+    filas.push(vacios(["proyecto", p.nombre, p.tipo || "", p.estado || "activo"]));
   });
   (cfg.plan || []).forEach(function (p) {
     filas.push(vacios(["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
@@ -551,9 +561,9 @@ function marcarTareaHecha(libro, r) {
   for (var i = 0; i < ids.length; i++) {
     if (String(ids[i][0]) !== String(r.datos.tarea_id)) continue;
     var fila = i + 2;
-    if (String(hoja.getRange(fila, 7).getValue()) === "Hecha") return;
-    hoja.getRange(fila, 7).setValue("Hecha");
-    hoja.getRange(fila, 9, 1, 2).setValues([[r.datos.hecha_el || "", r.datos.hecha_por || ""]]);
+    if (String(hoja.getRange(fila, 8).getValue()) === "Hecha") return;
+    hoja.getRange(fila, 8).setValue("Hecha");
+    hoja.getRange(fila, 11, 1, 2).setValues([[r.datos.hecha_el || "", r.datos.hecha_por || ""]]);
     return;
   }
 }
@@ -566,15 +576,19 @@ function listaDeTareas(chacra) {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
   };
   var lista = [];
-  hoja.getRange(2, 1, hoja.getLastRow() - 1, 10).getValues().forEach(function (f) {
+  // Columnas: 1 Id · 3 Proyecto · 4 Para cuando · 5 Tarea · 6 Importancia
+  // 7 Personas · 8 Estado · 9 Quien la toma · 10 Anoto · 11 Hecha el · 12 Hecha por
+  hoja.getRange(2, 1, hoja.getLastRow() - 1, 12).getValues().forEach(function (f) {
     if (!f[0]) return;
-    var hecha = String(f[6]) === "Hecha";
-    if (hecha && texto(f[8]) < corrimientoDias(-10)) return;
+    var estado = String(f[7] || "Pendiente");
+    var hecha = estado === "Hecha";
+    if (hecha && texto(f[10]) < corrimientoDias(-10)) return;
     lista.push({
-      id: String(f[0]), fecha: texto(f[2]), tarea: String(f[3]),
-      importancia: String(f[4] || "Media"), personas: Number(f[5]) || 1,
-      hecha: hecha, creada_por: String(f[7] || ""),
-      hecha_el: texto(f[8]), hecha_por: String(f[9] || ""),
+      id: String(f[0]), proyecto: String(f[2] || ""), fecha: texto(f[3]),
+      tarea: String(f[4]), importancia: String(f[5] || "Media"),
+      personas: Number(f[6]) || 1, estado: estado, hecha: hecha,
+      asignada: String(f[8] || ""), creada_por: String(f[9] || ""),
+      hecha_el: texto(f[10]), hecha_por: String(f[11] || ""),
     });
   });
   return lista;

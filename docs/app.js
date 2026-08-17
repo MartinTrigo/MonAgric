@@ -70,6 +70,7 @@ let resumen = leer(LS.resumen, null);   // totales de la chacra (desde su planil
 let CAT = null;                         // catálogo común (catalogo.json)
 let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
+let vistaTareas = "hoy";        // "hoy" o "proyectos"
 
 // Hasta no haber leído la configuración de la chacra en el servicio no se puede
 // guardar nada: guardar reescribe la hoja Config entera, así que hacerlo con la
@@ -190,6 +191,20 @@ const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 // De la configuración de esta chacra
 const enPlan = (cultivo) => (CFG?.plan || []).find((p) => p.cultivo === cultivo);
 const sectores = () => CFG?.sectores || [];
+
+// Las áreas de trabajo de la chacra: agrupan las tareas y permiten saber
+// cuántas horas se lleva cada una.
+const proyectos = () => CFG?.proyectos || [];
+const proyectosActivos = () => proyectos().filter((p) => (p.estado || "activo") !== "terminado");
+const TIPOS_PROYECTO = ["Productivo", "Infraestructura", "Gestión"];
+const ESTADOS_PROYECTO = ["activo", "pausado", "terminado"];
+const ESTADOS_TAREA = ["Pendiente", "En curso", "Hecha"];
+
+function opcionesProyecto(seleccionado = "", conVacio = true) {
+  const lista = proyectosActivos();
+  return `${conVacio ? `<option value=""${seleccionado ? "" : " selected"}>Sin proyecto</option>` : ""}
+    ${lista.map((p) => `<option${p.nombre === seleccionado ? " selected" : ""}>${esc(p.nombre)}</option>`).join("")}`;
+}
 const hayConfig = () => !!(CFG && CFG.sectores?.length);
 const bancalM2 = () => {
   const b = CFG?.bancal || {};
@@ -663,6 +678,10 @@ const plantillas = {
           ${actividades().map((a) => `<option>${esc(a)}</option>`).join("")}
         </select>
 
+        ${proyectosActivos().length ? `
+        <label>¿En qué proyecto? <small>(opcional)</small></label>
+        <select name="proyecto">${opcionesProyecto()}</select>` : ""}
+
         <label>Observaciones (opcional)</label>
         <textarea name="observaciones" rows="2" placeholder="Ej: cosecha de tomates, sector B"></textarea>
 
@@ -698,13 +717,21 @@ const plantillas = {
     const lista = tareasParaMostrar();
     const pendientes_ = lista.filter((t) => !t.hecha);
     const hechas = lista.filter((t) => t.hecha).slice(0, 8);
+    const porProyecto = vistaTareas === "proyectos";
+
     return `
+    <div class="pestanas-tareas">
+      <button class="pestana${porProyecto ? "" : " activa"}" data-vista-tareas="hoy">Hoy</button>
+      <button class="pestana${porProyecto ? " activa" : ""}" data-vista-tareas="proyectos">Por proyecto</button>
+    </div>
+
+    ${porProyecto ? tarjetasDeProyectos(lista) : `
     <div class="tarjeta">
       <h2>&#9745; Tareas pendientes <small>${pendientes_.length}</small></h2>
       ${pendientes_.length
         ? pendientes_.map(filaTarea).join("")
         : `<p class="nota">No hay tareas pendientes. Agregá una acá abajo.</p>`}
-    </div>
+    </div>`}
 
     <div class="tarjeta">
       <h2>Anotar una tarea</h2>
@@ -712,6 +739,9 @@ const plantillas = {
         <label>¿Qué hay que hacer?</label>
         <input type="text" name="tarea" maxlength="140" autocomplete="off"
                placeholder="Ej: desyuyar el sector B" required>
+
+        <label>Proyecto</label>
+        <select name="proyecto">${opcionesProyecto()}</select>
 
         <div class="fila">
           <div>
@@ -732,8 +762,19 @@ const plantillas = {
           </label>`).join("")}
         </div>
 
-        <label>Quién la anota</label>
-        <select name="creada_por" required>${opcionesIntegrante(yo)}</select>
+        <div class="fila">
+          <div>
+            <label>Quién la anota</label>
+            <select name="creada_por" required>${opcionesIntegrante(yo)}</select>
+          </div>
+          <div>
+            <label>Quién la toma <small>(opcional)</small></label>
+            <select name="asignada">
+              <option value="">Cualquiera</option>
+              ${integrantes().map((n) => `<option>${esc(n)}</option>`).join("")}
+            </select>
+          </div>
+        </div>
 
         <button class="principal">Agregar tarea</button>
       </form>
@@ -945,6 +986,42 @@ const plantillas = {
         <label>Nombre</label>
         <input type="text" name="nombre" maxlength="40" placeholder="Ej: Marto" required>
         <button class="secundario">Agregar</button>
+      </form>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Proyectos <small>${proyectos().length}</small></h2>
+      <p class="nota">Las áreas de trabajo de la chacra. Sirven para agrupar las tareas
+      y para saber cuántas horas se lleva cada una.</p>
+      <div id="lista-proyectos">
+        ${proyectos().length ? proyectos().map((p, i) => `<div class="registro">
+            <div><div class="detalle">${esc(p.nombre)}</div>
+              <div class="cuando">${esc(p.tipo || "sin tipo")}${
+                (p.estado || "activo") !== "activo" ? " · " + esc(p.estado) : ""}</div></div>
+            <button type="button" class="quitar" data-proyecto="${i}" aria-label="Quitar">&times;</button>
+          </div>`).join("")
+          : `<p class="nota">Todavía no cargaste ninguno.</p>`}
+      </div>
+      <form id="form-proyecto" class="alta">
+        <div class="fila">
+          <div>
+            <label>Nombre</label>
+            <input type="text" name="nombre" maxlength="40" placeholder="Ej: Plantinera" required>
+          </div>
+          <div>
+            <label>Tipo</label>
+            <select name="tipo">
+              ${TIPOS_PROYECTO.map((t) => `<option>${t}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label>Estado</label>
+            <select name="estado">
+              ${ESTADOS_PROYECTO.map((e) => `<option>${e}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <button class="secundario">Agregar proyecto</button>
       </form>
     </div>
 
@@ -1566,6 +1643,20 @@ function prepararConfiguracion() {
     };
   });
 
+  // ---- proyectos
+  const fProy = $("#form-proyecto");
+  fProy.onsubmit = (e) => {
+    e.preventDefault();
+    const nombre = fProy.nombre.value.trim();
+    if (!nombre) return aviso("Ponele un nombre al proyecto.", true);
+    const lista = [...proyectos()];
+    if (lista.some((p) => p.nombre.toLowerCase() === nombre.toLowerCase())) {
+      return aviso(`Ya hay un proyecto que se llama ${nombre}.`, true);
+    }
+    lista.push({ nombre, tipo: fProy.tipo.value, estado: fProy.estado.value });
+    guardarConfig({ proyectos: lista }, `${nombre} agregado ✓`);
+  };
+
   // ---- integrantes
   const fInt = $("#form-integrante");
   fInt.onsubmit = (e) => {
@@ -1708,6 +1799,9 @@ function prepararConfiguracion() {
       } else if (b.dataset.plan !== undefined) {
         const plan = (CFG.plan || []).filter((_, i) => i !== Number(b.dataset.plan));
         guardarConfig({ plan }, "Cultivo quitado del plan");
+      } else if (b.dataset.proyecto !== undefined) {
+        const lista = proyectos().filter((_, i) => i !== Number(b.dataset.proyecto));
+        guardarConfig({ proyectos: lista }, "Proyecto quitado");
       } else if (b.dataset.integrante) {
         const equipo = (CFG.integrantes || []).filter((n) => n !== b.dataset.integrante);
         guardarConfig({ integrantes: equipo }, "Integrante quitado");
@@ -1763,12 +1857,68 @@ function tareasParaMostrar() {
     (peso[a.importancia] ?? 1) - (peso[b.importancia] ?? 1));
 }
 
+// Una tarjeta por proyecto: cómo viene de tareas y cuántas horas se le
+// dedicaron. Es la respuesta a "¿cuánto nos llevó la plantinera?".
+function tarjetasDeProyectos(tareas) {
+  const horas = horasPorProyecto();
+  const lista = proyectos();
+  if (!lista.length) {
+    return `<div class="tarjeta"><h2>Sin proyectos</h2>
+      <p class="nota">Cargalos en Configuración y las tareas se van a poder agrupar
+      por área de trabajo.</p></div>`;
+  }
+
+  const sinProyecto = tareas.filter((t) => !t.proyecto && !t.hecha).length;
+
+  return lista.map((p) => {
+    const suyas = tareas.filter((t) => t.proyecto === p.nombre);
+    const pend = suyas.filter((t) => !t.hecha && t.estado !== "En curso").length;
+    const curso = suyas.filter((t) => !t.hecha && t.estado === "En curso").length;
+    const listas = suyas.filter((t) => t.hecha).length;
+    const hs = horas[p.nombre] || 0;
+    const pausado = (p.estado || "activo") !== "activo";
+
+    return `<div class="tarjeta proyecto${pausado ? " pausado" : ""}">
+      <h2>${esc(p.nombre)} <small>${esc(p.tipo || "")}${pausado ? " · " + esc(p.estado) : ""}</small></h2>
+      <div class="cifras">
+        ${cifraClara(pend, "pendientes")}
+        ${cifraClara(curso, "en curso")}
+        ${cifraClara(listas, "hechas")}
+      </div>
+      <p class="nota" style="margin-top:8px">
+        ${hs ? `<b>${num(hs, 1)} horas</b> cargadas` : "Sin horas cargadas todavía"}
+      </p>
+      ${suyas.filter((t) => !t.hecha).slice(0, 4).map(filaTarea).join("")}
+    </div>`;
+  }).join("") + (sinProyecto ? `<div class="tarjeta">
+    <h2>Sin proyecto <small>${sinProyecto}</small></h2>
+    ${tareas.filter((t) => !t.proyecto && !t.hecha).map(filaTarea).join("")}
+  </div>` : "");
+}
+
+// Suma las horas de cada proyecto: las que ya están en la planilla más las que
+// esperan en este teléfono.
+function horasPorProyecto() {
+  const total = {};
+  (leer(LS.ultimos, {}).horas || []).forEach((f) => {
+    const p = f.Proyecto;
+    if (p) total[p] = (total[p] || 0) + (Number(f.Horas) || 0);
+  });
+  pendientes.filter((r) => r.tipo === "horas" && r.datos.proyecto).forEach((r) => {
+    total[r.datos.proyecto] = (total[r.datos.proyecto] || 0) + (Number(r.datos.horas) || 0);
+  });
+  return total;
+}
+
 function filaTarea(t) {
   const vencida = !t.hecha && t.fecha && t.fecha < hoy();
   const cuando = t.fecha === hoy() ? "hoy" : fechaCorta(t.fecha);
   const meta = [
     `<span class="punto-imp imp-${esc(t.importancia || "Media")}"></span>${esc(t.importancia || "Media")}`,
     vencida ? `atrasada desde el ${cuando}` : `para ${cuando}`,
+    (t.proyecto ? esc(t.proyecto) : ""),
+    (t.estado === "En curso" ? "<b>en curso</b>" : ""),
+    (t.asignada ? `la toma ${esc(t.asignada)}` : ""),
     (t.personas > 1 ? `${t.personas} personas` : ""),
     (t.hecha && t.hecha_por ? `hecha por ${esc(t.hecha_por)}` : ""),
     (t.sinEnviar ? "sin enviar" : ""),
@@ -1796,14 +1946,21 @@ function prepararTareas() {
     escribir(LS.nombre, f.creada_por.value);
     guardarRegistro("tareas", {
       tarea: texto,
+      proyecto: f.proyecto.value,
       fecha: f.fecha.value,
       importancia: f.querySelector("input[name=importancia]:checked").value,
       personas: parseInt(f.personas.value, 10) || 1,
       creada_por: f.creada_por.value,
+      asignada: f.asignada.value,
+      estado: "Pendiente",
       hecha: false,
     });
     render("tareas");
   };
+
+  document.querySelectorAll("[data-vista-tareas]").forEach((b) => {
+    b.onclick = () => { vistaTareas = b.dataset.vistaTareas; render("tareas"); };
+  });
 
   document.querySelectorAll(".tarea-check").forEach((b) => {
     b.onclick = () => {
@@ -1844,6 +2001,7 @@ function prepararHoras() {
       integrante: f.integrante.value,
       horas,
       actividad: f.actividad.value,
+      proyecto: f.proyecto ? f.proyecto.value : "",
       observaciones: f.observaciones.value.trim(),
     });
     render("horas");

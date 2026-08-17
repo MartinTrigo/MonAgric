@@ -380,6 +380,32 @@ form.alta {
 .buscador-op .del-plan { float: right; font-size: .72rem; color: var(--tenue); }
 .buscador-vacio { padding: 12px 14px; font-size: .9rem; color: var(--tenue); }
 
+/* ---- pestañas de Tareas: Hoy / Por proyecto ---- */
+.pestanas-tareas {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pestana {
+  flex: 1;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--tenue);
+  background: #fff;
+  border: 1.5px solid var(--sage-light);
+  border-radius: 20px;
+  cursor: pointer;
+}
+.pestana.activa {
+  background: var(--sage);
+  border-color: var(--sage-dark);
+  color: #fff;
+}
+.tarjeta.proyecto .cifras { margin-top: 4px; }
+.tarjeta.proyecto.pausado { opacity: .65; }
+
 /* ---- tareas ---- */
 .tarea {
   display: flex;
