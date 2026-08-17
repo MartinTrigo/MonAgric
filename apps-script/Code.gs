@@ -325,6 +325,7 @@ function doPost(e) {
     try {
       registros.forEach(function (r) {
         if (r.tipo === "tareas_hecha") { marcarTareaHecha(libro, r); guardados++; }
+        else if (r.tipo === "tareas_reabrir") { reabrirTarea(libro, r); guardados++; }
         else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
         else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
         else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
@@ -420,8 +421,11 @@ function leerConfigDe(libro, chacra) {
       cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0, tipo_riego: String(f[3] || "") });
     } else if (seccion === "integrante") cfg.integrantes.push(clave);
     else if (seccion === "proyecto") {
-      cfg.proyectos.push({ nombre: clave, tipo: String(f[2] || ""),
-                           estado: String(f[3] || "activo") });
+      cfg.proyectos.push({
+        nombre: clave, tipo: String(f[2] || ""), estado: String(f[3] || "activo"),
+        actividades: String(f[4] || "").split(";").map(function (a) { return a.trim(); })
+                     .filter(function (a) { return a; }),
+      });
     }
     else if (seccion === "plan") {
       cfg.plan.push({ cultivo: clave, superficie_m2: Number(f[2]) || 0,
@@ -473,7 +477,8 @@ function guardarConfig(libro, cfg) {
   // Los proyectos: las areas de trabajo de la chacra. Sirven para agrupar las
   // tareas y para saber cuantas horas se lleva cada una.
   (cfg.proyectos || []).forEach(function (p) {
-    filas.push(vacios(["proyecto", p.nombre, p.tipo || "", p.estado || "activo"]));
+    filas.push(vacios(["proyecto", p.nombre, p.tipo || "", p.estado || "activo",
+                       (p.actividades || []).join("; ")]));
   });
   (cfg.plan || []).forEach(function (p) {
     filas.push(vacios(["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
@@ -564,6 +569,20 @@ function marcarTareaHecha(libro, r) {
     if (String(hoja.getRange(fila, 8).getValue()) === "Hecha") return;
     hoja.getRange(fila, 8).setValue("Hecha");
     hoja.getRange(fila, 11, 1, 2).setValues([[r.datos.hecha_el || "", r.datos.hecha_por || ""]]);
+    return;
+  }
+}
+
+// Alguien se arrepintio: la tarea vuelve a estar pendiente.
+function reabrirTarea(libro, r) {
+  var hoja = libro.getSheetByName(HOJAS.tareas.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return;
+  var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) !== String(r.datos.tarea_id)) continue;
+    var fila = i + 2;
+    hoja.getRange(fila, 8).setValue("Pendiente");
+    hoja.getRange(fila, 11, 1, 2).setValues([["", ""]]);
     return;
   }
 }

@@ -197,6 +197,11 @@ const sectores = () => CFG?.sectores || [];
 const proyectos = () => CFG?.proyectos || [];
 const proyectosActivos = () => proyectos().filter((p) => (p.estado || "activo") !== "terminado");
 const TIPOS_PROYECTO = ["Productivo", "Infraestructura", "Gestión"];
+
+// Las actividades que tiene sentido hacer en cada proyecto. Sembrar existe en
+// Hortícolas pero no en Sala de Lavado: por eso la lista es de cada uno.
+const actividadesDe = (nombre) =>
+  (proyectos().find((p) => p.nombre === nombre) || {}).actividades || [];
 const ESTADOS_PROYECTO = ["activo", "pausado", "terminado"];
 const ESTADOS_TAREA = ["Pendiente", "En curso", "Hecha"];
 
@@ -672,6 +677,11 @@ const plantillas = {
           <option value="" disabled selected>Elegí el proyecto…</option>
           ${opcionesProyecto("", false)}
         </select>
+
+        <div id="bloque-actividad" hidden>
+          <label>¿Qué actividad?</label>
+          <select name="actividad"></select>
+        </div>
 
         <label>Horas trabajadas</label>
         <!-- texto y no "number": con type=number el navegador descarta "5,5" y
@@ -1842,12 +1852,20 @@ function tareasParaMostrar() {
   const deLaPlanilla = leer(LS.tareas, []);
   const nuevasLocales = pendientes.filter((r) => r.tipo === "tareas")
     .map((r) => ({ ...r.datos, id: r.id, sinEnviar: true }));
-  const hechasLocales = new Set(
-    pendientes.filter((r) => r.tipo === "tareas_hecha").map((r) => r.datos.tarea_id));
+  // La cola se recorre en orden: si alguien marcó, se arrepintió y volvió a
+  // marcar, vale lo último que hizo.
+  const estadoLocal = {};
+  pendientes.forEach((r) => {
+    if (r.tipo === "tareas_hecha") estadoLocal[r.datos.tarea_id] = true;
+    else if (r.tipo === "tareas_reabrir") estadoLocal[r.datos.tarea_id] = false;
+  });
 
   const todas = [...nuevasLocales, ...deLaPlanilla]
     .filter((t, i, arr) => arr.findIndex((o) => o.id === t.id) === i)
-    .map((t) => ({ ...t, hecha: t.hecha || hechasLocales.has(t.id) }));
+    .map((t) => ({
+      ...t,
+      hecha: t.id in estadoLocal ? estadoLocal[t.id] : t.hecha,
+    }));
 
   const peso = { Alta: 0, Media: 1, Baja: 2 };
   return todas.sort((a, b) =>
@@ -1924,7 +1942,10 @@ function filaTarea(t) {
 
   return `<div class="tarea${t.hecha ? " lista" : ""}${vencida ? " vencida" : ""}">
     <button class="tarea-check${t.hecha ? " hecha" : ""}" data-tarea="${esc(t.id)}"
-            ${t.hecha ? "disabled" : ""} aria-label="Marcar como hecha">${t.hecha ? "&#10003;" : ""}</button>
+            data-hecha="${t.hecha ? "1" : ""}"
+            aria-label="${t.hecha ? "Volver a pendiente" : "Marcar como hecha"}"
+            title="${t.hecha ? "Tocá para volverla a pendiente" : "Marcar como hecha"}"
+            >${t.hecha ? "&#10003;" : ""}</button>
     <div class="tarea-texto">
       <div class="titulo">${esc(t.tarea)}</div>
       <div class="tarea-meta">${meta}</div>
@@ -1962,11 +1983,35 @@ function prepararTareas() {
 
   document.querySelectorAll(".tarea-check").forEach((b) => {
     b.onclick = () => {
-      guardarRegistro("tareas_hecha", {
-        tarea_id: b.dataset.tarea,
-        hecha_el: hoy(),
-        hecha_por: leer(LS.nombre, ""),
-      });
+      const id = b.dataset.tarea;
+      if (b.dataset.hecha) {
+        // Se arrepintió: la tarea vuelve a estar pendiente. Si la marca de
+        // hecha todavía no viajó, alcanza con sacarla de la cola.
+        const esperando = pendientes.some((r) => r.tipo === "tareas_hecha" && r.datos.tarea_id === id);
+        if (esperando) {
+          pendientes = pendientes.filter(
+            (r) => !(r.tipo === "tareas_hecha" && r.datos.tarea_id === id));
+          escribir(LS.pendientes, pendientes);
+          refrescarEstado();
+          aviso("Volvió a pendiente");
+        } else {
+          guardarRegistro("tareas_reabrir", { tarea_id: id }, "Volvió a pendiente");
+        }
+      } else {
+        const esperaReabrir = pendientes.some(
+          (r) => r.tipo === "tareas_reabrir" && r.datos.tarea_id === id);
+        if (esperaReabrir) {
+          pendientes = pendientes.filter(
+            (r) => !(r.tipo === "tareas_reabrir" && r.datos.tarea_id === id));
+          escribir(LS.pendientes, pendientes);
+          refrescarEstado();
+          aviso("Marcada como hecha");
+        } else {
+          guardarRegistro("tareas_hecha", {
+            tarea_id: id, hecha_el: hoy(), hecha_por: leer(LS.nombre, ""),
+          });
+        }
+      }
       render("tareas");
     };
   });
@@ -1984,6 +2029,20 @@ async function traerTareas() {
 
 function prepararHoras() {
   const f = $("#form-horas");
+  if (f) {
+    // La lista de actividades cambia con el proyecto: se rearma cada vez.
+    const bloque = $("#bloque-actividad");
+    const verActividades = () => {
+      const lista = actividadesDe(f.proyecto.value);
+      bloque.hidden = !lista.length;
+      f.actividad.innerHTML = lista.length
+        ? `<option value="">Sin especificar</option>` +
+          lista.map((a) => `<option>${esc(a)}</option>`).join("")
+        : "";
+    };
+    f.proyecto?.addEventListener("change", verActividades);
+    verActividades();
+  }
   // Si el teléfono todavía no está activado, la vista muestra la tarjeta
   // del código y este formulario no existe.
   if (!f) return;
@@ -1999,7 +2058,7 @@ function prepararHoras() {
       integrante: f.integrante.value,
       horas,
       proyecto: f.proyecto.value,
-      actividad: "",   // se reemplazó por el proyecto
+      actividad: f.actividad ? f.actividad.value : "",
       observaciones: f.observaciones.value.trim(),
     });
     render("horas");
