@@ -636,6 +636,8 @@ const plantillas = {
   },
 
   horas() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     const yo = leer(LS.nombre, "");
     const equipo = leer(LS.ultimasHoras, []);
     const pendientesHoras = pendientes.filter((r) => r.tipo === "horas");
@@ -690,6 +692,8 @@ const plantillas = {
   },
 
   tareas() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     const yo = leer(LS.nombre, "");
     const lista = tareasParaMostrar();
     const pendientes_ = lista.filter((t) => !t.hecha);
@@ -742,6 +746,8 @@ const plantillas = {
   },
 
   cosechas() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
     const yo = leer(LS.nombre, "");
     return `
     <div class="tarjeta">
@@ -1019,6 +1025,15 @@ const plantillas = {
       <button class="principal" id="btn-guardar-ajustes">Guardar ajustes</button>
       <button class="secundario" id="btn-probar">Probar conexión</button>
     </div>
+
+    ${tieneAcceso() ? `<div class="tarjeta">
+      <h2>Este teléfono</h2>
+      <p class="nota">Activado para <b>${esc(chacraActual()?.nombre || "")}</b>
+      como <b>${esc(leer(LS.nombre, "—"))}</b>.</p>
+      <button class="secundario" id="btn-desvincular">Desvincular este teléfono</button>
+      <p class="nota" style="margin-top:8px">Vuelve a pedir un código de acceso.
+      Lo que tengas sin enviar no se pierde: se manda cuando lo actives de nuevo.</p>
+    </div>` : ""}
     <div class="tarjeta">
       <h2>Acerca de</h2>
       <p class="nota">MonAgric — monitoreo agrícola para emprendimientos agroecológicos.
@@ -1365,6 +1380,9 @@ function prepararInicio() {
 
 function prepararSiembras() {
   const f = $("#form-siembras");
+  // Si el teléfono todavía no está activado, la vista muestra la tarjeta
+  // del código y este formulario no existe.
+  if (!f) return;
   const bandejas = $("#bloque-bandejas");
   const lugar = $("#bloque-lugar");
   const calculo = $("#calculo-siembra");
@@ -1768,6 +1786,9 @@ function filaTarea(t) {
 
 function prepararTareas() {
   const f = $("#form-tareas");
+  // Si el teléfono todavía no está activado, la vista muestra la tarjeta
+  // del código y este formulario no existe.
+  if (!f) return;
   f.onsubmit = (e) => {
     e.preventDefault();
     const texto = f.tarea.value.trim();
@@ -1808,6 +1829,9 @@ async function traerTareas() {
 
 function prepararHoras() {
   const f = $("#form-horas");
+  // Si el teléfono todavía no está activado, la vista muestra la tarjeta
+  // del código y este formulario no existe.
+  if (!f) return;
   f.onsubmit = (e) => {
     e.preventDefault();
     const horas = aNumero(f.horas.value);
@@ -1828,6 +1852,9 @@ function prepararHoras() {
 
 function prepararCosechas() {
   const f = $("#form-cosechas");
+  // Si el teléfono todavía no está activado, la vista muestra la tarjeta
+  // del código y este formulario no existe.
+  if (!f) return;
   const calculo = $("#calculo-cosecha");
   const renglones = $("#renglones-cosecha");
   let proximo = 1;
@@ -1936,6 +1963,16 @@ function prepararAjustes() {
     aviso("Ajustes guardados ✓");
     sincronizar();
   };
+
+  const desvincular = $("#btn-desvincular");
+  if (desvincular) {
+    desvincular.onclick = () => {
+      if (!confirm("¿Desvincular este teléfono? Vas a necesitar un código nuevo para volver a activarlo.")) return;
+      escribir(LS.credencial, "");
+      aviso("Teléfono desvinculado. Pedí un código para activarlo de nuevo.");
+      render("inicio");
+    };
+  }
 
   $("#btn-probar").onclick = async () => {
     const partes = [];
