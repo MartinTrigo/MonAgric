@@ -133,3 +133,59 @@ function responderJSON(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// --- Mantenimiento: unificar como se escribieron los proyectos ---
+//
+// El campo Proyecto se lleno a mano durante meses, asi que el mismo area quedo
+// escrita de varias formas ("Horticola", "hortícola", "Hortícolas"). MonAgric
+// las agrupa igual al mostrar, pero si exportas la planilla para analizarla
+// afuera el texto crudo vuelve a separarlas.
+//
+// Esta funcion reescribe la columna Proyecto usando la forma correcta. Se
+// ejecuta a mano desde el editor (boton Ejecutar), cuando haga falta: elegi
+// unificarProyectos en la lista de funciones y mira el registro.
+//
+// Para agregar una forma nueva, sumala del lado izquierdo en minuscula y sin
+// tildes; a la derecha va como queres que quede escrito.
+var FORMAS_PROYECTO = {
+  "horticola": "Hortícola",
+  "horticolas": "Hortícola",
+  "fruticola": "Frutícola",
+  "fruticolas": "Frutícola",
+  "fungi": "Fungis",
+  "fungis": "Fungis",
+  "plantinera": "Plantinera",
+  "biofabrica": "Biofábrica",
+  "sala de lavado": "Sala de lavado",
+  "mantenimiento": "Mantenimiento",
+  "administracion": "Administración",
+  "comercializacion": "Comercialización"
+};
+
+function unificarProyectos() {
+  var hoja = buscarHojaRespuestas();
+  var total = hoja.getLastRow();
+  if (total < 2) { Logger.log("No hay registros."); return; }
+
+  var rango = hoja.getRange(2, COL_PROYECTO, total - 1, 1);
+  var valores = rango.getValues();
+  var cambios = 0, resumen = {};
+
+  for (var i = 0; i < valores.length; i++) {
+    var crudo = String(valores[i][0] || "").trim();
+    if (!crudo) continue;
+    var clave = crudo.toLowerCase()
+      .replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
+      .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
+    var correcto = FORMAS_PROYECTO[clave];
+    if (!correcto || correcto === crudo) continue;
+    valores[i][0] = correcto;
+    cambios++;
+    resumen[crudo + " -> " + correcto] = (resumen[crudo + " -> " + correcto] || 0) + 1;
+  }
+
+  if (!cambios) { Logger.log("Ya estaba todo escrito igual: no se cambio nada."); return; }
+  rango.setValues(valores);
+  Logger.log("Filas corregidas: " + cambios);
+  for (var k in resumen) Logger.log("  " + k + "  (" + resumen[k] + " filas)");
+}

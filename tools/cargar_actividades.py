@@ -31,6 +31,8 @@ ACTIVIDADES = {
                          "Proveedores", "Otras"],
     "Administración": ["Contabilidad", "Proyección", "Pagos", "Otras"],
     "Biofábrica": ["Diseño de plan", "Elaboración", "Monitoreo", "Aplicación"],
+    "Mantenimiento": ["Corte de pasto", "Orden y limpieza", "Reparaciones",
+                      "Mejoras"],
 }
 
 

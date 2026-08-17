@@ -528,6 +528,29 @@ function calcularResumen(chacra) {
   return res;
 }
 
+// "Horticola", "hortícola" y "Hortícolas" son el mismo proyecto escrito por
+// personas distintas. Para agrupar se compara sin tildes, sin mayusculas y sin
+// la s final; para mostrar se usa el nombre tal como esta en la configuracion.
+function claveProyecto(nombre) {
+  var s = String(nombre || "").trim().toLowerCase();
+  s = s.replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
+       .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
+  return s.replace(/s$/, "");
+}
+
+// Diccionario clave comparable -> nombre para mostrar, armado con los proyectos
+// que la chacra tiene cargados. Lo que no figure ahi se muestra como vino.
+function nombresDeProyecto(libro, chacra) {
+  var mapa = {};
+  try {
+    var cfg = leerConfigDe(libro, chacra);
+    (cfg.proyectos || []).forEach(function (p) {
+      if (p && p.nombre) mapa[claveProyecto(p.nombre)] = p.nombre;
+    });
+  } catch (err) { /* sin configuracion se muestra el texto crudo */ }
+  return mapa;
+}
+
 // Tica lee la planilla del proyecto; el resto, su propia hoja Horas.
 function sumarHoras(chacra, libro, res) {
   try {
@@ -543,6 +566,7 @@ function sumarHoras(chacra, libro, res) {
     }
     if (!hoja || hoja.getLastRow() < 2) return;
 
+    var nombres = nombresDeProyecto(libro, chacra);
     var ancho = colProyecto - colNombre + 1;
     var filas = hoja.getRange(2, colNombre, hoja.getLastRow() - 1, ancho).getValues();
     var iHoras = colHoras - colNombre, iProyecto = colProyecto - colNombre;
@@ -554,7 +578,8 @@ function sumarHoras(chacra, libro, res) {
       res.horas_por_integrante[quien] = (res.horas_por_integrante[quien] || 0) + n;
       // Los registros anteriores a los proyectos no tienen ninguno: se agrupan
       // aparte para que el total por proyecto siga cerrando con el total.
-      var proy = String(f[iProyecto] || "").trim() || "Sin proyecto";
+      var crudo = String(f[iProyecto] || "").trim();
+      var proy = crudo ? (nombres[claveProyecto(crudo)] || crudo) : "Sin proyecto";
       res.horas_por_proyecto[proy] = (res.horas_por_proyecto[proy] || 0) + n;
     });
   } catch (err) {
