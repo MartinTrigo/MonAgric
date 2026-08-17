@@ -311,8 +311,9 @@ async function enviarHora(r) {
       fecha: d.fecha,
       nombre: d.integrante,
       horas: d.horas,
-      actividad: d.actividad,
+      actividad: d.actividad || "",
       obs: d.observaciones || "",
+      proyecto: d.proyecto || "",
     }),
   });
   const datos = await resp.json();
@@ -666,24 +667,21 @@ const plantillas = {
         <label>¿Quién trabajó?</label>
         <select name="integrante" required>${opcionesIntegrante(yo)}</select>
 
+        <label>¿En qué proyecto?</label>
+        <select name="proyecto" required>
+          <option value="" disabled selected>Elegí el proyecto…</option>
+          ${opcionesProyecto("", false)}
+        </select>
+
         <label>Horas trabajadas</label>
         <!-- texto y no "number": con type=number el navegador descarta "5,5" y
              en el celular el teclado en español ofrece coma. -->
         <input type="text" name="horas" inputmode="decimal" autocomplete="off"
                placeholder="Ej: 4 o 2,5" required>
 
-        <label>¿Qué actividad hiciste más?</label>
-        <select name="actividad" required>
-          <option value="" disabled selected>Elegí la actividad…</option>
-          ${actividades().map((a) => `<option>${esc(a)}</option>`).join("")}
-        </select>
-
-        ${proyectosActivos().length ? `
-        <label>¿En qué proyecto? <small>(opcional)</small></label>
-        <select name="proyecto">${opcionesProyecto()}</select>` : ""}
-
-        <label>Observaciones (opcional)</label>
-        <textarea name="observaciones" rows="2" placeholder="Ej: cosecha de tomates, sector B"></textarea>
+        <label>¿Qué hiciste?</label>
+        <textarea name="observaciones" rows="2"
+                  placeholder="Ej: armado de mesadas y colocación de la pollera"></textarea>
 
         <button class="principal">Guardar horas</button>
       </form>
@@ -1993,15 +1991,15 @@ function prepararHoras() {
     e.preventDefault();
     const horas = aNumero(f.horas.value);
     if (!(horas > 0 && horas <= 24)) return aviso("Las horas deben ser un número entre 0 y 24.", true);
-    if (!f.actividad.value) return aviso("Elegí una actividad.", true);
+    if (!f.proyecto.value) return aviso("Elegí el proyecto.", true);
     // El nombre elegido queda como el de este teléfono: la próxima vez viene puesto.
     escribir(LS.nombre, f.integrante.value);
     guardarRegistro("horas", {
       fecha: f.fecha.value,
       integrante: f.integrante.value,
       horas,
-      actividad: f.actividad.value,
-      proyecto: f.proyecto ? f.proyecto.value : "",
+      proyecto: f.proyecto.value,
+      actividad: "",   // se reemplazó por el proyecto
       observaciones: f.observaciones.value.trim(),
     });
     render("horas");
