@@ -1280,7 +1280,8 @@ function filaEquipo(tipo, f) {
     extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
   } else if (tipo === "horas") {
     detalle = `${esc(f.Integrante)} — ${num(f.Horas, 1)} h`;
-    extra = esc(f.Actividad || "");
+    extra = [f.Proyecto, f.Actividad, f.Observaciones]
+      .filter(Boolean).map(esc).join(" · ");
   } else {
     detalle = esc(f.Tarea || f.Cultivo || "");
     extra = "";
@@ -1551,7 +1552,7 @@ function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
   }
   CFG = Object.assign({
     nombre: chacraActual()?.nombre || "", temporada: {}, bancal: {},
-    sectores: [], integrantes: [], plan: [],
+    sectores: [], integrantes: [], proyectos: [], plan: [],
   }, CFG || {}, cambios);
   escribir(LS.config, CFG);
   guardarRegistro("config", CFG, mensaje);
@@ -1914,14 +1915,13 @@ function tarjetasDeProyectos(tareas) {
 
 // Suma las horas de cada proyecto: las que ya están en la planilla más las que
 // esperan en este teléfono.
+// El total de la temporada lo suma el servidor leyendo la planilla entera: aca
+// solo se le agregan las horas que todavia estan en la cola sin viajar.
 function horasPorProyecto() {
-  const total = {};
-  (leer(LS.ultimos, {}).horas || []).forEach((f) => {
-    const p = f.Proyecto;
-    if (p) total[p] = (total[p] || 0) + (Number(f.Horas) || 0);
-  });
-  pendientes.filter((r) => r.tipo === "horas" && r.datos.proyecto).forEach((r) => {
-    total[r.datos.proyecto] = (total[r.datos.proyecto] || 0) + (Number(r.datos.horas) || 0);
+  const total = Object.assign({}, resumen?.horas_por_proyecto || {});
+  pendientes.filter((r) => r.tipo === "horas").forEach((r) => {
+    const p = r.datos.proyecto || "Sin proyecto";
+    total[p] = (total[p] || 0) + (Number(r.datos.horas) || 0);
   });
   return total;
 }

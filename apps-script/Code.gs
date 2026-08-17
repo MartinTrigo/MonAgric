@@ -501,7 +501,7 @@ function calcularResumen(chacra) {
 
   var libro = planillaDe(chacra);
   var res = { ok: true, kg_cosechados: 0, kg_por_cultivo: {}, siembras: 0, plantines: 0,
-              horas: 0, horas_por_integrante: {}, actualizado: new Date().toISOString() };
+              horas: 0, horas_por_integrante: {}, horas_por_proyecto: {}, actualizado: new Date().toISOString() };
 
   var cosechas = libro.getSheetByName("Cosechas");
   if (cosechas && cosechas.getLastRow() > 1) {
@@ -531,7 +531,7 @@ function calcularResumen(chacra) {
 // Tica lee la planilla del proyecto; el resto, su propia hoja Horas.
 function sumarHoras(chacra, libro, res) {
   try {
-    var hoja = null, colNombre = 3, colHoras = 4;
+    var hoja = null, colNombre = 3, colHoras = 4, colProyecto = 7;
     if (String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
       var hojas = SpreadsheetApp.openById(PLANILLA_HORAS_TICA).getSheets();
       for (var i = 0; i < hojas.length; i++) {
@@ -539,18 +539,23 @@ function sumarHoras(chacra, libro, res) {
       }
     } else {
       hoja = libro.getSheetByName("Horas");
-      colNombre = 4; colHoras = 5;
+      colNombre = 4; colHoras = 5; colProyecto = 7;
     }
     if (!hoja || hoja.getLastRow() < 2) return;
 
-    var filas = hoja.getRange(2, colNombre, hoja.getLastRow() - 1, colHoras - colNombre + 1)
-                    .getValues();
+    var ancho = colProyecto - colNombre + 1;
+    var filas = hoja.getRange(2, colNombre, hoja.getLastRow() - 1, ancho).getValues();
+    var iHoras = colHoras - colNombre, iProyecto = colProyecto - colNombre;
     filas.forEach(function (f) {
       var quien = String(f[0]).trim();
-      var n = Number(f[f.length - 1]) || 0;
+      var n = Number(f[iHoras]) || 0;
       if (!quien || !n) return;
       res.horas += n;
       res.horas_por_integrante[quien] = (res.horas_por_integrante[quien] || 0) + n;
+      // Los registros anteriores a los proyectos no tienen ninguno: se agrupan
+      // aparte para que el total por proyecto siga cerrando con el total.
+      var proy = String(f[iProyecto] || "").trim() || "Sin proyecto";
+      res.horas_por_proyecto[proy] = (res.horas_por_proyecto[proy] || 0) + n;
     });
   } catch (err) {
     res.horas_error = String(err);
