@@ -2,7 +2,8 @@
 // PAC-FARM — un clásico de laberinto con temática de huerta
 //
 // El cosechador junta rabanitos y nabos, las frutillas de las esquinas lo
-// vuelven temible por unos segundos y cada tanto aparece un tomate de regalo.
+// vuelven temible por unos segundos y cada tanto aparece una hortaliza suelta
+// de regalo, en cualquier lugar del mapa y por unos pocos segundos.
 // Las plagas (vaquita, pulgón, mosca blanca y babosa) lo persiguen.
 //
 // Todo se dibuja en un lienzo de 224x288 píxeles que después se agranda por
@@ -48,6 +49,16 @@ const LAB_ORIGINAL = [
 ];
 
 const COLS = 28, FILAS = 31, T = 8;      // celda de 8x8 píxeles
+
+// Los regalos caen donde originalmente habia una verdura para juntar. Eso deja
+// afuera las paredes, la casa de las plagas y los tuneles de los costados, sin
+// tener que enumerar a mano los lugares prohibidos.
+const CELDAS_REGALO = [];
+LAB_ORIGINAL.forEach(function (fila, f) {
+  for (let c = 0; c < fila.length; c++) {
+    if (fila[c] === "." || fila[c] === "o") CELDAS_REGALO.push([c, f]);
+  }
+});
 const MARGEN_ARRIBA = 24;                // franja del marcador
 const ANCHO = COLS * T;                  // 224
 const ALTO = FILAS * T + MARGEN_ARRIBA + 16;
@@ -132,6 +143,69 @@ const TOMATE = dibujoDe([
   "..rRRRRRr..",
   "...rrrrr...",
 ], { g: "#5fbf5a", R: "#e4483c", r: "#a82a20", h: "#ff9b9b" });
+
+const BROCOLI = dibujoDe([
+  "...ggg.....",
+  "..gGGGgg...",
+  ".gGGGGGGg..",
+  "gGGGGGGGGg.",
+  ".gGGGGGGGg.",
+  "..gGGGGGg..",
+  "...gtttg...",
+  "....ttt....",
+  "....ttt....",
+  ".....t.....",
+], { g: "#2f7a2c", G: "#5cb054", t: "#a8d98f" });
+
+const LECHUGA = dibujoDe([
+  "..c.c.c.c..",
+  ".ccCCCCCcc.",
+  "cCCcCCCcCCc",
+  "cCCCcCcCCCc",
+  "cCCCCcCCCCc",
+  "cCCcCCCcCCc",
+  ".cCCCCCCCc.",
+  "..cCCCCCc..",
+  "...ccccc...",
+  "...........",
+], { c: "#4e9c3f", C: "#96dd58" });
+
+const REPOLLO = dibujoDe([
+  "...ppppp...",
+  "..pPPPPPp..",
+  ".pPPvPvPPp.",
+  "pPPPvPvPPPp",
+  "pPPvPPPvPPp",
+  "pPPPvPvPPPp",
+  ".pPPvPvPPp.",
+  "..pPPPPPp..",
+  "...ppppp...",
+  "....ttt....",
+], { p: "#4a2359", P: "#9b5bb5", v: "#c99fdb", t: "#7fa86a" });
+
+const ZANAHORIA = dibujoDe([
+  "..g..g..g..",
+  "..gg.g.gg..",
+  "...ggggg...",
+  ".oOOOOOOOo.",
+  ".oOOoOOoOo.",
+  "..oOOOOOo..",
+  "..oOOoOOo..",
+  "...oOOOo...",
+  "....ooo....",
+  ".....o.....",
+], { g: "#5fbf5a", o: "#b0480c", O: "#f2892a" });
+
+// Lo que puede aparecer de regalo. El tomate es el de siempre y vale menos
+// justamente porque es el mas comun; el repollo y la zanahoria tardan mas en
+// salir y pagan mejor. La escala por nivel es la que ya tenia el tomate.
+const REGALOS = [
+  { img: TOMATE, puntos: 100, peso: 4 },
+  { img: LECHUGA, puntos: 150, peso: 3 },
+  { img: BROCOLI, puntos: 200, peso: 3 },
+  { img: ZANAHORIA, puntos: 300, peso: 2 },
+  { img: REPOLLO, puntos: 400, peso: 1 },
+];
 
 // ---------- El cosechador ----------
 // Se calcula píxel por píxel: un círculo al que se le recorta la boca, y encima
@@ -276,7 +350,8 @@ let escena = "listo";         // listo | jugando | muriendo | fin | nivel
 let reloj = 0, relojEscena = 0;
 let modoIndice = 0, modoReloj = 0, modo = "dispersar";
 let asustadasReloj = 0, plagasComidas = 0;
-let tomate = null;            // { x, y, reloj }
+let regalo = null;            // { x, y, reloj, img, puntos }
+let relojRegalo = 0;          // cuanto falta para el proximo
 let sonidoActivo = true, pausado = false;
 
 const cosechador = {
@@ -378,7 +453,8 @@ function ubicarPersonajes() {
 
   modoIndice = 0; modoReloj = 0; modo = "dispersar";
   asustadasReloj = 0; plagasComidas = 0;
-  tomate = null;
+  regalo = null;
+  relojRegalo = 6 + Math.random() * 8;
 }
 
 // Lo que tarda un bicho comido en rearmarse dentro de la madriguera. Es a
@@ -456,17 +532,38 @@ function comer() {
     sonar("mordisco");
   }
 
-  // el tomate de regalo aparece dos veces por nivel
-  if (verdurasComidas === 70 || verdurasComidas === 170) {
-    tomate = { x: centroX(13), y: centroY(17), reloj: 10 };
-  }
   if (verdurasQuedan === 0) {
     escena = "nivel";
     relojEscena = 0;
   }
 }
 
-const puntosTomate = () => Math.min(100 + (nivel - 1) * 100, 500);
+const puntosRegalo = (r) => Math.min(r.puntos + (nivel - 1) * 100, r.puntos * 5);
+
+// Se elige con pesos: el tomate sale seguido y el repollo es un hallazgo.
+function sortearRegalo() {
+  const total = REGALOS.reduce((s, r) => s + r.peso, 0);
+  let n = Math.random() * total;
+  for (const r of REGALOS) { n -= r.peso; if (n <= 0) return r; }
+  return REGALOS[0];
+}
+
+// Aparece lejos del cosechador, para que haya que ir a buscarlo y no le caiga
+// encima. Si despues de varios intentos no se encuentra lugar, vale cualquiera.
+function aparecerRegalo() {
+  let celda = null;
+  for (let i = 0; i < 30; i++) {
+    const c = CELDAS_REGALO[Math.floor(Math.random() * CELDAS_REGALO.length)];
+    const d = Math.hypot(centroX(c[0]) - cosechador.x, centroY(c[1]) - cosechador.y);
+    if (d > 40) { celda = c; break; }
+  }
+  if (!celda) celda = CELDAS_REGALO[Math.floor(Math.random() * CELDAS_REGALO.length)];
+  const elegido = sortearRegalo();
+  regalo = {
+    x: centroX(celda[0]), y: centroY(celda[1]),
+    reloj: 9, img: elegido.img, puntos: elegido.puntos,
+  };
+}
 
 function sumar(p) {
   puntaje += p;
@@ -788,7 +885,10 @@ function dibujar() {
     }
   }
 
-  if (tomate) dibujarCentrado(TOMATE, tomate.x, tomate.y);
+  // Cuando le queda poco parpadea, asi se ve que se esta por ir.
+  if (regalo && (regalo.reloj > 3 || Math.floor(regalo.reloj * 6) % 2 === 0)) {
+    dibujarCentrado(regalo.img, regalo.x, regalo.y);
+  }
 
   // plagas
   if (escena !== "muriendo") {
@@ -947,14 +1047,20 @@ function actualizar(dt) {
   if (paso > 0.01) cosechador.animacion += dt * 14;
   comer();
 
-  // tomate
-  if (tomate) {
-    tomate.reloj -= dt;
-    if (tomate.reloj <= 0) tomate = null;
-    else if (Math.hypot(tomate.x - cosechador.x, tomate.y - cosechador.y) < 7) {
-      sumar(puntosTomate());
-      tomate = null;
+  // regalos: una hortaliza suelta que aparece cada tanto en cualquier lugar
+  if (regalo) {
+    regalo.reloj -= dt;
+    if (regalo.reloj <= 0) regalo = null;
+    else if (Math.hypot(regalo.x - cosechador.x, regalo.y - cosechador.y) < 7) {
+      sumar(puntosRegalo(regalo));
+      regalo = null;
       sonar("tomate");
+    }
+  } else {
+    relojRegalo -= dt;
+    if (relojRegalo <= 0) {
+      aparecerRegalo();
+      relojRegalo = 12 + Math.random() * 14;
     }
   }
 
@@ -996,6 +1102,12 @@ const leerDeMonAgric = (clave, sino = null) => {
 
 const servicio = () => leerDeMonAgric("monagric_script_url", "") || URL_SERVICIO;
 const chacra = () => leerDeMonAgric("monagric_chacra", "");
+// El juego vive en la misma direccion que MonAgric, asi que comparte con ella
+// el almacenamiento del navegador: la credencial que el telefono canjeo una vez
+// esta ahi y se reusa. Sin esto el servicio rechaza los pedidos y el ranking
+// queda congelado en lo ultimo que se habia bajado.
+const credencial = () => leerDeMonAgric("monagric_credencial", "");
+const dispositivo = () => leerDeMonAgric("monagric_dispositivo", "");
 const jugador = () => leerDeMonAgric("pacfarm_jugador", "") ||
                       leerDeMonAgric("monagric_nombre", "");
 const hayEquipo = () => !!(chacra() && jugador());
@@ -1005,7 +1117,7 @@ let enviandoPuntaje = false;
 
 async function guardarPuntaje() {
   const nombre = jugador();
-  if (!nombre || !chacra() || puntaje <= 0 || enviandoPuntaje) return;
+  if (!nombre || !chacra() || !credencial() || puntaje <= 0 || enviandoPuntaje) return;
   enviandoPuntaje = true;
   try {
     const resp = await fetch(servicio(), {
@@ -1013,6 +1125,8 @@ async function guardarPuntaje() {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         chacra: chacra(),
+        credencial: credencial(),
+        dispositivo: dispositivo(),
         registros: [{
           id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
           tipo: "puntaje",
@@ -1029,9 +1143,12 @@ async function guardarPuntaje() {
 }
 
 async function traerRanking() {
-  if (!chacra() || !navigator.onLine) return;
+  if (!chacra() || !credencial() || !navigator.onLine) return;
   try {
-    const r = await fetch(`${servicio()}?ranking=1&chacra=${encodeURIComponent(chacra())}`);
+    const r = await fetch(`${servicio()}?ranking=1` +
+      `&chacra=${encodeURIComponent(chacra())}` +
+      `&credencial=${encodeURIComponent(credencial())}` +
+      `&dispositivo=${encodeURIComponent(dispositivo())}`);
     const d = await r.json();
     if (Array.isArray(d.ranking)) {
       ranking = d.ranking;

@@ -4,8 +4,8 @@
     {
       "name": "monagric-web",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "docs"],
-      "port": 8123
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "docs"],
+      "port": 8080
     }
   ]
 }
