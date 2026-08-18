@@ -19,7 +19,8 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--superficie);
   color: var(--texto);
-  min-height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;   /* iOS anterior a 15.4 ignora dvh y usa el de arriba */
   display: flex;
   flex-direction: column;
   -webkit-text-size-adjust: 100%;
@@ -59,7 +60,9 @@ body {
 main {
   flex: 1;
   padding: 14px;
-  padding-bottom: 92px;
+  /* La barra de pestañas es fija y en iPhone crece con el indicador de inicio.
+     Si el hueco fuera un numero fijo, tapaba la ultima tarjeta de cada seccion. */
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
   max-width: 620px;
   width: 100%;
   margin: 0 auto;
@@ -473,7 +476,7 @@ form.alta {
 .aviso {
   position: fixed;
   left: 50%;
-  bottom: 86px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   background: var(--sage-dark);
   color: #fff;
