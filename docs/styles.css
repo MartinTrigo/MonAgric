@@ -114,6 +114,31 @@ input, select, textarea {
   color: var(--texto);
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--sage); border-color: var(--sage); }
+
+/* Safari le pone a los desplegables y a las fechas su propio dibujo, distinto
+   del de Android: el select pierde la flecha y queda como una caja muerta que
+   no se ve que se pueda tocar, y la fecha no se estira al ancho del campo. Se
+   apaga ese dibujo y se pone uno propio, asi se ven igual en los dos telefonos.
+   La flecha va como imagen de fondo para no tener que envolver cada select. */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23557153' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 12px 8px;
+  padding-right: 36px;
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  /* Sin esto Safari lo achica al texto y queda mas bajo que los demas campos. */
+  min-height: 47px;
+  text-align: left;
+}
+/* El icono de calendario propio de Safari se superpone al borde redondeado. */
+input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .fila { display: flex; gap: 10px; }
 .fila > div { flex: 1; min-width: 0; }
 
