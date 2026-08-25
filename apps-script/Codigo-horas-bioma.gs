@@ -17,7 +17,7 @@ var HOJA_RESPUESTAS = "Respuestas de formulario 1";
 var HOJA_CONFIG = "Config";
 // Columna donde se escribe el proyecto. Va despues de Observaciones, al final
 // de lo que ya existia, asi no se corre ninguna columna anterior.
-var COL_PROYECTO = 7;
+var COL_AREA = 7;
 
 // --- La app pide la lista de trabajadores y los últimos registros ---
 function doGet(e) {
@@ -53,7 +53,7 @@ function doPost(e) {
       Number(datos.horas),         // Horas
       String(datos.actividad || ""), // Actividad (se dejo de usar, queda vacia)
       String(datos.obs || ""),     // Observaciones: que hizo
-      String(datos.proyecto || "") // Proyecto: en que area se aplicaron
+      String(datos.area || datos.proyecto || "") // Area en que se aplicaron
     ]);
 
     return responderJSON({ ok: true });
@@ -78,9 +78,11 @@ function buscarHojaRespuestas() {
   if (!hoja) {
     throw new Error("No encuentro la pestaña de respuestas. Revisá el nombre arriba del código.");
   }
-  // El encabezado de la columna nueva, la primera vez
-  if (!hoja.getRange(1, COL_PROYECTO).getValue()) {
-    hoja.getRange(1, COL_PROYECTO).setValue("Proyecto").setFontWeight("bold");
+  // El encabezado de la columna, la primera vez. Si quedo el nombre anterior
+  // se corrige: es la misma columna, solo que ahora se llama Area.
+  var cab = String(hoja.getRange(1, COL_AREA).getValue() || "");
+  if (!cab || cab === "Proyecto") {
+    hoja.getRange(1, COL_AREA).setValue("Área").setFontWeight("bold");
   }
   return hoja;
 }
@@ -108,7 +110,7 @@ function ultimosRegistros(cuantos) {
   var total = hoja.getLastRow();
   if (total < 2) return []; // solo encabezado
   var n = Math.min(cuantos, total - 1);
-  var valores = hoja.getRange(total - n + 1, 1, n, COL_PROYECTO).getValues();
+  var valores = hoja.getRange(total - n + 1, 1, n, COL_AREA).getValues();
   var tz = Session.getScriptTimeZone();
   var lista = [];
   // Recorremos de abajo hacia arriba: el más reciente primero
@@ -120,7 +122,7 @@ function ultimosRegistros(cuantos) {
       fecha: fechaTxt,
       nombre: String(valores[i][2]),
       horas: (typeof h === "number") ? h : String(h),
-      // Se muestra el proyecto; si el registro es viejo y no lo tiene, la
+      // Se muestra el area; si el registro es viejo y no lo tiene, la
       // actividad, que es lo que se usaba antes.
       actividad: String(valores[i][6] || valores[i][4] || "")
     });
@@ -134,7 +136,7 @@ function responderJSON(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// --- Mantenimiento: unificar como se escribieron los proyectos ---
+// --- Mantenimiento: unificar como se escribieron las areas ---
 //
 // El campo Proyecto se lleno a mano durante meses, asi que el mismo area quedo
 // escrita de varias formas ("Horticola", "hortícola", "Hortícolas"). MonAgric
@@ -143,11 +145,11 @@ function responderJSON(obj) {
 //
 // Esta funcion reescribe la columna Proyecto usando la forma correcta. Se
 // ejecuta a mano desde el editor (boton Ejecutar), cuando haga falta: elegi
-// unificarProyectos en la lista de funciones y mira el registro.
+// unificarAreas en la lista de funciones y mira el registro.
 //
 // Para agregar una forma nueva, sumala del lado izquierdo en minuscula y sin
 // tildes; a la derecha va como queres que quede escrito.
-var FORMAS_PROYECTO = {
+var FORMAS_AREA = {
   "horticola": "Hortícola",
   "horticolas": "Hortícola",
   "fruticola": "Frutícola",
@@ -162,12 +164,12 @@ var FORMAS_PROYECTO = {
   "comercializacion": "Comercialización"
 };
 
-function unificarProyectos() {
+function unificarAreas() {
   var hoja = buscarHojaRespuestas();
   var total = hoja.getLastRow();
   if (total < 2) { Logger.log("No hay registros."); return; }
 
-  var rango = hoja.getRange(2, COL_PROYECTO, total - 1, 1);
+  var rango = hoja.getRange(2, COL_AREA, total - 1, 1);
   var valores = rango.getValues();
   var cambios = 0, resumen = {};
 
@@ -177,7 +179,7 @@ function unificarProyectos() {
     var clave = crudo.toLowerCase()
       .replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
       .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
-    var correcto = FORMAS_PROYECTO[clave];
+    var correcto = FORMAS_AREA[clave];
     if (!correcto || correcto === crudo) continue;
     valores[i][0] = correcto;
     cambios++;

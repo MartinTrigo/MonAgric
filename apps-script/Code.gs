@@ -90,12 +90,12 @@ var HOJAS = {
   },
   tareas: {
     nombre: "Tareas",
-    encabezados: ["Id", "Temporada", "Proyecto", "Para cuándo", "Tarea", "Importancia",
+    encabezados: ["Id", "Temporada", "Área", "Para cuándo", "Tarea", "Importancia",
                   "Personas", "Estado", "Quién la toma", "Anotó", "Hecha el", "Hecha por",
                   "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
-      return [r.id, r.temporada || "", d.proyecto || "", d.fecha, d.tarea,
+      return [r.id, r.temporada || "", d.area || d.proyecto || "", d.fecha, d.tarea,
               d.importancia || "Media", d.personas || 1, "Pendiente", d.asignada || "",
               d.creada_por || "", "", "", r.dispositivo || "", new Date()];
     },
@@ -115,11 +115,11 @@ var HOJAS = {
   horas: {
     nombre: "Horas",
     encabezados: ["Id", "Temporada", "Fecha", "Integrante", "Horas", "Actividad",
-                  "Proyecto", "Observaciones", "Cargado por", "Recibido"],
+                  "Área", "Observaciones", "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.integrante, d.horas, d.actividad || "",
-              d.proyecto || "", d.observaciones || "", r.dispositivo || "", new Date()];
+              d.area || d.proyecto || "", d.observaciones || "", r.dispositivo || "", new Date()];
     },
   },
 };
@@ -401,7 +401,7 @@ function leerConfigDe(libro, chacra) {
   // La direccion de la planilla viaja con la configuracion: la app la usa para
   // el enlace "ver todo en la planilla".
   var cfg = { chacra: chacra, planilla: libro.getUrl(), temporada: {}, bancal: {},
-              sectores: [], integrantes: [], proyectos: [], plan: [] };
+              sectores: [], integrantes: [], areas: [], plan: [] };
   if (!hoja || hoja.getLastRow() < 2) return cfg;
 
   // Las fechas la planilla las guarda como fecha de verdad, no como texto: hay
@@ -420,8 +420,9 @@ function leerConfigDe(libro, chacra) {
     else if (seccion === "sector") {
       cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0, tipo_riego: String(f[3] || "") });
     } else if (seccion === "integrante") cfg.integrantes.push(clave);
-    else if (seccion === "proyecto") {
-      cfg.proyectos.push({
+    // "proyecto" es como se llamaba antes: las filas viejas se siguen leyendo.
+    else if (seccion === "area" || seccion === "proyecto") {
+      cfg.areas.push({
         nombre: clave, tipo: String(f[2] || ""), estado: String(f[3] || "activo"),
         actividades: String(f[4] || "").split(";").map(function (a) { return a.trim(); })
                      .filter(function (a) { return a; }),
@@ -474,11 +475,11 @@ function guardarConfig(libro, cfg) {
   (cfg.integrantes || []).forEach(function (n) {
     filas.push(vacios(["integrante", n]));
   });
-  // Los proyectos: las areas de trabajo de la chacra. Sirven para agrupar las
-  // tareas y para saber cuantas horas se lleva cada una.
-  (cfg.proyectos || []).forEach(function (p) {
-    filas.push(vacios(["proyecto", p.nombre, p.tipo || "", p.estado || "activo",
-                       (p.actividades || []).join("; ")]));
+  // Solo las areas propias de la chacra. Las seis estandar viven en la app,
+  // iguales para todos, asi que no se guardan aca ni se pueden editar.
+  (cfg.areas || cfg.proyectos || []).forEach(function (a) {
+    filas.push(vacios(["area", a.nombre, a.tipo || "", a.estado || "activo",
+                       (a.actividades || []).join("; ")]));
   });
   (cfg.plan || []).forEach(function (p) {
     filas.push(vacios(["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
@@ -501,7 +502,7 @@ function calcularResumen(chacra) {
 
   var libro = planillaDe(chacra);
   var res = { ok: true, kg_cosechados: 0, kg_por_cultivo: {}, siembras: 0, plantines: 0,
-              horas: 0, horas_por_integrante: {}, horas_por_proyecto: {}, actualizado: new Date().toISOString() };
+              horas: 0, horas_por_integrante: {}, horas_por_area: {}, actualizado: new Date().toISOString() };
 
   var cosechas = libro.getSheetByName("Cosechas");
   if (cosechas && cosechas.getLastRow() > 1) {
@@ -531,21 +532,28 @@ function calcularResumen(chacra) {
 // "Horticola", "hortícola" y "Hortícolas" son el mismo proyecto escrito por
 // personas distintas. Para agrupar se compara sin tildes, sin mayusculas y sin
 // la s final; para mostrar se usa el nombre tal como esta en la configuracion.
-function claveProyecto(nombre) {
+function claveArea(nombre) {
   var s = String(nombre || "").trim().toLowerCase();
   s = s.replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
        .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
   return s.replace(/s$/, "");
 }
 
+// Las seis areas estandar. Viven en la app, que es donde se eligen, pero el
+// servidor necesita la lista para escribir bien el nombre al agrupar: en las
+// planillas viejas el area se tipeo a mano y viene de mil formas.
+var AREAS_FIJAS = ["Hortícola", "Frutícola", "Fungis", "Comercialización",
+                   "Administración", "Mantenimiento"];
+
 // Diccionario clave comparable -> nombre para mostrar, armado con los proyectos
 // que la chacra tiene cargados. Lo que no figure ahi se muestra como vino.
-function nombresDeProyecto(libro, chacra) {
+function nombresDeArea(libro, chacra) {
   var mapa = {};
+  AREAS_FIJAS.forEach(function (n) { mapa[claveArea(n)] = n; });
   try {
     var cfg = leerConfigDe(libro, chacra);
-    (cfg.proyectos || []).forEach(function (p) {
-      if (p && p.nombre) mapa[claveProyecto(p.nombre)] = p.nombre;
+    (cfg.areas || cfg.proyectos || []).forEach(function (a) {
+      if (a && a.nombre) mapa[claveArea(a.nombre)] = a.nombre;
     });
   } catch (err) { /* sin configuracion se muestra el texto crudo */ }
   return mapa;
@@ -566,7 +574,7 @@ function sumarHoras(chacra, libro, res) {
     }
     if (!hoja || hoja.getLastRow() < 2) return;
 
-    var nombres = nombresDeProyecto(libro, chacra);
+    var nombres = nombresDeArea(libro, chacra);
     var ancho = colProyecto - colNombre + 1;
     var filas = hoja.getRange(2, colNombre, hoja.getLastRow() - 1, ancho).getValues();
     var iHoras = colHoras - colNombre, iProyecto = colProyecto - colNombre;
@@ -579,8 +587,8 @@ function sumarHoras(chacra, libro, res) {
       // Los registros anteriores a los proyectos no tienen ninguno: se agrupan
       // aparte para que el total por proyecto siga cerrando con el total.
       var crudo = String(f[iProyecto] || "").trim();
-      var proy = crudo ? (nombres[claveProyecto(crudo)] || crudo) : "Sin proyecto";
-      res.horas_por_proyecto[proy] = (res.horas_por_proyecto[proy] || 0) + n;
+      var proy = crudo ? (nombres[claveArea(crudo)] || crudo) : "Sin área";
+      res.horas_por_area[proy] = (res.horas_por_area[proy] || 0) + n;
     });
   } catch (err) {
     res.horas_error = String(err);

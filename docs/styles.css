@@ -516,3 +516,15 @@ form.alta {
 }
 .aviso.error { background: var(--peligro); }
 .oculto { opacity: 0; pointer-events: none; }
+
+/* ---- áreas de trabajo ---- */
+/* Las seis fijas se muestran mas apagadas que las propias: se ven, se entiende
+   que estan, pero queda claro que no hay nada que tocar ahi. */
+.lista-areas .registro { opacity: .78; }
+.lista-areas .cuando { font-size: .78rem; }
+h3.sub {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--sage-dark);
+  margin: 16px 0 6px;
+}

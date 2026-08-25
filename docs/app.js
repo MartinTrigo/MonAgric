@@ -70,7 +70,7 @@ let resumen = leer(LS.resumen, null);   // totales de la chacra (desde su planil
 let CAT = null;                         // catálogo común (catalogo.json)
 let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
-let vistaTareas = "hoy";        // "hoy" o "proyectos"
+let vistaTareas = "hoy";        // "hoy" o "areas"
 
 // Hasta no haber leído la configuración de la chacra en el servicio no se puede
 // guardar nada: guardar reescribe la hoja Config entera, así que hacerlo con la
@@ -192,23 +192,57 @@ const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 const enPlan = (cultivo) => (CFG?.plan || []).find((p) => p.cultivo === cultivo);
 const sectores = () => CFG?.sectores || [];
 
-// Las áreas de trabajo de la chacra: agrupan las tareas y permiten saber
-// cuántas horas se lleva cada una.
-const proyectos = () => CFG?.proyectos || [];
-const proyectosActivos = () => proyectos().filter((p) => (p.estado || "activo") !== "terminado");
-const TIPOS_PROYECTO = ["Productivo", "Infraestructura", "Gestión"];
+// ---- Áreas de trabajo ----
+// Un área es la clasificación del trabajo, no un emprendimiento: agrupa las
+// tareas y permite saber cuántas horas se lleva cada parte de la chacra.
+//
+// Estas seis vienen con la app y son iguales para todos los colectivos. No se
+// agregan ni se borran, justamente para que las horas de Tica, Huerma y Foco
+// Verde se puedan comparar entre sí: si cada uno inventara sus nombres, el dato
+// serviría puertas adentro y nada más. Toda chacra hace mantenimiento,
+// administración y comercialización, aunque produzca cosas distintas.
+const AREAS_FIJAS = [
+  { nombre: "Hortícola", actividades: ["Siembras", "Trasplante", "Desyuye",
+      "Sanidad y Fertilidad", "Poda / Conducción", "Cosecha / Poscosecha"] },
+  { nombre: "Frutícola", actividades: ["Implantación", "Poda / Conducción",
+      "Fertilidad y Sanidad", "Cosecha / Poscosecha"] },
+  { nombre: "Fungis", actividades: ["Sustrato", "Inoculación", "Mantenimiento",
+      "Cosecha"] },
+  { nombre: "Comercialización", actividades: ["Stock", "Análisis mercado",
+      "Armado de oferta", "Proveedores", "Otras"] },
+  { nombre: "Administración", actividades: ["Contabilidad", "Proyección",
+      "Pagos", "Otras"] },
+  { nombre: "Mantenimiento", actividades: ["Corte de pasto", "Orden y limpieza",
+      "Reparaciones", "Mejoras"] },
+];
 
-// Las actividades que tiene sentido hacer en cada proyecto. Sembrar existe en
-// Hortícolas pero no en Sala de Lavado: por eso la lista es de cada uno.
-const actividadesDe = (nombre) =>
-  (proyectos().find((p) => p.nombre === nombre) || {}).actividades || [];
-const ESTADOS_PROYECTO = ["activo", "pausado", "terminado"];
+// Lo propio de cada chacra: Biofábrica o Plantinera existen en Tica y no tienen
+// por qué existir en las demás. Se suman a las fijas, nunca las reemplazan.
+const areasPropias = () => (CFG?.areas || CFG?.proyectos || []).filter(
+  (a) => !esAreaFija(a.nombre));
+
+const esAreaFija = (nombre) =>
+  AREAS_FIJAS.some((a) => claveArea(a.nombre) === claveArea(nombre));
+
+// "Horticola", "hortícola" y "Hortícolas" son la misma área escrita por
+// personas distintas. Se compara sin tildes, sin mayúsculas y sin la s final.
+const claveArea = (nombre) => String(nombre || "").trim().toLowerCase()
+  .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/s$/, "");
+
+const areas = () => AREAS_FIJAS.concat(areasPropias());
+const areasActivas = () => areas().filter((a) => (a.estado || "activo") !== "terminado");
+const ESTADOS_AREA = ["activo", "pausado", "terminado"];
 const ESTADOS_TAREA = ["Pendiente", "En curso", "Hecha"];
 
-function opcionesProyecto(seleccionado = "", conVacio = true) {
-  const lista = proyectosActivos();
-  return `${conVacio ? `<option value=""${seleccionado ? "" : " selected"}>Sin proyecto</option>` : ""}
-    ${lista.map((p) => `<option${p.nombre === seleccionado ? " selected" : ""}>${esc(p.nombre)}</option>`).join("")}`;
+// Las actividades que tiene sentido hacer en cada área. Sembrar existe en
+// Hortícola pero no en Administración: por eso la lista es de cada una.
+const actividadesDe = (nombre) =>
+  (areas().find((a) => claveArea(a.nombre) === claveArea(nombre)) || {}).actividades || [];
+
+function opcionesArea(seleccionado = "", conVacio = true) {
+  const lista = areasActivas();
+  return `${conVacio ? `<option value=""${seleccionado ? "" : " selected"}>Sin área</option>` : ""}
+    ${lista.map((a) => `<option${claveArea(a.nombre) === claveArea(seleccionado) ? " selected" : ""}>${esc(a.nombre)}</option>`).join("")}`;
 }
 const hayConfig = () => !!(CFG && CFG.sectores?.length);
 const bancalM2 = () => {
@@ -318,7 +352,7 @@ async function enviarHora(r) {
       horas: d.horas,
       actividad: d.actividad || "",
       obs: d.observaciones || "",
-      proyecto: d.proyecto || "",
+      area: d.area || d.proyecto || "",
     }),
   });
   const datos = await resp.json();
@@ -672,10 +706,10 @@ const plantillas = {
         <label>¿Quién trabajó?</label>
         <select name="integrante" required>${opcionesIntegrante(yo)}</select>
 
-        <label>¿En qué proyecto?</label>
-        <select name="proyecto" required>
-          <option value="" disabled selected>Elegí el proyecto…</option>
-          ${opcionesProyecto("", false)}
+        <label>¿En qué área?</label>
+        <select name="area" required>
+          <option value="" disabled selected>Elegí el área…</option>
+          ${opcionesArea("", false)}
         </select>
 
         <div id="bloque-actividad" hidden>
@@ -725,15 +759,15 @@ const plantillas = {
     const lista = tareasParaMostrar();
     const pendientes_ = lista.filter((t) => !t.hecha);
     const hechas = lista.filter((t) => t.hecha).slice(0, 8);
-    const porProyecto = vistaTareas === "proyectos";
+    const porArea = vistaTareas === "areas";
 
     return `
     <div class="pestanas-tareas">
-      <button class="pestana${porProyecto ? "" : " activa"}" data-vista-tareas="hoy">Hoy</button>
-      <button class="pestana${porProyecto ? " activa" : ""}" data-vista-tareas="proyectos">Por proyecto</button>
+      <button class="pestana${porArea ? "" : " activa"}" data-vista-tareas="hoy">Hoy</button>
+      <button class="pestana${porArea ? " activa" : ""}" data-vista-tareas="areas">Por área</button>
     </div>
 
-    ${porProyecto ? tarjetasDeProyectos(lista) : `
+    ${porArea ? tarjetasDeAreas(lista) : `
     <div class="tarjeta">
       <h2>&#9745; Tareas pendientes <small>${pendientes_.length}</small></h2>
       ${pendientes_.length
@@ -748,8 +782,8 @@ const plantillas = {
         <input type="text" name="tarea" maxlength="140" autocomplete="off"
                placeholder="Ej: desyuyar el sector B" required>
 
-        <label>Proyecto</label>
-        <select name="proyecto">${opcionesProyecto()}</select>
+        <label>Área</label>
+        <select name="area">${opcionesArea()}</select>
 
         <div class="fila">
           <div>
@@ -998,38 +1032,47 @@ const plantillas = {
     </div>
 
     <div class="tarjeta">
-      <h2>Proyectos <small>${proyectos().length}</small></h2>
-      <p class="nota">Las áreas de trabajo de la chacra. Sirven para agrupar las tareas
-      y para saber cuántas horas se lleva cada una.</p>
-      <div id="lista-proyectos">
-        ${proyectos().length ? proyectos().map((p, i) => `<div class="registro">
-            <div><div class="detalle">${esc(p.nombre)}</div>
-              <div class="cuando">${esc(p.tipo || "sin tipo")}${
-                (p.estado || "activo") !== "activo" ? " · " + esc(p.estado) : ""}</div></div>
-            <button type="button" class="quitar" data-proyecto="${i}" aria-label="Quitar">&times;</button>
-          </div>`).join("")
-          : `<p class="nota">Todavía no cargaste ninguno.</p>`}
+      <h2>Áreas de trabajo <small>${areas().length}</small></h2>
+      <p class="nota">Con qué se clasifica cada hora y cada tarea. Las seis primeras
+      vienen con la app y son iguales en todas las chacras: así las horas se pueden
+      comparar entre colectivos. Abajo podés sumar las propias de tu espacio.</p>
+
+      <div class="lista-areas">
+        ${AREAS_FIJAS.map((a) => `<div class="registro">
+            <div><div class="detalle">${esc(a.nombre)}</div>
+              <div class="cuando">${a.actividades.map(esc).join(" · ")}</div></div>
+          </div>`).join("")}
       </div>
-      <form id="form-proyecto" class="alta">
+
+      <h3 class="sub">Propias de esta chacra</h3>
+      <div id="lista-areas-propias">
+        ${areasPropias().length ? areasPropias().map((a, i) => `<div class="registro">
+            <div><div class="detalle">${esc(a.nombre)}${
+                (a.estado || "activo") !== "activo" ? ` <small>${esc(a.estado)}</small>` : ""}</div>
+              <div class="cuando">${(a.actividades || []).length
+                ? (a.actividades || []).map(esc).join(" · ")
+                : "sin actividades: se escribe en Observaciones"}</div></div>
+            <button type="button" class="quitar" data-area="${i}" aria-label="Quitar">&times;</button>
+          </div>`).join("")
+          : `<p class="nota">Ninguna todavía. Las seis de arriba ya alcanzan para empezar.</p>`}
+      </div>
+      <form id="form-area" class="alta">
         <div class="fila">
           <div>
             <label>Nombre</label>
             <input type="text" name="nombre" maxlength="40" placeholder="Ej: Plantinera" required>
           </div>
           <div>
-            <label>Tipo</label>
-            <select name="tipo">
-              ${TIPOS_PROYECTO.map((t) => `<option>${t}</option>`).join("")}
-            </select>
-          </div>
-          <div>
             <label>Estado</label>
             <select name="estado">
-              ${ESTADOS_PROYECTO.map((e) => `<option>${e}</option>`).join("")}
+              ${ESTADOS_AREA.map((e) => `<option>${e}</option>`).join("")}
             </select>
           </div>
         </div>
-        <button class="secundario">Agregar proyecto</button>
+        <label>Actividades <small>(separadas por coma)</small></label>
+        <input type="text" name="actividades" maxlength="240"
+               placeholder="Ej: Diseño, Ejecución, Mejoras">
+        <button class="secundario">Agregar área</button>
       </form>
     </div>
 
@@ -1280,7 +1323,7 @@ function filaEquipo(tipo, f) {
     extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
   } else if (tipo === "horas") {
     detalle = `${esc(f.Integrante)} — ${num(f.Horas, 1)} h`;
-    extra = [f.Proyecto, f.Actividad, f.Observaciones]
+    extra = [f["Área"] || f.Proyecto, f.Actividad, f.Observaciones]
       .filter(Boolean).map(esc).join(" · ");
   } else {
     detalle = esc(f.Tarea || f.Cultivo || "");
@@ -1552,7 +1595,7 @@ function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
   }
   CFG = Object.assign({
     nombre: chacraActual()?.nombre || "", temporada: {}, bancal: {},
-    sectores: [], integrantes: [], proyectos: [], plan: [],
+    sectores: [], integrantes: [], areas: [], plan: [],
   }, CFG || {}, cambios);
   escribir(LS.config, CFG);
   guardarRegistro("config", CFG, mensaje);
@@ -1652,18 +1695,27 @@ function prepararConfiguracion() {
     };
   });
 
-  // ---- proyectos
-  const fProy = $("#form-proyecto");
-  fProy.onsubmit = (e) => {
+  // ---- áreas propias de la chacra
+  const fArea = $("#form-area");
+  fArea.onsubmit = (e) => {
     e.preventDefault();
-    const nombre = fProy.nombre.value.trim();
-    if (!nombre) return aviso("Ponele un nombre al proyecto.", true);
-    const lista = [...proyectos()];
-    if (lista.some((p) => p.nombre.toLowerCase() === nombre.toLowerCase())) {
-      return aviso(`Ya hay un proyecto que se llama ${nombre}.`, true);
+    const nombre = fArea.nombre.value.trim();
+    if (!nombre) return aviso("Ponele un nombre al área.", true);
+    // Se compara sin tildes ni mayúsculas: sin esto "Horticola" entraría como
+    // un área nueva al lado de "Hortícola" y las horas quedarían partidas.
+    if (esAreaFija(nombre)) {
+      return aviso(`${nombre} ya viene con la app.`, true);
     }
-    lista.push({ nombre, tipo: fProy.tipo.value, estado: fProy.estado.value });
-    guardarConfig({ proyectos: lista }, `${nombre} agregado ✓`);
+    const lista = [...areasPropias()];
+    if (lista.some((a) => claveArea(a.nombre) === claveArea(nombre))) {
+      return aviso(`Ya hay un área que se llama ${nombre}.`, true);
+    }
+    lista.push({
+      nombre, estado: fArea.estado.value,
+      actividades: fArea.actividades.value.split(",")
+        .map((a) => a.trim()).filter(Boolean),
+    });
+    guardarConfig({ areas: lista }, `${nombre} agregada ✓`);
   };
 
   // ---- integrantes
@@ -1808,9 +1860,9 @@ function prepararConfiguracion() {
       } else if (b.dataset.plan !== undefined) {
         const plan = (CFG.plan || []).filter((_, i) => i !== Number(b.dataset.plan));
         guardarConfig({ plan }, "Cultivo quitado del plan");
-      } else if (b.dataset.proyecto !== undefined) {
-        const lista = proyectos().filter((_, i) => i !== Number(b.dataset.proyecto));
-        guardarConfig({ proyectos: lista }, "Proyecto quitado");
+      } else if (b.dataset.area !== undefined) {
+        const lista = areasPropias().filter((_, i) => i !== Number(b.dataset.area));
+        guardarConfig({ areas: lista }, "Área quitada");
       } else if (b.dataset.integrante) {
         const equipo = (CFG.integrantes || []).filter((n) => n !== b.dataset.integrante);
         guardarConfig({ integrantes: equipo }, "Integrante quitado");
@@ -1874,29 +1926,30 @@ function tareasParaMostrar() {
     (peso[a.importancia] ?? 1) - (peso[b.importancia] ?? 1));
 }
 
-// Una tarjeta por proyecto: cómo viene de tareas y cuántas horas se le
+// Una tarjeta por área: cómo viene de tareas y cuántas horas se le
 // dedicaron. Es la respuesta a "¿cuánto nos llevó la plantinera?".
-function tarjetasDeProyectos(tareas) {
-  const horas = horasPorProyecto();
-  const lista = proyectos();
-  if (!lista.length) {
-    return `<div class="tarjeta"><h2>Sin proyectos</h2>
-      <p class="nota">Cargalos en Configuración y las tareas se van a poder agrupar
-      por área de trabajo.</p></div>`;
-  }
+function tarjetasDeAreas(tareas) {
+  const horas = horasPorArea();
+  // El área de una tarea puede venir con otra escritura que la de la lista, así
+  // que se compara igual que en todos lados: sin tildes ni mayúsculas.
+  const areaDe = (t) => t.area || t.proyecto || "";
+  const sinArea = tareas.filter((t) => !areaDe(t) && !t.hecha).length;
 
-  const sinProyecto = tareas.filter((t) => !t.proyecto && !t.hecha).length;
-
-  return lista.map((p) => {
-    const suyas = tareas.filter((t) => t.proyecto === p.nombre);
+  return areas().map((a) => {
+    const suyas = tareas.filter((t) => claveArea(areaDe(t)) === claveArea(a.nombre));
     const pend = suyas.filter((t) => !t.hecha && t.estado !== "En curso").length;
     const curso = suyas.filter((t) => !t.hecha && t.estado === "En curso").length;
     const listas = suyas.filter((t) => t.hecha).length;
-    const hs = horas[p.nombre] || 0;
-    const pausado = (p.estado || "activo") !== "activo";
+    const hs = horas[a.nombre] || 0;
+    const pausada = (a.estado || "activo") !== "activo";
 
-    return `<div class="tarjeta proyecto${pausado ? " pausado" : ""}">
-      <h2>${esc(p.nombre)} <small>${esc(p.tipo || "")}${pausado ? " · " + esc(p.estado) : ""}</small></h2>
+    // Un área fija sin nada cargado no aporta nada a la vista: se muestra solo
+    // si tiene tareas u horas. Las seis están siempre para elegir igual.
+    if (!suyas.length && !hs && esAreaFija(a.nombre)) return "";
+
+    return `<div class="tarjeta proyecto${pausada ? " pausado" : ""}">
+      <h2>${esc(a.nombre)} <small>${esAreaFija(a.nombre) ? "" : "propia"}${
+        pausada ? " · " + esc(a.estado) : ""}</small></h2>
       <div class="cifras">
         ${cifraClara(pend, "pendientes")}
         ${cifraClara(curso, "en curso")}
@@ -1907,20 +1960,18 @@ function tarjetasDeProyectos(tareas) {
       </p>
       ${suyas.filter((t) => !t.hecha).slice(0, 4).map(filaTarea).join("")}
     </div>`;
-  }).join("") + (sinProyecto ? `<div class="tarjeta">
-    <h2>Sin proyecto <small>${sinProyecto}</small></h2>
-    ${tareas.filter((t) => !t.proyecto && !t.hecha).map(filaTarea).join("")}
+  }).join("") + (sinArea ? `<div class="tarjeta">
+    <h2>Sin área <small>${sinArea}</small></h2>
+    ${tareas.filter((t) => !areaDe(t) && !t.hecha).map(filaTarea).join("")}
   </div>` : "");
 }
 
-// Suma las horas de cada proyecto: las que ya están en la planilla más las que
-// esperan en este teléfono.
-// El total de la temporada lo suma el servidor leyendo la planilla entera: aca
-// solo se le agregan las horas que todavia estan en la cola sin viajar.
-function horasPorProyecto() {
-  const total = Object.assign({}, resumen?.horas_por_proyecto || {});
+// El total de la temporada lo suma el servidor leyendo la planilla entera: acá
+// solo se le agregan las horas que todavía están en la cola sin viajar.
+function horasPorArea() {
+  const total = Object.assign({}, resumen?.horas_por_area || resumen?.horas_por_proyecto || {});
   pendientes.filter((r) => r.tipo === "horas").forEach((r) => {
-    const p = r.datos.proyecto || "Sin proyecto";
+    const p = r.datos.area || r.datos.proyecto || "Sin área";
     total[p] = (total[p] || 0) + (Number(r.datos.horas) || 0);
   });
   return total;
@@ -2030,17 +2081,17 @@ async function traerTareas() {
 function prepararHoras() {
   const f = $("#form-horas");
   if (f) {
-    // La lista de actividades cambia con el proyecto: se rearma cada vez.
+    // La lista de actividades cambia con el área: se rearma cada vez.
     const bloque = $("#bloque-actividad");
     const verActividades = () => {
-      const lista = actividadesDe(f.proyecto.value);
+      const lista = actividadesDe(f.area.value);
       bloque.hidden = !lista.length;
       f.actividad.innerHTML = lista.length
         ? `<option value="">Sin especificar</option>` +
           lista.map((a) => `<option>${esc(a)}</option>`).join("")
         : "";
     };
-    f.proyecto?.addEventListener("change", verActividades);
+    f.area?.addEventListener("change", verActividades);
     verActividades();
   }
   // Si el teléfono todavía no está activado, la vista muestra la tarjeta
