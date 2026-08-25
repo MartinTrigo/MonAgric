@@ -334,17 +334,6 @@
       "lineas_bancal": 1
     }
   },
-  "actividades": [
-    "Planificación",
-    "Siembra",
-    "Trasplante",
-    "Manejo productivo",
-    "Cosecha y acondicionado",
-    "Administración",
-    "Comercialización",
-    "Comunicación",
-    "Mantenimiento"
-  ],
   "tipos_siembra": [
     "Siembra directa",
     "Siembra almácigo",

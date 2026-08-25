@@ -1,7 +1,7 @@
 """Genera docs/catalogo.json: lo que es IGUAL para todas las chacras.
 
 El catalogo lo definimos nosotros y no se toca desde la app: cultivos, perfiles
-(dias a cosecha, rinde de referencia, distancias), actividades de trabajo y
+(dias a cosecha, rinde de referencia, distancias) y
 tipos de siembra. Es lo que despues permite comparar una chacra con otra: si
 cada una escribiera los cultivos a su manera, los datos no se podrian juntar.
 
@@ -22,9 +22,6 @@ RAIZ = Path(__file__).resolve().parent.parent
 DB_PATH = RAIZ / "monagric.sqlite3"
 SALIDA = RAIZ / "docs" / "catalogo.json"
 
-ACTIVIDADES_TRABAJO = ["Planificación", "Siembra", "Trasplante", "Manejo productivo",
-                       "Cosecha y acondicionado", "Administración", "Comercialización",
-                       "Comunicación", "Mantenimiento"]
 TIPOS_SIEMBRA = ["Siembra directa", "Siembra almácigo", "Trasplante", "Esqueje"]
 TIPOS_BANDEJA = [72, 98, 128, 162]
 TIPOS_RIEGO = ["Aspersión", "Goteo", "Surco", "Superficie"]
@@ -61,7 +58,6 @@ def main() -> None:
         "generado": datetime.now().isoformat(timespec="seconds"),
         "cultivos": cultivos,
         "perfiles": perfiles,
-        "actividades": ACTIVIDADES_TRABAJO,
         "tipos_siembra": TIPOS_SIEMBRA,
         "tipos_bandeja": TIPOS_BANDEJA,
         "tipos_riego": TIPOS_RIEGO,
@@ -71,8 +67,7 @@ def main() -> None:
     SALIDA.parent.mkdir(parents=True, exist_ok=True)
     SALIDA.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Catalogo comun exportado a {SALIDA}")
-    print(f"  {len(cultivos)} cultivos · {len(perfiles)} con perfil · "
-          f"{len(ACTIVIDADES_TRABAJO)} actividades")
+    print(f"  {len(cultivos)} cultivos · {len(perfiles)} con perfil · ")
 
 
 if __name__ == "__main__":

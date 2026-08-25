@@ -168,6 +168,12 @@ medidas del bancal, sectores con sus bancales, quiénes trabajan y el plan de
 cultivos. Hasta que eso esté, no pueden registrar siembras ni cosechas —las
 horas y las tareas sí funcionan desde el minuto uno.
 
+**Las áreas de trabajo no se cargan.** Hortícola, Frutícola, Fungis,
+Comercialización, Administración y Mantenimiento vienen con la app, con sus
+actividades, y son las mismas en todas las chacras: así las horas se pueden
+comparar entre colectivos. Si el espacio tiene algo propio —una plantinera, una
+sala de lavado, apicultura— se agrega abajo de esa lista, en Configuración.
+
 Conviene hacerlo con alguien que conozca bien la chacra, y sin apuro.
 
 ### Compartir el panel
