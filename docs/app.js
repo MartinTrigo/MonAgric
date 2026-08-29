@@ -2017,7 +2017,7 @@ function prepararTareas() {
     escribir(LS.nombre, f.creada_por.value);
     guardarRegistro("tareas", {
       tarea: texto,
-      proyecto: f.proyecto.value,
+      area: f.area.value,
       fecha: f.fecha.value,
       importancia: f.querySelector("input[name=importancia]:checked").value,
       personas: parseInt(f.personas.value, 10) || 1,
@@ -2102,14 +2102,14 @@ function prepararHoras() {
     e.preventDefault();
     const horas = aNumero(f.horas.value);
     if (!(horas > 0 && horas <= 24)) return aviso("Las horas deben ser un número entre 0 y 24.", true);
-    if (!f.proyecto.value) return aviso("Elegí el proyecto.", true);
+    if (!f.area.value) return aviso("Elegí el área.", true);
     // El nombre elegido queda como el de este teléfono: la próxima vez viene puesto.
     escribir(LS.nombre, f.integrante.value);
     guardarRegistro("horas", {
       fecha: f.fecha.value,
       integrante: f.integrante.value,
       horas,
-      proyecto: f.proyecto.value,
+      area: f.area.value,
       actividad: f.actividad ? f.actividad.value : "",
       observaciones: f.observaciones.value.trim(),
     });
