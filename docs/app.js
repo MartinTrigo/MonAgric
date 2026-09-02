@@ -253,10 +253,17 @@ const bancalM2 = () => {
 
 // En Chacra Tica los nombres salen también de la planilla de horas del proyecto,
 // que es donde está el historial; en las demás, solo de su configuración.
+// La planilla de horas viene de una plantilla que traia filas de relleno
+// ("Operador 9", "Encargado 2"): no son personas y ensucian el desplegable.
+// Un nombre real no es una palabra generica seguida de un numero.
+const esNombreDeRelleno = (n) =>
+  /^(trabajador|operador|encargado|integrante|persona|nombre)\s*\d+$/i.test(String(n).trim());
+
 function integrantes() {
   const deConfig = CFG?.integrantes || [];
   if (!horasVanAparte()) return [...deConfig];
-  return [...new Set([...leer(LS.nombresPlanilla, []), ...deConfig])];
+  const dePlanilla = leer(LS.nombresPlanilla, []).filter((n) => !esNombreDeRelleno(n));
+  return [...new Set([...dePlanilla, ...deConfig])];
 }
 
 // ---- Estado de sincronización ----

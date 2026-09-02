@@ -99,7 +99,9 @@ function listaDeNombres() {
     if (v === "Trabajador") continue;                          // encabezado
     if (v.indexOf("Configuración") === 0) continue;            // título
     if (v.indexOf("Editá") === 0 || v.indexOf("Editár") === 0) continue; // nota al pie
-    if (/^Trabajador \d+$/.test(v)) continue;                  // genéricos sin renombrar
+    // Filas de relleno de la plantilla original: "Trabajador 3", "Operador 9",
+    // "Encargado 2". No son personas, y en la app aparecian para elegir.
+    if (/^(Trabajador|Operador|Encargado|Integrante|Persona)\s*\d+$/i.test(v)) continue;
     nombres.push(v);
   }
   return nombres;
