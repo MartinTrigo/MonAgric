@@ -147,6 +147,15 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
 // En el campo se escribe "5,5" tanto como "5.5": las dos formas valen.
 const aNumero = (txt) => parseFloat(String(txt ?? "").replace(",", ".").trim());
 
+// Días entre dos fechas ISO. Se usa mediodía para que un cambio de horario de
+// verano no reste ni sume un día de más.
+function diasEntre(desdeISO, hastaISO) {
+  if (!desdeISO || !hastaISO) return null;
+  const a = new Date(desdeISO + "T12:00:00"), b = new Date(hastaISO + "T12:00:00");
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
 function sumarDias(fechaISO, dias) {
   if (!fechaISO || !dias) return "";
   const d = new Date(fechaISO + "T12:00:00");
@@ -198,6 +207,10 @@ const enPlan = (cultivo) => (CFG?.plan || []).find((p) => p.cultivo === cultivo)
 // decoración.
 const DISPOSICIONES = ["En línea", "Tresbolillo"];
 
+// Con cuánta anticipación se avisa que un almácigo va a estar en fecha.
+// Diez días cubre la semana que viene, que es como se planifica el trabajo.
+const DIAS_AVISO = 10;
+
 // Las siembras de almácigo que todavía no se trasplantaron. Se cruzan las dos
 // listas por el id de la siembra: lo que ya tiene trasplante sale de la lista.
 // Se miran también las que esperan en la cola de este teléfono, para que un
@@ -236,13 +249,24 @@ function almacigosPendientes() {
     .map((s) => Object.assign(s, { etiqueta: etiquetaAlmacigo(s) }));
 }
 
+// Cuánto le falta o hace cuánto se pasó, según la fecha estimada. Es lo que
+// convierte la lista en una sugerencia y no en un archivo: se ve de un vistazo
+// qué hay que sacar de la bandeja esta semana.
+function estadoAlmacigo(s) {
+  const dias = diasEntre(hoy(), s.estimado);
+  if (dias === null) return { texto: "sin fecha estimada", orden: 3, dias: null };
+  if (dias < 0) return { texto: `atrasado ${Math.abs(dias)} días`, orden: 0, dias };
+  if (dias === 0) return { texto: "es hoy", orden: 0, dias };
+  if (dias <= DIAS_AVISO) return { texto: `en ${dias} días`, orden: 1, dias };
+  return { texto: `para ${fechaCorta(s.estimado)}`, orden: 2, dias };
+}
+
 function etiquetaAlmacigo(s) {
   const partes = [s.cultivo];
   if (s.variedad) partes.push(s.variedad);
   partes.push(`G${s.generacion}`);
   if (s.plantines) partes.push(`${num(s.plantines)} plantines`);
-  const cuando = s.estimado ? ` · para ${fechaCorta(s.estimado)}` : "";
-  return partes.join(" ") + cuando;
+  return `${partes.join(" ")} · ${estadoAlmacigo(s).texto}`;
 }
 
 // Cuántas plantas entran en un bancal con ese marco. En tresbolillo las filas
@@ -792,7 +816,27 @@ const plantillas = {
       ${historialDe("trasplantes")}`;
     }
 
+    const listos = pend.filter((s) => (estadoAlmacigo(s).dias ?? 99) <= 0);
+    const pronto = pend.filter((s) => {
+      const d = estadoAlmacigo(s).dias;
+      return d !== null && d > 0 && d <= DIAS_AVISO;
+    });
+
     return `
+    ${listos.length || pronto.length ? `<div class="tarjeta">
+      <h2>Para trasplantar</h2>
+      <p class="nota">Según los días en almácigo de cada cultivo, contados desde
+      que se sembró. Es una guía: manda lo que se ve en la bandeja.</p>
+      ${listos.map((s) => `<div class="registro">
+        <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""} · G${s.generacion}</div>
+          <div class="cuando alerta">${esc(estadoAlmacigo(s).texto)}</div></div>
+      </div>`).join("")}
+      ${pronto.map((s) => `<div class="registro">
+        <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""} · G${s.generacion}</div>
+          <div class="cuando">${esc(estadoAlmacigo(s).texto)}</div></div>
+      </div>`).join("")}
+    </div>` : ""}
+
     <div class="tarjeta">
       <h2>&#127807; Registrar trasplante</h2>
       <form id="form-trasplantes">
@@ -808,9 +852,9 @@ const plantillas = {
 
         <div id="bloque-lugar">${camposSectorBancal()}</div>
 
-        <label>Plantines trasplantados</label>
-        <input type="text" name="plantines" inputmode="numeric"
-               placeholder="Cuántos se plantaron">
+        <label>¿Cuántos bancales ocupó?</label>
+        <input type="text" name="bancales" value="1" inputmode="numeric"
+               placeholder="Ej: 2">
 
         <h3 class="sub">Marco de plantación</h3>
         <p class="nota">Viene sugerido del plan de la temporada. Si en el campo
@@ -2274,7 +2318,6 @@ function prepararTrasplantes() {
     sugerido = { lineas: plan.lineas || 0, distancia_cm: plan.distancia_cm || 0 };
     f.lineas.value = sugerido.lineas || "";
     f.distancia_cm.value = sugerido.distancia_cm || "";
-    if (!f.plantines.value) f.plantines.value = s.plantines || "";
     const sembrada = s.fecha ? `sembrado el ${fechaCorta(s.fecha)}` : "";
     const espera = s.estimado ? ` · estimado para ${fechaCorta(s.estimado)}` : "";
     nota.innerHTML = `${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""}
@@ -2282,23 +2325,36 @@ function prepararTrasplantes() {
     recalcular();
   };
 
-  const recalcular = () => {
+  // Los plantines no se cuentan en el campo: se deducen del marco y de cuántos
+  // bancales se ocuparon, que es lo que sí se sabe al terminar de plantar.
+  const cuentas = () => {
     const lineas = aNumero(f.lineas.value) || 0;
     const dist = aNumero(f.distancia_cm.value) || 0;
-    const caben = plantasPorBancal(lineas, dist, f.disposicion.value);
-    const plantines = aNumero(f.plantines.value) || 0;
-    if (!caben) { calculo.innerHTML = ""; return; }
-    const bancales = plantines ? plantines / caben : 0;
-    const cambiado = lineas !== sugerido.lineas || dist !== sugerido.distancia_cm;
-    calculo.innerHTML = `Entran <b>${num(caben)} plantas</b> por bancal`
-      + (bancales ? ` · ${num(plantines)} plantines ocupan <b>${num(bancales, 1)} bancales</b>` : "")
+    const bancales = aNumero(f.bancales.value) || 0;
+    const porBancal = plantasPorBancal(lineas, dist, f.disposicion.value);
+    return { lineas, dist, bancales, porBancal, total: Math.round(porBancal * bancales) };
+  };
+
+  const recalcular = () => {
+    const c = cuentas();
+    if (!c.porBancal) { calculo.innerHTML = ""; return; }
+    const s = elegido();
+    const disponibles = s ? s.plantines : 0;
+    const cambiado = c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm;
+    calculo.innerHTML = `<b>${num(c.porBancal)} plantines</b> por bancal`
+      + (c.bancales ? ` · <b>${num(c.total)} plantines</b> en ${num(c.bancales)} bancales` : "")
       + (cambiado && sugerido.lineas
           ? `<br><small>Distinto del plan (${sugerido.lineas} líneas a ${sugerido.distancia_cm} cm): se guarda como lo hiciste.</small>`
+          : "")
+      // Aviso, no bloqueo: puede sobrar plantines o haberse perdido algunos, y
+      // quien está en el campo sabe mejor que la cuenta.
+      + (disponibles && c.total > disponibles * 1.1
+          ? `<br><small class="alerta">El almácigo tenía ${num(disponibles)} plantines: la cuenta da ${num(c.total)}.</small>`
           : "");
   };
 
   f.siembra_id.addEventListener("change", alElegir);
-  ["lineas", "distancia_cm", "plantines"].forEach((n) =>
+  ["lineas", "distancia_cm", "bancales"].forEach((n) =>
     f[n].addEventListener("input", recalcular));
   f.disposicion.addEventListener("change", recalcular);
 
@@ -2306,26 +2362,35 @@ function prepararTrasplantes() {
     e.preventDefault();
     const s = elegido();
     if (!s) return aviso("Elegí qué almácigo estás trasplantando.", true);
-    const lineas = aNumero(f.lineas.value) || 0;
-    const dist = aNumero(f.distancia_cm.value) || 0;
+    const c = cuentas();
+    // Lo que de verdad tardó en la bandeja, contra lo que decía la tabla. Es el
+    // dato que en unas temporadas permite corregir los días teóricos con lo que
+    // pasa en esta chacra y no en un manual.
+    const teoricos = perfil(s.cultivo)?.dias_almacigo || 0;
+    const reales = diasEntre(s.fecha, f.fecha.value);
     escribir(LS.nombre, f.operador.value);
     guardarRegistro("trasplantes", {
       fecha: f.fecha.value,
       siembra_id: s.id,
+      fecha_siembra: s.fecha || "",
+      dias_almacigo_real: reales === null ? "" : reales,
+      dias_almacigo_teorico: teoricos || "",
+      diferencia_dias: (reales === null || !teoricos) ? "" : reales - teoricos,
       cultivo: s.cultivo,
       variedad: s.variedad,
       generacion: s.generacion,
       sector: f.sector ? f.sector.value : "",
       bancal: f.bancal ? f.bancal.value : "",
-      plantines: aNumero(f.plantines.value) || "",
-      lineas: lineas || "",
-      distancia_cm: dist || "",
+      bancales: c.bancales || "",
+      lineas: c.lineas || "",
+      distancia_cm: c.dist || "",
       disposicion: f.disposicion.value,
       // Queda escrito si se respetó el plan o se cambió en el campo: es la
       // diferencia entre lo planificado y lo que de verdad pasó.
-      marco: (lineas !== sugerido.lineas || dist !== sugerido.distancia_cm)
+      marco: (c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm)
         ? "Modificado" : "Sugerido",
-      plantas_bancal: plantasPorBancal(lineas, dist, f.disposicion.value) || "",
+      plantines_bancal: c.porBancal || "",
+      plantines_total: c.total || "",
       operador: f.operador.value,
       observaciones: f.observaciones.value.trim(),
     });

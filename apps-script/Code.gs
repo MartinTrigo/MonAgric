@@ -106,16 +106,21 @@ var HOJAS = {
   // de cada bancal. Sin esta hoja, las siembras de almacigo no tienen lugar.
   trasplantes: {
     nombre: "Trasplantes",
-    encabezados: ["Id", "Temporada", "Fecha", "Siembra origen", "Cultivo", "Variedad",
-                  "Generación", "Sector", "Bancal", "Plantines", "Líneas",
-                  "Distancia cm", "Disposición", "Marco", "Plantas por bancal",
+    encabezados: ["Id", "Temporada", "Fecha", "Siembra origen", "Fecha siembra",
+                  "Días en almácigo", "Días teóricos", "Diferencia días",
+                  "Cultivo", "Variedad", "Generación", "Sector", "Bancal",
+                  "Bancales", "Líneas", "Distancia cm", "Disposición", "Marco",
+                  "Plantines por bancal", "Plantines totales",
                   "Operador", "Observaciones", "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
-      return [r.id, r.temporada || "", d.fecha, d.siembra_id || "", d.cultivo,
-              d.variedad || "", d.generacion || 1, d.sector || "", d.bancal || "",
-              d.plantines || "", d.lineas || "", d.distancia_cm || "",
-              d.disposicion || "", d.marco || "", d.plantas_bancal || "",
+      return [r.id, r.temporada || "", d.fecha, d.siembra_id || "",
+              d.fecha_siembra || "", d.dias_almacigo_real || "",
+              d.dias_almacigo_teorico || "", d.diferencia_dias === 0 ? 0 : (d.diferencia_dias || ""),
+              d.cultivo, d.variedad || "", d.generacion || 1, d.sector || "", d.bancal || "",
+              d.bancales || "", d.lineas || "", d.distancia_cm || "",
+              d.disposicion || "", d.marco || "",
+              d.plantines_bancal || "", d.plantines_total || "",
               d.operador || "", d.observaciones || "", r.dispositivo || "", new Date()];
     },
   },

@@ -528,3 +528,6 @@ h3.sub {
   color: var(--sage-dark);
   margin: 16px 0 6px;
 }
+
+/* Lo que ya se pasó de fecha: se ve, sin gritar. */
+.alerta { color: var(--peligro); font-weight: 700; }
