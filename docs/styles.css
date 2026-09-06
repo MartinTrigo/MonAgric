@@ -531,3 +531,48 @@ h3.sub {
 
 /* Lo que ya se pasó de fecha: se ve, sin gritar. */
 .alerta { color: var(--peligro); font-weight: 700; }
+
+/* ---- En pantalla grande ----
+   La app se diseñó para un celular en el campo, con la barra abajo donde llega
+   el pulgar. En una notebook eso deja el 43% de la pantalla usado, obliga a
+   scrollear con 900px de alto libres, y pone la navegación lejos del contenido.
+   Nada de esto cambia en el teléfono: todo vive dentro de la media query. */
+@media (min-width: 1000px) {
+  /* La barra sube y se queda con el encabezado: no hay pulgar que la busque. */
+  .tabs {
+    position: static;
+    border-top: none;
+    border-bottom: 1px solid var(--sage-light);
+    padding-bottom: 0;
+    justify-content: center;
+  }
+  /* Con lugar de sobra no hace falta deslizar las secciones. */
+  .tabs-medio { flex: 0 1 auto; overflow-x: visible; }
+  .tab { padding-left: 18px; padding-right: 18px; }
+
+  main {
+    max-width: 1180px;
+    padding-bottom: 24px;
+  }
+
+  /* Dos columnas: el formulario y lo último cargado se ven a la vez, que es
+     justo lo que en el celular obliga a bajar. Las tarjetas se acomodan solas
+     de izquierda a derecha y cada una arranca arriba, sin estirarse. */
+  #vista {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+  #vista > .tarjeta { margin: 0; }
+
+  /* El aviso flotante se apoyaba en la barra de abajo, que ya no está ahí. */
+  .aviso { bottom: 24px; }
+}
+
+/* Pantallas muy anchas: una tercera columna aprovecha el lugar sin estirar
+   los formularios, que a más de ~600px se vuelven incómodos de leer. */
+@media (min-width: 1600px) {
+  main { max-width: 1720px; }
+  #vista { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
