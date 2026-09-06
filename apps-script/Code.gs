@@ -100,6 +100,25 @@ var HOJAS = {
               d.creada_por || "", "", "", r.dispositivo || "", new Date()];
     },
   },
+  // El trasplante es el momento en que una siembra deja la bandeja y ocupa un
+  // lugar en el campo. Guarda el id de la siembra de origen: es lo que permite
+  // seguir un cultivo desde el almacigo hasta la cosecha, y saber el rinde real
+  // de cada bancal. Sin esta hoja, las siembras de almacigo no tienen lugar.
+  trasplantes: {
+    nombre: "Trasplantes",
+    encabezados: ["Id", "Temporada", "Fecha", "Siembra origen", "Cultivo", "Variedad",
+                  "Generación", "Sector", "Bancal", "Plantines", "Líneas",
+                  "Distancia cm", "Disposición", "Marco", "Plantas por bancal",
+                  "Operador", "Observaciones", "Cargado por", "Recibido"],
+    fila: function (r) {
+      var d = r.datos;
+      return [r.id, r.temporada || "", d.fecha, d.siembra_id || "", d.cultivo,
+              d.variedad || "", d.generacion || 1, d.sector || "", d.bancal || "",
+              d.plantines || "", d.lineas || "", d.distancia_cm || "",
+              d.disposicion || "", d.marco || "", d.plantas_bancal || "",
+              d.operador || "", d.observaciones || "", r.dispositivo || "", new Date()];
+    },
+  },
   // Se cosecha de varios bancales a la vez, asi que se registran los kilos
   // totales por cultivo; el rendimiento sale despues contra el plan.
   cosechas: {

@@ -191,6 +191,69 @@ const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 
 // De la configuración de esta chacra
 const enPlan = (cultivo) => (CFG?.plan || []).find((p) => p.cultivo === cultivo);
+
+// ---- Trasplantes ----
+// Cómo se acomodan las plantas dentro del bancal. En tresbolillo entran más
+// plantas en la misma superficie, así que el dato cambia el calculo y no es
+// decoración.
+const DISPOSICIONES = ["En línea", "Tresbolillo"];
+
+// Las siembras de almácigo que todavía no se trasplantaron. Se cruzan las dos
+// listas por el id de la siembra: lo que ya tiene trasplante sale de la lista.
+// Se miran también las que esperan en la cola de este teléfono, para que un
+// trasplante recién cargado no ofrezca de nuevo el mismo almácigo.
+function almacigosPendientes() {
+  const ultimos = leer(LS.ultimos, {});
+  const yaHechos = new Set([
+    ...(ultimos.trasplantes || []).map((f) => String(f["Siembra origen"] || "")),
+    ...pendientes.concat(enviados).filter((r) => r.tipo === "trasplantes")
+                 .map((r) => String(r.datos.siembra_id || "")),
+  ].filter(Boolean));
+
+  const deLaPlanilla = (ultimos.siembras || []).map((f) => ({
+    id: String(f.Id), cultivo: f.Cultivo, variedad: f.Variedad || "",
+    generacion: Number(f["Generación"]) || 1, tipo: f.Tipo,
+    plantines: Number(f.Plantines) || 0, fecha: f.Fecha,
+    estimado: f["Trasplante estimado"] || "",
+  }));
+  const locales = pendientes.concat(enviados)
+    .filter((r) => r.tipo === "siembras")
+    .map((r) => ({
+      id: String(r.id), cultivo: r.datos.cultivo, variedad: r.datos.variedad || "",
+      generacion: Number(r.datos.generacion) || 1, tipo: r.datos.tipo,
+      plantines: Number(r.datos.plantines) || 0, fecha: r.datos.fecha,
+      estimado: r.datos.trasplante_estimado || "",
+    }));
+
+  const vistos = new Set();
+  return [...locales, ...deLaPlanilla]
+    .filter((s) => /almácigo|almacigo/i.test(s.tipo || ""))
+    .filter((s) => !yaHechos.has(s.id))
+    .filter((s) => (vistos.has(s.id) ? false : vistos.add(s.id)))
+    // Primero lo que hace más tiempo que espera: es lo que corre riesgo de
+    // pasarse de punto en la bandeja.
+    .sort((a, b) => String(a.estimado || a.fecha).localeCompare(String(b.estimado || b.fecha)))
+    .map((s) => Object.assign(s, { etiqueta: etiquetaAlmacigo(s) }));
+}
+
+function etiquetaAlmacigo(s) {
+  const partes = [s.cultivo];
+  if (s.variedad) partes.push(s.variedad);
+  partes.push(`G${s.generacion}`);
+  if (s.plantines) partes.push(`${num(s.plantines)} plantines`);
+  const cuando = s.estimado ? ` · para ${fechaCorta(s.estimado)}` : "";
+  return partes.join(" ") + cuando;
+}
+
+// Cuántas plantas entran en un bancal con ese marco. En tresbolillo las filas
+// se intercalan y entra unas 15% más de plantas en la misma superficie.
+function plantasPorBancal(lineas, distanciaCm, disposicion) {
+  const largoCm = (CFG?.bancal?.largo_m || 0) * 100;
+  if (!largoCm || !lineas || !distanciaCm) return 0;
+  const porLinea = Math.floor(largoCm / distanciaCm);
+  const total = porLinea * lineas;
+  return disposicion === "Tresbolillo" ? Math.round(total * 1.15) : total;
+}
 const sectores = () => CFG?.sectores || [];
 
 // ---- Áreas de trabajo ----
@@ -527,10 +590,20 @@ function opcionesIntegrante(seleccionado = "") {
     ${lista.map((n) => `<option${n === seleccionado ? " selected" : ""}>${esc(n)}</option>`).join("")}`;
 }
 
+// Cada sector tiene su propia cantidad de bancales, asi que la lista se rearma
+// al elegir sector. Antes salia siempre la del primero: en Chacra Tica eso
+// dejaba elegir solo del 1 al 6 (los del Frutillar) en sectores de 25 bancales.
+function opcionesBancal(sector, seleccionado = "") {
+  const s = sectores().find((x) => x.sector === sector) || sectores()[0];
+  const n = s ? s.bancales : 0;
+  return Array.from({ length: n }, (_, i) => i + 1)
+    .map((b) => `<option${String(b) === String(seleccionado) ? " selected" : ""}>${b}</option>`)
+    .join("");
+}
+
 function camposSectorBancal(idPrefijo = "") {
   const secs = sectores();
   if (!secs.length) return "";
-  const bancales = Array.from({ length: secs[0].bancales }, (_, i) => i + 1);
   return `<div class="fila">
     <div>
       <label>Sector</label>
@@ -541,7 +614,7 @@ function camposSectorBancal(idPrefijo = "") {
     <div>
       <label>Bancal</label>
       <select name="bancal" id="${idPrefijo}bancal">
-        ${bancales.map((b) => `<option>${b}</option>`).join("")}
+        ${opcionesBancal(secs[0].sector)}
       </select>
     </div>
   </div>`;
@@ -696,6 +769,78 @@ const plantillas = {
       </form>
     </div>
     ${historialDe("siembras")}`;
+  },
+
+  // El trasplante parte SIEMPRE de una siembra de almácigo ya cargada: así el
+  // cultivo, la variedad y la generación no se vuelven a tipear (ni a tipear
+  // distinto), y queda el vínculo que después permite calcular el rinde real
+  // del bancal. Por eso lo primero que se elige es cuál almácigo se está
+  // sacando de la bandeja.
+  trasplantes() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
+    if (!hayConfig()) return tarjetaSinConfig();
+    const yo = leer(LS.nombre, "");
+    const pend = almacigosPendientes();
+
+    if (!pend.length) {
+      return `<div class="tarjeta">
+        <h2>&#127807; Trasplantes</h2>
+        <p class="nota">No hay almácigos esperando trasplante. Aparecen acá solos
+        en cuanto se carga una siembra de almácigo en la sección Siembras.</p>
+      </div>
+      ${historialDe("trasplantes")}`;
+    }
+
+    return `
+    <div class="tarjeta">
+      <h2>&#127807; Registrar trasplante</h2>
+      <form id="form-trasplantes">
+        <label>¿Qué almácigo estás trasplantando?</label>
+        <select name="siembra_id" required>
+          <option value="" disabled selected>Elegí el almácigo…</option>
+          ${pend.map((s) => `<option value="${esc(s.id)}">${esc(s.etiqueta)}</option>`).join("")}
+        </select>
+        <p class="nota" id="nota-almacigo"></p>
+
+        <label>Fecha</label>
+        <input type="date" name="fecha" value="${hoy()}" required>
+
+        <div id="bloque-lugar">${camposSectorBancal()}</div>
+
+        <label>Plantines trasplantados</label>
+        <input type="text" name="plantines" inputmode="numeric"
+               placeholder="Cuántos se plantaron">
+
+        <h3 class="sub">Marco de plantación</h3>
+        <p class="nota">Viene sugerido del plan de la temporada. Si en el campo
+        se hizo distinto, cambialo acá y queda registrado como fue de verdad.</p>
+        <div class="fila">
+          <div>
+            <label>Líneas por bancal</label>
+            <input type="text" name="lineas" inputmode="numeric">
+          </div>
+          <div>
+            <label>Distancia (cm)</label>
+            <input type="text" name="distancia_cm" inputmode="numeric">
+          </div>
+        </div>
+        <label>Disposición</label>
+        <select name="disposicion">
+          ${DISPOSICIONES.map((d) => `<option>${esc(d)}</option>`).join("")}
+        </select>
+        <div class="calculo" id="calculo-trasplante"></div>
+
+        <label>Operador</label>
+        <select name="operador" required>${opcionesIntegrante(yo)}</select>
+
+        <label>Observaciones</label>
+        <textarea name="observaciones" rows="2" placeholder="Opcional"></textarea>
+
+        <button class="principal">Guardar trasplante</button>
+      </form>
+    </div>
+    ${historialDe("trasplantes")}`;
   },
 
   horas() {
@@ -1326,6 +1471,11 @@ function filaEquipo(tipo, f) {
       : (f.Sector ? `${esc(f.Sector)}${f.Bancal || ""}` : "");
     detalle = `${esc(f.Cultivo)}${f.Variedad ? " " + esc(f.Variedad) : ""} · G${f["Generación"] || 1}`;
     extra = [esc(f.Tipo), cant, f.Operador ? "por " + esc(f.Operador) : ""].filter(Boolean).join(" · ");
+  } else if (tipo === "trasplantes") {
+    detalle = `${esc(f.Cultivo)}${f.Variedad ? " " + esc(f.Variedad) : ""} · G${f["Generación"] || 1}`;
+    extra = [f.Sector ? `${esc(f.Sector)}${f.Bancal || ""}` : "",
+             f.Plantines ? `${num(f.Plantines)} plantines` : "",
+             f.Operador ? "por " + esc(f.Operador) : ""].filter(Boolean).join(" · ");
   } else if (tipo === "cosechas") {
     detalle = `${esc(f.Cultivo)} — ${num(f.Kg, 1)} kg`;
     extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
@@ -1383,6 +1533,12 @@ function filaRegistro(r) {
       : (d.sector ? `${esc(d.sector)}${d.bancal || ""}` : "");
     detalle = [esc(d.cultivo), d.generacion ? "G" + d.generacion : "", esc(d.tipo), cant]
       .filter(Boolean).join(" · ");
+  } else if (r.tipo === "trasplantes") {
+    titulo = "Trasplante";
+    detalle = [esc(d.cultivo), d.generacion ? "G" + d.generacion : "",
+               d.sector ? `${esc(d.sector)}${d.bancal || ""}` : "",
+               d.plantines ? `${num(d.plantines)} plantines` : ""]
+      .filter(Boolean).join(" · ");
   } else if (r.tipo === "tareas") {
     titulo = "Tarea";
     detalle = esc(d.tarea);
@@ -1415,13 +1571,17 @@ function render(vista) {
 
   ({ siembras: prepararSiembras, horas: prepararHoras, cosechas: prepararCosechas,
      tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes,
-     configuracion: prepararConfiguracion, plan: prepararInicio
+     configuracion: prepararConfiguracion, plan: prepararInicio,
+     trasplantes: prepararTrasplantes
    }[vista] || (() => {}))();
 
   prepararComunes();
 
   // Las secciones de registro muestran lo último de toda la chacra.
-  if (["siembras", "cosechas", "horas"].includes(vista)) traerUltimos(vista);
+  if (["siembras", "cosechas", "horas", "trasplantes"].includes(vista)) traerUltimos(vista);
+  // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
+  // aunque la sección que se está mirando sea Trasplantes.
+  if (vista === "trasplantes") traerUltimos("siembras");
 
   // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
   const activa = document.querySelector(".tabs-medio .tab.activa");
@@ -1430,6 +1590,16 @@ function render(vista) {
 
 // Botones que pueden aparecer en cualquier vista.
 function prepararComunes() {
+  // Vale para cualquier formulario que tenga el par sector/bancal.
+  document.querySelectorAll('select[name="sector"]').forEach((sel) => {
+    const bancal = sel.closest("form")?.querySelector('select[name="bancal"]');
+    if (!bancal) return;
+    sel.addEventListener("change", () => {
+      const antes = bancal.value;
+      bancal.innerHTML = opcionesBancal(sel.value, antes);
+    });
+  });
+
   document.querySelectorAll(".chip-chacra").forEach((b) => {
     b.onclick = async () => {
       escribir(LS.chacra, b.dataset.chacra);
@@ -2084,6 +2254,83 @@ async function traerTareas() {
       `${urlServicio()}?${conCredenciales("tareas=1")}`)).json();
     if (Array.isArray(d.tareas)) escribir(LS.tareas, d.tareas);
   } catch { /* sin conexión: se usa la última lista guardada */ }
+}
+
+function prepararTrasplantes() {
+  const f = $("#form-trasplantes");
+  if (!f) return;
+  const pend = almacigosPendientes();
+  const nota = $("#nota-almacigo");
+  const calculo = $("#calculo-trasplante");
+  // Se recuerda lo que sugirió el plan para saber si lo cambiaron a mano.
+  let sugerido = { lineas: 0, distancia_cm: 0 };
+
+  const elegido = () => pend.find((s) => s.id === f.siembra_id.value);
+
+  const alElegir = () => {
+    const s = elegido();
+    if (!s) { nota.textContent = ""; return; }
+    const plan = enPlan(s.cultivo) || {};
+    sugerido = { lineas: plan.lineas || 0, distancia_cm: plan.distancia_cm || 0 };
+    f.lineas.value = sugerido.lineas || "";
+    f.distancia_cm.value = sugerido.distancia_cm || "";
+    if (!f.plantines.value) f.plantines.value = s.plantines || "";
+    const sembrada = s.fecha ? `sembrado el ${fechaCorta(s.fecha)}` : "";
+    const espera = s.estimado ? ` · estimado para ${fechaCorta(s.estimado)}` : "";
+    nota.innerHTML = `${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""}
+      · G${s.generacion} · ${sembrada}${espera}`;
+    recalcular();
+  };
+
+  const recalcular = () => {
+    const lineas = aNumero(f.lineas.value) || 0;
+    const dist = aNumero(f.distancia_cm.value) || 0;
+    const caben = plantasPorBancal(lineas, dist, f.disposicion.value);
+    const plantines = aNumero(f.plantines.value) || 0;
+    if (!caben) { calculo.innerHTML = ""; return; }
+    const bancales = plantines ? plantines / caben : 0;
+    const cambiado = lineas !== sugerido.lineas || dist !== sugerido.distancia_cm;
+    calculo.innerHTML = `Entran <b>${num(caben)} plantas</b> por bancal`
+      + (bancales ? ` · ${num(plantines)} plantines ocupan <b>${num(bancales, 1)} bancales</b>` : "")
+      + (cambiado && sugerido.lineas
+          ? `<br><small>Distinto del plan (${sugerido.lineas} líneas a ${sugerido.distancia_cm} cm): se guarda como lo hiciste.</small>`
+          : "");
+  };
+
+  f.siembra_id.addEventListener("change", alElegir);
+  ["lineas", "distancia_cm", "plantines"].forEach((n) =>
+    f[n].addEventListener("input", recalcular));
+  f.disposicion.addEventListener("change", recalcular);
+
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const s = elegido();
+    if (!s) return aviso("Elegí qué almácigo estás trasplantando.", true);
+    const lineas = aNumero(f.lineas.value) || 0;
+    const dist = aNumero(f.distancia_cm.value) || 0;
+    escribir(LS.nombre, f.operador.value);
+    guardarRegistro("trasplantes", {
+      fecha: f.fecha.value,
+      siembra_id: s.id,
+      cultivo: s.cultivo,
+      variedad: s.variedad,
+      generacion: s.generacion,
+      sector: f.sector ? f.sector.value : "",
+      bancal: f.bancal ? f.bancal.value : "",
+      plantines: aNumero(f.plantines.value) || "",
+      lineas: lineas || "",
+      distancia_cm: dist || "",
+      disposicion: f.disposicion.value,
+      // Queda escrito si se respetó el plan o se cambió en el campo: es la
+      // diferencia entre lo planificado y lo que de verdad pasó.
+      marco: (lineas !== sugerido.lineas || dist !== sugerido.distancia_cm)
+        ? "Modificado" : "Sugerido",
+      plantas_bancal: plantasPorBancal(lineas, dist, f.disposicion.value) || "",
+      operador: f.operador.value,
+      observaciones: f.observaciones.value.trim(),
+    });
+    render("trasplantes");
+  };
 }
 
 function prepararHoras() {
