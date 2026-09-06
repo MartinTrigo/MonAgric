@@ -104,13 +104,17 @@ var HOJAS = {
   // lugar en el campo. Guarda el id de la siembra de origen: es lo que permite
   // seguir un cultivo desde el almacigo hasta la cosecha, y saber el rinde real
   // de cada bancal. Sin esta hoja, las siembras de almacigo no tienen lugar.
+  //
+  // Va UNA FILA POR BANCAL. Un mismo dia se puede plantar la misma variedad en
+  // cuatro bancales distintos, y cada uno rinde distinto: si fueran una sola
+  // fila con un contador, el rinde por bancal no se podria calcular nunca. Las
+  // filas de una misma tanda comparten siembra de origen y fecha.
   trasplantes: {
     nombre: "Trasplantes",
     encabezados: ["Id", "Temporada", "Fecha", "Siembra origen", "Fecha siembra",
                   "Días en almácigo", "Días teóricos", "Diferencia días",
                   "Cultivo", "Variedad", "Generación", "Sector", "Bancal",
-                  "Bancales", "Líneas", "Distancia cm", "Disposición", "Marco",
-                  "Plantines por bancal", "Plantines totales",
+                  "Líneas", "Distancia cm", "Disposición", "Marco", "Plantines",
                   "Operador", "Observaciones", "Cargado por", "Recibido"],
     fila: function (r) {
       var d = r.datos;
@@ -118,9 +122,8 @@ var HOJAS = {
               d.fecha_siembra || "", d.dias_almacigo_real || "",
               d.dias_almacigo_teorico || "", d.diferencia_dias === 0 ? 0 : (d.diferencia_dias || ""),
               d.cultivo, d.variedad || "", d.generacion || 1, d.sector || "", d.bancal || "",
-              d.bancales || "", d.lineas || "", d.distancia_cm || "",
-              d.disposicion || "", d.marco || "",
-              d.plantines_bancal || "", d.plantines_total || "",
+              d.lineas || "", d.distancia_cm || "", d.disposicion || "",
+              d.marco || "", d.plantines || "",
               d.operador || "", d.observaciones || "", r.dispositivo || "", new Date()];
     },
   },

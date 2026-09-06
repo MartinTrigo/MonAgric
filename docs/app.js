@@ -261,6 +261,28 @@ function estadoAlmacigo(s) {
   return { texto: `para ${fechaCorta(s.estimado)}`, orden: 2, dias };
 }
 
+// Un renglon de destino: a que sector y a que bancal fue esta parte del
+// almacigo. Se repite tantas veces como bancales se hayan plantado, porque
+// cada bancal termina siendo una fila propia en la planilla.
+function renglonBancal(i) {
+  const secs = sectores();
+  if (!secs.length) return "";
+  return `<div class="renglon-bancal fila" data-renglon="${i}">
+    <div>
+      ${i === 0 ? "<label>Sector</label>" : ""}
+      <select name="sector_${i}" data-sector>
+        ${secs.map((s) => `<option value="${esc(s.sector)}">${esc(s.sector)} (${s.bancales})</option>`).join("")}
+      </select>
+    </div>
+    <div>
+      ${i === 0 ? "<label>Bancal</label>" : ""}
+      <select name="bancal_${i}" data-bancal>${opcionesBancal(secs[0].sector)}</select>
+    </div>
+    ${i === 0 ? "" : `<button type="button" class="quitar" data-quitar-bancal
+        aria-label="Quitar este bancal">&times;</button>`}
+  </div>`;
+}
+
 function etiquetaAlmacigo(s) {
   const partes = [s.cultivo];
   if (s.variedad) partes.push(s.variedad);
@@ -850,11 +872,10 @@ const plantillas = {
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
 
-        <div id="bloque-lugar">${camposSectorBancal()}</div>
-
-        <label>¿Cuántos bancales ocupó?</label>
-        <input type="text" name="bancales" value="1" inputmode="numeric"
-               placeholder="Ej: 2">
+        <label>¿A qué bancales fue?</label>
+        <div id="renglones-bancal">${renglonBancal(0)}</div>
+        <button type="button" class="secundario mas" id="btn-mas-bancal">
+          + Agregar otro bancal</button>
 
         <h3 class="sub">Marco de plantación</h3>
         <p class="nota">Viene sugerido del plan de la temporada. Si en el campo
@@ -2327,10 +2348,26 @@ function prepararTrasplantes() {
 
   // Los plantines no se cuentan en el campo: se deducen del marco y de cuántos
   // bancales se ocuparon, que es lo que sí se sabe al terminar de plantar.
+  const renglones = $("#renglones-bancal");
+  let proximo = 1;
+
+  // Cada renglon es un destino: sector y bancal. Se descartan los repetidos,
+  // que serian dos filas iguales para el mismo lugar.
+  const destinos = () => {
+    const vistos = new Set();
+    return [...renglones.querySelectorAll(".renglon-bancal")].map((div) => ({
+      sector: div.querySelector("[data-sector]").value,
+      bancal: div.querySelector("[data-bancal]").value,
+    })).filter((d) => {
+      const clave = `${d.sector}|${d.bancal}`;
+      return vistos.has(clave) ? false : vistos.add(clave);
+    });
+  };
+
   const cuentas = () => {
     const lineas = aNumero(f.lineas.value) || 0;
     const dist = aNumero(f.distancia_cm.value) || 0;
-    const bancales = aNumero(f.bancales.value) || 0;
+    const bancales = destinos().length;
     const porBancal = plantasPorBancal(lineas, dist, f.disposicion.value);
     return { lineas, dist, bancales, porBancal, total: Math.round(porBancal * bancales) };
   };
@@ -2342,7 +2379,7 @@ function prepararTrasplantes() {
     const disponibles = s ? s.plantines : 0;
     const cambiado = c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm;
     calculo.innerHTML = `<b>${num(c.porBancal)} plantines</b> por bancal`
-      + (c.bancales ? ` · <b>${num(c.total)} plantines</b> en ${num(c.bancales)} bancales` : "")
+      + (c.bancales ? ` · ${c.bancales} bancal(es) elegidos = <b>${num(c.total)} plantines</b>` : "")
       + (cambiado && sugerido.lineas
           ? `<br><small>Distinto del plan (${sugerido.lineas} líneas a ${sugerido.distancia_cm} cm): se guarda como lo hiciste.</small>`
           : "")
@@ -2354,9 +2391,31 @@ function prepararTrasplantes() {
   };
 
   f.siembra_id.addEventListener("change", alElegir);
-  ["lineas", "distancia_cm", "bancales"].forEach((n) =>
-    f[n].addEventListener("input", recalcular));
+  ["lineas", "distancia_cm"].forEach((n) => f[n].addEventListener("input", recalcular));
   f.disposicion.addEventListener("change", recalcular);
+
+  // El sector de cada renglon manda sobre su lista de bancales, y agregar o
+  // quitar renglones cambia el total: se recalcula ante cualquier cambio.
+  const engancharRenglones = () => {
+    renglones.querySelectorAll("[data-sector]").forEach((sel) => {
+      sel.onchange = () => {
+        const b = sel.closest(".renglon-bancal").querySelector("[data-bancal]");
+        b.innerHTML = opcionesBancal(sel.value, b.value);
+        recalcular();
+      };
+    });
+    renglones.querySelectorAll("[data-bancal]").forEach((sel) => { sel.onchange = recalcular; });
+    renglones.querySelectorAll("[data-quitar-bancal]").forEach((b) => {
+      b.onclick = () => { b.closest(".renglon-bancal").remove(); recalcular(); };
+    });
+  };
+  engancharRenglones();
+
+  $("#btn-mas-bancal").onclick = () => {
+    renglones.insertAdjacentHTML("beforeend", renglonBancal(proximo++));
+    engancharRenglones();
+    recalcular();
+  };
 
   f.onsubmit = (e) => {
     e.preventDefault();
@@ -2368,8 +2427,14 @@ function prepararTrasplantes() {
     // pasa en esta chacra y no en un manual.
     const teoricos = perfil(s.cultivo)?.dias_almacigo || 0;
     const reales = diasEntre(s.fecha, f.fecha.value);
+    const lugares = destinos();
+    if (!lugares.length) return aviso("Elegí al menos un bancal.", true);
     escribir(LS.nombre, f.operador.value);
-    guardarRegistro("trasplantes", {
+
+    // Una fila por bancal: comparten siembra de origen, fecha y marco, pero
+    // cada una tiene su lugar. Es lo que después permite comparar el rinde de
+    // un bancal contra otro plantados el mismo día con la misma variedad.
+    const comun = {
       fecha: f.fecha.value,
       siembra_id: s.id,
       fecha_siembra: s.fecha || "",
@@ -2379,9 +2444,6 @@ function prepararTrasplantes() {
       cultivo: s.cultivo,
       variedad: s.variedad,
       generacion: s.generacion,
-      sector: f.sector ? f.sector.value : "",
-      bancal: f.bancal ? f.bancal.value : "",
-      bancales: c.bancales || "",
       lineas: c.lineas || "",
       distancia_cm: c.dist || "",
       disposicion: f.disposicion.value,
@@ -2389,11 +2451,15 @@ function prepararTrasplantes() {
       // diferencia entre lo planificado y lo que de verdad pasó.
       marco: (c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm)
         ? "Modificado" : "Sugerido",
-      plantines_bancal: c.porBancal || "",
-      plantines_total: c.total || "",
+      plantines: c.porBancal || "",
       operador: f.operador.value,
       observaciones: f.observaciones.value.trim(),
-    });
+    };
+    const aviso_ = lugares.length === 1
+      ? "Trasplante guardado ✓"
+      : `Trasplante guardado: ${lugares.length} bancales ✓`;
+    lugares.forEach((l) => guardarRegistro("trasplantes",
+      Object.assign({}, comun, { sector: l.sector, bancal: l.bancal }), aviso_));
     render("trasplantes");
   };
 }
