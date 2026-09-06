@@ -17,6 +17,10 @@
 // Cada chacra escribe en su propia planilla; el servicio las reparte según el
 // código. Para sumar una: crear su planilla, agregarla acá y cargar su id en la
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
+// Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
+// una copia vieja, que es dificil de adivinar de otro modo.
+const VERSION_APP = "versión 14 · 6/9/2026";
+
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
   { codigo: "milpa", nombre: "La Milpa" },
@@ -1344,6 +1348,15 @@ const plantillas = {
   ajustes() {
     return `
     <div class="tarjeta">
+      <h2>Versión de la app</h2>
+      <p class="nota">Si algo que te dijeron que estaba arreglado no aparece, el
+      teléfono puede haber quedado con una copia vieja guardada. Este botón la
+      tira y vuelve a bajar todo.</p>
+      <p class="nota">Tenés la <b>${esc(VERSION_APP)}</b></p>
+      <button class="secundario" id="btn-actualizar-app">Buscar actualización</button>
+    </div>
+
+    <div class="tarjeta">
       <h2>&#9881; Ajustes</h2>
       <label>Chacra</label>
       <select id="aj-chacra">
@@ -2590,6 +2603,18 @@ function prepararCosechas() {
 
 function prepararAjustes() {
   const esScript = (u) => !u || u.startsWith("https://script.google.com/");
+
+  // Borra la copia guardada y vuelve a pedir todo a la red. Los registros que
+  // esperan enviarse NO se tocan: viven aparte y se sincronizan igual.
+  $("#btn-actualizar-app").onclick = async () => {
+    aviso("Buscando actualización…");
+    try {
+      for (const k of await caches.keys()) await caches.delete(k);
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.update();
+    } catch (_) { /* sin service worker igual conviene recargar */ }
+    location.reload();
+  };
 
   $("#btn-guardar-ajustes").onclick = () => {
     const nuevaChacra = $("#aj-chacra").value;

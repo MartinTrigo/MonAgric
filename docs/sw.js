@@ -3,7 +3,7 @@
 // Estrategia "red primero, caché de respaldo": con señal siempre se usa la
 // última versión publicada (así las mejoras llegan solas a los celulares) y sin
 // señal se sirve la última copia guardada, que es lo que importa en el campo.
-const CACHE = "monagric-v13";
+const CACHE = "monagric-v14";
 const ARCHIVOS = [
   ".",
   "index.html",
@@ -35,8 +35,16 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;         // las planillas van siempre a la red
 
+  // Se le pide a la red que revalide siempre. Sin esto, fetch() respeta la
+  // cache del navegador y GitHub manda max-age=600: el telefono podia seguir
+  // sirviendo su copia vieja sin preguntar, aunque el service worker estuviera
+  // al dia. Con "no-cache" viaja el ETag y el servidor responde 304 si no
+  // cambio nada, asi que no cuesta datos de mas.
+  let pedido = e.request;
+  try { pedido = new Request(e.request, { cache: "no-cache" }); } catch (_) { /* navegadores viejos */ }
+
   e.respondWith(
-    fetch(e.request)
+    fetch(pedido)
       .then((resp) => {
         if (resp.ok) {
           const copia = resp.clone();
