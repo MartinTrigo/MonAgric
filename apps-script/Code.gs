@@ -705,6 +705,11 @@ function actualizarPanel(soloChacra) {
       var cfg = leerConfigDe(origen, codigo);
       if (!cfg.plan || !cfg.plan.length) { sinPlan.push(codigo); return; }
       escribirHojaDeChacra(libro, codigo, cfg, origen);
+      // Tica ademas mantiene su copia local de las horas de Bioma. Va aparte:
+      // si la planilla de Bioma no responde, el panel se arma igual.
+      if (codigo === CHACRA_CON_HORAS_APARTE) {
+        try { espejarHorasDeTica(); } catch (e) { fallaron["espejo-horas"] = String(e); }
+      }
       hechas.push(codigo);
     } catch (err) {
       fallaron[codigo] = String(err);
@@ -895,6 +900,71 @@ function ultimosDeHoja(chacra, cual, cuantos) {
     });
     return obj;
   }).reverse();          // el más nuevo primero
+}
+
+// ---------- Espejo de las horas de Chacra Tica ----------
+//
+// Tica carga sus horas en la planilla del proyecto Bioma, que es donde esta el
+// historial desde julio, y eso se mantiene: es la fuente. Pero era la unica
+// chacra sin sus horas en su propia planilla, asi que su carpeta no se parecia
+// a la de las demas y no se podia leer todo de un solo lado.
+//
+// Esta funcion copia las filas de Bioma a la hoja Horas de Tica, con los
+// mismos encabezados que usan las otras chacras. Es una COPIA: se reescribe
+// entera en cada pasada, asi que lo que se edite ahi a mano se pierde. Para
+// corregir una hora hay que hacerlo en la planilla de Bioma.
+//
+// El resumen sigue sumando desde Bioma, no desde esta hoja: si sumara las dos,
+// las horas de Tica se contarian dos veces.
+function espejarHorasDeTica() {
+  var origen = null;
+  var hojas = SpreadsheetApp.openById(PLANILLA_HORAS_TICA).getSheets();
+  for (var i = 0; i < hojas.length; i++) {
+    if (hojas[i].getName().indexOf("Respuestas de formulario") === 0) { origen = hojas[i]; break; }
+  }
+  if (!origen || origen.getLastRow() < 2) return { ok: false, error: "No encontre las horas de Bioma." };
+
+  // Bioma: Marca(1) Fecha(2) Trabajador(3) Horas(4) Actividad(5) Obs(6) Area(7)
+  var filas = origen.getRange(2, 1, origen.getLastRow() - 1, 7).getValues();
+  var libro = planillaDe(CHACRA_CON_HORAS_APARTE);
+  var cfg = leerConfigDe(libro, CHACRA_CON_HORAS_APARTE);
+  var temporada = (cfg.temporada && cfg.temporada.nombre) || "";
+  var desde = (cfg.temporada && cfg.temporada.inicio) ? new Date(cfg.temporada.inicio) : null;
+  var tz = Session.getScriptTimeZone();
+  var comoFecha = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+
+  var salida = [];
+  filas.forEach(function (f) {
+    var quien = String(f[2] || "").trim();
+    var horas = Number(f[3]) || 0;
+    if (!quien || !horas) return;                       // filas vacias o de relleno
+    var fecha = f[1];
+    // El id sale de la marca temporal: es estable aunque se reordenen las filas.
+    var marca = (f[0] instanceof Date) ? f[0].getTime() : 0;
+    salida.push([
+      "bioma-" + (marca || Utilities.getUuid().slice(0, 8)),
+      (desde && fecha instanceof Date && fecha < desde) ? "" : temporada,
+      comoFecha(fecha), quien, horas,
+      String(f[4] || ""), String(f[6] || ""), String(f[5] || ""),
+      "planilla de horas", f[0] instanceof Date ? f[0] : ""
+    ]);
+  });
+
+  var def = HOJAS.horas;
+  var hoja = libro.getSheetByName(def.nombre);
+  if (!hoja) {
+    hoja = libro.insertSheet(def.nombre);
+    ponerEncabezados(hoja, def.encabezados);
+  }
+  // Se borra y se reescribe entera: asi una fila corregida o borrada en Bioma
+  // queda igual de este lado, sin duplicados ni sobrantes.
+  if (hoja.getLastRow() > 1) {
+    hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length).clearContent();
+  }
+  if (salida.length) hoja.getRange(2, 1, salida.length, def.encabezados.length).setValues(salida);
+  return { ok: true, copiadas: salida.length };
 }
 
 // ---------- Exportar a la app de escritorio ----------
