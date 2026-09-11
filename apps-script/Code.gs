@@ -1141,6 +1141,7 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
 
   filas.push(["Mes a mes", "", "", "", ""]);
   filas.push(["Mes", "Horas", "Ganado", "Cobrado", "Saldo"]);
+  var filaPrimerMes = filas.length + 1;   // las filas de la hoja empiezan en 1
   Object.keys(porMes).sort().forEach(function (m) {
     var g = porMes[m].horas * tarifa;
     filas.push([m, porMes[m].horas, g, porMes[m].pagado, g - porMes[m].pagado]);
@@ -1148,14 +1149,19 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
   filas.push(["TOTAL", totalHoras, devengado, totalPagado, devengado - totalPagado]);
   filas.push(["", "", "", "", ""]);
 
+  var filasDeMeses = filas.length + 1 - filaPrimerMes;   // incluye el TOTAL
+
   filas.push(["Pagos que recibiste", "", "", "", ""]);
   filas.push(["Fecha", "Monto", "Medio de pago", "Observaciones", ""]);
+  var filaPrimerPago = filas.length + 1;
   if (!misPagos.length) filas.push(["Todavía no hay pagos registrados.", "", "", "", ""]);
   misPagos.forEach(function (f) {
     filas.push([dia(campo(f, ["fecha"])), Number(campo(f, ["monto"])) || 0,
                 String(campo(f, ["medio"]) || ""), String(campo(f, ["observaciones", "obs"]) || ""), ""]);
   });
   filas.push(["", "", "", "", ""]);
+
+  var filasDePagos = filas.length + 1 - filaPrimerPago;
 
   filas.push(["Tus horas, día por día", "", "", "", ""]);
   filas.push(["Fecha", "Horas", "Área", "Actividad", "Observaciones"]);
@@ -1172,9 +1178,14 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
   hoja.getRange("B4:B8").setNumberFormat("$#,##0");
   // El mes a mes y los pagos tambien son plata: sin formato se leen como
   // numeros sueltos y cuesta distinguir 37500 de 375000.
-  var filaMeses = 11;
-  hoja.getRange(filaMeses, 3, Object.keys(porMes).length + 1, 3).setNumberFormat("$#,##0");
-  hoja.getRange(filaMeses, 2, Object.keys(porMes).length + 1, 1).setNumberFormat("0.0");
+  if (filasDeMeses > 0) {
+    hoja.getRange(filaPrimerMes, 2, filasDeMeses, 1).setNumberFormat("0.0");
+    hoja.getRange(filaPrimerMes, 3, filasDeMeses, 3).setNumberFormat("$#,##0");
+    hoja.getRange(filaPrimerMes + filasDeMeses - 1, 1, 1, 5).setFontWeight("bold");
+  }
+  if (misPagos.length && filasDePagos > 0) {
+    hoja.getRange(filaPrimerPago, 2, filasDePagos, 1).setNumberFormat("$#,##0");
+  }
   hoja.getRange("B5").setNumberFormat("0.0");
   hoja.getRange(1, 1).setFontSize(14).setFontWeight("bold");
   hoja.getRange(8, 1, 1, 2).setFontWeight("bold").setBackground("#fff3c4");
