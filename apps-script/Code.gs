@@ -300,8 +300,9 @@ function atender(p) {
 
   // El panel y exportar son cosa de la administracion: van con la clave de
   // admin, que solo esta en las herramientas de escritorio de Martin.
-  if (p.panel || p.exportar || p.cuentas) {
+  if (p.panel || p.exportar || p.cuentas || p.diagfechas) {
     if (!esAdmin(p.clave)) return respuesta(rechazo("Esto es solo para la administración."));
+    if (p.diagfechas) return respuesta(diagnosticoFechas());
     if (p.cuentas) return respuesta(espejarCuentasTrabajadores());
     if (p.panel) return respuesta(actualizarPanel(chacra));
     return respuesta({ ok: true, hoja: p.exportar, filas: exportarHoja(chacra, p.exportar) });
@@ -1141,6 +1142,50 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
   hoja.getRange(8, 1, 1, 2).setFontWeight("bold").setBackground("#fff3c4");
   hoja.autoResizeColumns(1, 5);
   return true;
+}
+
+// ---------- Diagnostico de las fechas de Registro Horas ----------
+//
+// En las cuentas de Bioma, julio de Marto daba 32 h cuando el registro tiene
+// 45,5. Agosto y septiembre cerraban exactos. Como la columna Fecha se muestra
+// sin año en muchas filas ("15/7"), desde afuera no se puede saber que hay
+// adentro de la celda. Esto lo dice: si es texto o fecha, y de que año.
+function diagnosticoFechas() {
+  var bioma = SpreadsheetApp.openById(PLANILLA_HORAS_TICA);
+  var hoja = bioma.getSheetByName("Registro Horas");
+  if (!hoja) return { ok: false, error: "No encontre 'Registro Horas'." };
+
+  var datos = hoja.getDataRange().getValues();
+  var iCab = -1, iFecha = -1, iQuien = -1, iHoras = -1;
+  for (var i = 0; i < Math.min(datos.length, 10) && iCab < 0; i++) {
+    for (var j = 0; j < datos[i].length; j++) {
+      var c = String(datos[i][j]).trim().toLowerCase();
+      if (c === "fecha") { iCab = i; iFecha = j; }
+      if (c === "trabajador") iQuien = j;
+      if (c === "horas") iHoras = j;
+    }
+  }
+  if (iCab < 0) return { ok: false, error: "No encontre la fila de encabezados." };
+
+  var porAnio = {}, textos = [], horasPorAnio = {};
+  for (var k = iCab + 1; k < datos.length; k++) {
+    var v = datos[k][iFecha];
+    var h = Number(datos[k][iHoras]) || 0;
+    if (!datos[k][iQuien] && !h) continue;
+    if (v instanceof Date) {
+      var a = v.getFullYear() + "-" + ("0" + (v.getMonth() + 1)).slice(-2);
+      porAnio[a] = (porAnio[a] || 0) + 1;
+      horasPorAnio[a] = (horasPorAnio[a] || 0) + h;
+    } else {
+      porAnio["TEXTO"] = (porAnio["TEXTO"] || 0) + 1;
+      horasPorAnio["TEXTO"] = (horasPorAnio["TEXTO"] || 0) + h;
+      if (textos.length < 12) {
+        textos.push({ fila: k + 1, valor: String(v), quien: String(datos[k][iQuien]), horas: h });
+      }
+    }
+  }
+  return { ok: true, filas_por_mes: porAnio, horas_por_mes: horasPorAnio,
+           ejemplos_de_texto: textos };
 }
 
 // ---------- Exportar a la app de escritorio ----------
