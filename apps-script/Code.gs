@@ -981,7 +981,27 @@ function espejarHorasDeTica() {
 // de las pestañas de Bioma a proposito: ahi habia cuentas cruzadas (la de
 // Juanfra mostraba las horas de Luqui) y totales que no coincidian con su
 // propio detalle mensual. Calculando de la fuente, eso no puede pasar.
-var CARPETA_CUENTAS = "1j3J_xEHWRw8mXefbjgtvobp3Pludh3HY";
+// Cada persona con su planilla. Se apunta al archivo por su id y no se recorre
+// la carpeta a proposito: leer una carpeta obliga a pedirle permiso de Drive al
+// script, y eso lo haria reautorizar entero. Abrir una planilla por id es un
+// permiso que ya tiene.
+//
+// Para sumar a alguien: crear su planilla en la carpeta "cuenta trabajadores",
+// copiar el id de la barra de direcciones (la parte larga entre /d/ y /edit) y
+// agregar una linea aca. Tambien se puede poner el mismo mapa en la propiedad
+// CUENTAS del script, que gana sobre esta lista.
+var CUENTAS_TRABAJADORES = {
+  "Juanfra": "1PKaN1UqnBecA1sKb6hq9Y_tEJbMMuhnpGsBRTTeuoVc",
+  "Luqui": "1UJU69PjufpN27fGHzN9dzL_x6QdW2X0E3gkd7TrA2XA"
+};
+
+function cuentasConfiguradas() {
+  try {
+    var guardado = PropertiesService.getScriptProperties().getProperty("CUENTAS");
+    if (guardado) return JSON.parse(guardado);
+  } catch (e) { /* si la propiedad esta mal escrita, vale la lista de arriba */ }
+  return CUENTAS_TRABAJADORES;
+}
 
 // Busca la fila de encabezados y devuelve las filas como objetos. Las hojas de
 // Bioma tienen un titulo arriba, asi que la primera fila no sirve.
@@ -1033,19 +1053,17 @@ function espejarCuentasTrabajadores() {
     if (n) tarifas[claveNombre(n)] = Number(campo(f, ["tarifa"])) || 0;
   });
 
-  var carpeta = DriveApp.getFolderById(CARPETA_CUENTAS);
-  var archivos = carpeta.getFilesByType(MimeType.GOOGLE_SHEETS);
+  var mapa = cuentasConfiguradas();
   var hechas = [], fallaron = {};
-  while (archivos.hasNext()) {
-    var archivo = archivos.next();
-    var persona = archivo.getName().trim();
+  Object.keys(mapa).forEach(function (persona) {
     try {
-      escribirCuentaDe(archivo.getId(), persona, horas, pagos, tarifas[claveNombre(persona)] || 0);
+      escribirCuentaDe(mapa[persona], persona, horas, pagos,
+                       tarifas[claveNombre(persona)] || 0);
       hechas.push(persona);
     } catch (err) {
       fallaron[persona] = String(err);
     }
-  }
+  });
   return { ok: true, cuentas: hechas, fallaron: fallaron };
 }
 
