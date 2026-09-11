@@ -300,8 +300,9 @@ function atender(p) {
 
   // El panel y exportar son cosa de la administracion: van con la clave de
   // admin, que solo esta en las herramientas de escritorio de Martin.
-  if (p.panel || p.exportar) {
+  if (p.panel || p.exportar || p.cuentas) {
     if (!esAdmin(p.clave)) return respuesta(rechazo("Esto es solo para la administración."));
+    if (p.cuentas) return respuesta(espejarCuentasTrabajadores());
     if (p.panel) return respuesta(actualizarPanel(chacra));
     return respuesta({ ok: true, hoja: p.exportar, filas: exportarHoja(chacra, p.exportar) });
   }
@@ -709,6 +710,8 @@ function actualizarPanel(soloChacra) {
       // si la planilla de Bioma no responde, el panel se arma igual.
       if (codigo === CHACRA_CON_HORAS_APARTE) {
         try { espejarHorasDeTica(); } catch (e) { fallaron["espejo-horas"] = String(e); }
+        // Y las cuentas de cada trabajador, que salen de la misma planilla.
+        try { espejarCuentasTrabajadores(); } catch (e) { fallaron["cuentas"] = String(e); }
       }
       hechas.push(codigo);
     } catch (err) {
@@ -965,6 +968,179 @@ function espejarHorasDeTica() {
   }
   if (salida.length) hoja.getRange(2, 1, salida.length, def.encabezados.length).setValues(salida);
   return { ok: true, copiadas: salida.length };
+}
+
+// ---------- Cuenta individual de cada trabajador ----------
+//
+// Las cuentas viven en la planilla de horas de Bioma, todas en el mismo
+// archivo: quien puede abrirlo ve la de todos. Por eso cada trabajador tiene su
+// propia planilla en esta carpeta, y ahi solo esta lo suyo.
+//
+// Los numeros se RECALCULAN desde Registro Horas, Pagos y Config. No se copian
+// de las pestañas de Bioma a proposito: ahi habia cuentas cruzadas (la de
+// Juanfra mostraba las horas de Luqui) y totales que no coincidian con su
+// propio detalle mensual. Calculando de la fuente, eso no puede pasar.
+var CARPETA_CUENTAS = "1j3J_xEHWRw8mXefbjgtvobp3Pludh3HY";
+
+// Busca la fila de encabezados y devuelve las filas como objetos. Las hojas de
+// Bioma tienen un titulo arriba, asi que la primera fila no sirve.
+function filasConEncabezado(hoja, columnaClave) {
+  if (!hoja || hoja.getLastRow() < 2) return [];
+  var datos = hoja.getDataRange().getValues();
+  var iCab = -1;
+  for (var i = 0; i < Math.min(datos.length, 10); i++) {
+    for (var j = 0; j < datos[i].length; j++) {
+      if (String(datos[i][j]).trim().toLowerCase() === columnaClave) { iCab = i; break; }
+    }
+    if (iCab >= 0) break;
+  }
+  if (iCab < 0) return [];
+  var cab = datos[iCab].map(function (c) { return String(c).trim(); });
+  return datos.slice(iCab + 1).map(function (f) {
+    var o = {};
+    cab.forEach(function (c, k) { if (c) o[c] = f[k]; });
+    return o;
+  });
+}
+
+// La primera columna cuyo encabezado empiece con alguno de estos textos.
+function campo(fila, posibles) {
+  for (var k in fila) {
+    var clave = String(k).toLowerCase();
+    for (var i = 0; i < posibles.length; i++) {
+      if (clave.indexOf(posibles[i]) === 0) return fila[k];
+    }
+  }
+  return "";
+}
+
+function espejarCuentasTrabajadores() {
+  var bioma = SpreadsheetApp.openById(PLANILLA_HORAS_TICA);
+  var hojaHoras = bioma.getSheetByName("Registro Horas");
+  var hojaPagos = bioma.getSheetByName("Pagos");
+  var hojaConfig = bioma.getSheetByName("Config");
+  if (!hojaHoras || !hojaPagos || !hojaConfig) {
+    var nombres = bioma.getSheets().map(function (h) { return h.getName(); });
+    return { ok: false, error: "Falta alguna hoja en Bioma", hojas: nombres };
+  }
+
+  var horas = filasConEncabezado(hojaHoras, "trabajador");
+  var pagos = filasConEncabezado(hojaPagos, "trabajador");
+  var tarifas = {};
+  filasConEncabezado(hojaConfig, "trabajador").forEach(function (f) {
+    var n = String(campo(f, ["trabajador"]) || "").trim();
+    if (n) tarifas[claveNombre(n)] = Number(campo(f, ["tarifa"])) || 0;
+  });
+
+  var carpeta = DriveApp.getFolderById(CARPETA_CUENTAS);
+  var archivos = carpeta.getFilesByType(MimeType.GOOGLE_SHEETS);
+  var hechas = [], fallaron = {};
+  while (archivos.hasNext()) {
+    var archivo = archivos.next();
+    var persona = archivo.getName().trim();
+    try {
+      escribirCuentaDe(archivo.getId(), persona, horas, pagos, tarifas[claveNombre(persona)] || 0);
+      hechas.push(persona);
+    } catch (err) {
+      fallaron[persona] = String(err);
+    }
+  }
+  return { ok: true, cuentas: hechas, fallaron: fallaron };
+}
+
+// Nombre comparable: sin tildes ni mayusculas, para que "Luqui" encuentre su
+// tarifa aunque en Config este escrito distinto. Se llama claveNombre y no
+// clave porque 'clave' ya se usa como variable en varias funciones de aca.
+function claveNombre(n) {
+  return String(n || "").trim().toLowerCase()
+    .replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
+    .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
+}
+
+// Arma la planilla de una persona. Se reescribe entera en cada pasada: la
+// fuente son siempre Registro Horas y Pagos, asi que lo que se edite aca se
+// pierde y no hay riesgo de que dos numeros digan cosas distintas.
+function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
+  var yo = claveNombre(persona);
+  var tz = Session.getScriptTimeZone();
+  var mes = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM") : "";
+  };
+  var dia = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "dd/MM/yyyy") : String(v || "");
+  };
+
+  var mias = horas.filter(function (f) { return claveNombre(campo(f, ["trabajador"])) === yo; });
+  var misPagos = pagos.filter(function (f) { return claveNombre(campo(f, ["trabajador"])) === yo; });
+
+  var porMes = {}, totalHoras = 0, totalPagado = 0;
+  mias.forEach(function (f) {
+    var h = Number(campo(f, ["horas"])) || 0;
+    if (!h) return;
+    totalHoras += h;
+    var m = mes(campo(f, ["fecha"])) || "sin fecha";
+    porMes[m] = porMes[m] || { horas: 0, pagado: 0 };
+    porMes[m].horas += h;
+  });
+  misPagos.forEach(function (f) {
+    var monto = Number(campo(f, ["monto"])) || 0;
+    if (!monto) return;
+    totalPagado += monto;
+    var m = mes(campo(f, ["fecha"])) || "sin fecha";
+    porMes[m] = porMes[m] || { horas: 0, pagado: 0 };
+    porMes[m].pagado += monto;
+  });
+
+  var devengado = totalHoras * tarifa;
+  var filas = [];
+  filas.push(["Cuenta de " + persona, "", "", "", ""]);
+  filas.push(["Actualizado", Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm"), "", "", ""]);
+  filas.push(["", "", "", "", ""]);
+  filas.push(["Tu tarifa por hora", tarifa, "", "", ""]);
+  filas.push(["Horas trabajadas", totalHoras, "", "", ""]);
+  filas.push(["Total ganado", devengado, "", "", ""]);
+  filas.push(["Total cobrado", totalPagado, "", "", ""]);
+  filas.push(["TE QUEDA POR COBRAR", devengado - totalPagado, "", "", ""]);
+  filas.push(["", "", "", "", ""]);
+
+  filas.push(["Mes a mes", "", "", "", ""]);
+  filas.push(["Mes", "Horas", "Ganado", "Cobrado", "Saldo"]);
+  Object.keys(porMes).sort().forEach(function (m) {
+    var g = porMes[m].horas * tarifa;
+    filas.push([m, porMes[m].horas, g, porMes[m].pagado, g - porMes[m].pagado]);
+  });
+  filas.push(["TOTAL", totalHoras, devengado, totalPagado, devengado - totalPagado]);
+  filas.push(["", "", "", "", ""]);
+
+  filas.push(["Pagos que recibiste", "", "", "", ""]);
+  filas.push(["Fecha", "Monto", "Medio de pago", "Observaciones", ""]);
+  if (!misPagos.length) filas.push(["Todavía no hay pagos registrados.", "", "", "", ""]);
+  misPagos.forEach(function (f) {
+    filas.push([dia(campo(f, ["fecha"])), Number(campo(f, ["monto"])) || 0,
+                String(campo(f, ["medio"]) || ""), String(campo(f, ["observaciones", "obs"]) || ""), ""]);
+  });
+  filas.push(["", "", "", "", ""]);
+
+  filas.push(["Tus horas, día por día", "", "", "", ""]);
+  filas.push(["Fecha", "Horas", "Área", "Actividad", "Observaciones"]);
+  mias.forEach(function (f) {
+    filas.push([dia(campo(f, ["fecha"])), Number(campo(f, ["horas"])) || 0,
+                String(campo(f, ["área", "area"]) || ""), String(campo(f, ["actividad"]) || ""),
+                String(campo(f, ["observaciones", "obs"]) || "")]);
+  });
+
+  var libro = SpreadsheetApp.openById(archivoId);
+  var hoja = libro.getSheetByName("Mi cuenta") || libro.getSheets()[0].setName("Mi cuenta");
+  hoja.clear();
+  hoja.getRange(1, 1, filas.length, 5).setValues(filas);
+
+  // Lo que es plata se ve como plata; el resto queda en texto plano.
+  hoja.getRange("B4:B8").setNumberFormat("$#,##0");
+  hoja.getRange("B5").setNumberFormat("0.0");
+  hoja.getRange(1, 1).setFontSize(14).setFontWeight("bold");
+  hoja.getRange(8, 1, 1, 2).setFontWeight("bold").setBackground("#fff3c4");
+  hoja.autoResizeColumns(1, 5);
+  return true;
 }
 
 // ---------- Exportar a la app de escritorio ----------
