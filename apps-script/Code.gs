@@ -1003,6 +1003,24 @@ function cuentasConfiguradas() {
   return CUENTAS_TRABAJADORES;
 }
 
+// Las horas se leen de la hoja de respuestas del formulario y POR POSICION, no
+// por el nombre de la columna: en "Registro Horas" la septima columna no tiene
+// encabezado, y buscar por nombre dejaba el area sin leer y metia su valor en
+// observaciones. El formulario, en cambio, siempre escribe en el mismo orden.
+function horasNormalizadas(bioma) {
+  var hojas = bioma.getSheets(), origen = null;
+  for (var i = 0; i < hojas.length; i++) {
+    if (hojas[i].getName().indexOf("Respuestas de formulario") === 0) { origen = hojas[i]; break; }
+  }
+  if (!origen || origen.getLastRow() < 2) return [];
+  // Marca(1) Fecha(2) Trabajador(3) Horas(4) Actividad(5) Observaciones(6) Area(7)
+  return origen.getRange(2, 1, origen.getLastRow() - 1, 7).getValues().map(function (f) {
+    return { fecha: f[1], quien: String(f[2] || "").trim(), horas: Number(f[3]) || 0,
+             actividad: String(f[4] || ""), observaciones: String(f[5] || ""),
+             area: String(f[6] || "") };
+  }).filter(function (r) { return r.quien && r.horas; });
+}
+
 // Busca la fila de encabezados y devuelve las filas como objetos. Las hojas de
 // Bioma tienen un titulo arriba, asi que la primera fila no sirve.
 function filasConEncabezado(hoja, columnaClave) {
@@ -1037,15 +1055,14 @@ function campo(fila, posibles) {
 
 function espejarCuentasTrabajadores() {
   var bioma = SpreadsheetApp.openById(PLANILLA_HORAS_TICA);
-  var hojaHoras = bioma.getSheetByName("Registro Horas");
   var hojaPagos = bioma.getSheetByName("Pagos");
   var hojaConfig = bioma.getSheetByName("Config");
-  if (!hojaHoras || !hojaPagos || !hojaConfig) {
+  if (!hojaPagos || !hojaConfig) {
     var nombres = bioma.getSheets().map(function (h) { return h.getName(); });
     return { ok: false, error: "Falta alguna hoja en Bioma", hojas: nombres };
   }
 
-  var horas = filasConEncabezado(hojaHoras, "trabajador");
+  var horas = horasNormalizadas(bioma);
   var pagos = filasConEncabezado(hojaPagos, "trabajador");
   var tarifas = {};
   filasConEncabezado(hojaConfig, "trabajador").forEach(function (f) {
@@ -1089,15 +1106,15 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, "dd/MM/yyyy") : String(v || "");
   };
 
-  var mias = horas.filter(function (f) { return claveNombre(campo(f, ["trabajador"])) === yo; });
+  var mias = horas.filter(function (f) { return claveNombre(f.quien) === yo; });
   var misPagos = pagos.filter(function (f) { return claveNombre(campo(f, ["trabajador"])) === yo; });
 
   var porMes = {}, totalHoras = 0, totalPagado = 0;
   mias.forEach(function (f) {
-    var h = Number(campo(f, ["horas"])) || 0;
+    var h = f.horas;
     if (!h) return;
     totalHoras += h;
-    var m = mes(campo(f, ["fecha"])) || "sin fecha";
+    var m = mes(f.fecha) || "sin fecha";
     porMes[m] = porMes[m] || { horas: 0, pagado: 0 };
     porMes[m].horas += h;
   });
@@ -1143,9 +1160,7 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
   filas.push(["Tus horas, día por día", "", "", "", ""]);
   filas.push(["Fecha", "Horas", "Área", "Actividad", "Observaciones"]);
   mias.forEach(function (f) {
-    filas.push([dia(campo(f, ["fecha"])), Number(campo(f, ["horas"])) || 0,
-                String(campo(f, ["área", "area"]) || ""), String(campo(f, ["actividad"]) || ""),
-                String(campo(f, ["observaciones", "obs"]) || "")]);
+    filas.push([dia(f.fecha), f.horas, f.area, f.actividad, f.observaciones]);
   });
 
   var libro = SpreadsheetApp.openById(archivoId);
@@ -1155,6 +1170,11 @@ function escribirCuentaDe(archivoId, persona, horas, pagos, tarifa) {
 
   // Lo que es plata se ve como plata; el resto queda en texto plano.
   hoja.getRange("B4:B8").setNumberFormat("$#,##0");
+  // El mes a mes y los pagos tambien son plata: sin formato se leen como
+  // numeros sueltos y cuesta distinguir 37500 de 375000.
+  var filaMeses = 11;
+  hoja.getRange(filaMeses, 3, Object.keys(porMes).length + 1, 3).setNumberFormat("$#,##0");
+  hoja.getRange(filaMeses, 2, Object.keys(porMes).length + 1, 1).setNumberFormat("0.0");
   hoja.getRange("B5").setNumberFormat("0.0");
   hoja.getRange(1, 1).setFontSize(14).setFontWeight("bold");
   hoja.getRange(8, 1, 1, 2).setFontWeight("bold").setBackground("#fff3c4");
