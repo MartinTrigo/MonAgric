@@ -1078,6 +1078,60 @@ function cuentasParaElTelefono(chacra, persona) {
   };
 }
 
+// Se ejecuta A MANO desde el editor, una sola vez, para dos cosas:
+//
+// 1. Autorizar el permiso de pedidos externos. El script nunca habia llamado a
+//    una URL de afuera, y Apps Script no deja hacerlo hasta que alguien aprueba
+//    el permiso en el editor. Sin esto la seccion Cuentas responde
+//    "No cuentas con el permiso para llamar a UrlFetchApp.fetch".
+//
+// 2. Avisar si los nombres de Bioma coinciden con las personas registradas en
+//    MonAgric. Es la unica llave que une las dos cosas: si un telefono figura
+//    como "Lucas" y en las horas dice "Luqui", esa persona abre Cuentas y no ve
+//    nada. Mejor descubrirlo aca que en el celular de alguien.
+//
+// Elegir probarCuentas en la lista de funciones, Ejecutar, y mirar el registro.
+function probarCuentas() {
+  var chacra = CHACRA_CON_HORAS_APARTE;
+  if (!urlCuentasDe(chacra)) {
+    Logger.log("Falta la propiedad CUENTAS_URLS con la direccion de " + chacra + ".");
+    return;
+  }
+  var datos = traerCuentasDeBioma(chacra);
+  var nombres = (datos.trabajadores || []).map(function (t) { return t.nombre; });
+  Logger.log("Bioma respondio: " + nombres.length + " cuentas, actualizado "
+             + datos.actualizado);
+  Logger.log("  " + nombres.join(", "));
+  if (datos.totales) Logger.log("  totales: " + JSON.stringify(datos.totales));
+
+  // Personas con telefono activo en esta chacra
+  var hoja = SpreadsheetApp.openById(PLANILLA_ACCESOS_ID).getSheetByName("Dispositivos");
+  var personas = [], vistos = {};
+  if (hoja && hoja.getLastRow() > 1) {
+    hoja.getRange(2, 1, hoja.getLastRow() - 1, DISPOSITIVOS_ENCABEZADOS.length)
+        .getValues().forEach(function (f) {
+      var quien = String(f[2] || "").trim();
+      if (!quien) return;
+      if (String(f[1]).toLowerCase() !== chacra) return;
+      if (String(f[3]).toUpperCase().indexOf("S") !== 0) return;
+      if (!vistos[claveNombre(quien)]) { vistos[claveNombre(quien)] = true; personas.push(quien); }
+    });
+  }
+
+  var enBioma = {};
+  nombres.forEach(function (n) { enBioma[claveNombre(n)] = true; });
+  var sueltos = personas.filter(function (q) { return !enBioma[claveNombre(q)]; });
+
+  Logger.log("Telefonos activos en " + chacra + ": " + personas.join(", "));
+  if (sueltos.length) {
+    Logger.log("OJO: estas personas tienen telefono pero no tienen cuenta en Bioma,");
+    Logger.log("asi que al abrir Cuentas no van a ver nada: " + sueltos.join(", "));
+    Logger.log("Se arregla igualando el nombre en la hoja Dispositivos o en la de horas.");
+  } else {
+    Logger.log("Todos los telefonos activos tienen su cuenta en Bioma.");
+  }
+}
+
 // ---------- Cuenta individual de cada trabajador ----------
 //
 // Las cuentas viven en la planilla de horas de Bioma, todas en el mismo
