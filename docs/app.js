@@ -19,7 +19,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 15 · 8/9/2026";
+const VERSION_APP = "versión 16 · 12/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2485,10 +2485,16 @@ function prepararHoras() {
     const verActividades = () => {
       const lista = actividadesDe(f.area.value);
       bloque.hidden = !lista.length;
+      // Hay que elegir una: sin actividad la hora se puede sumar por area pero
+      // no se puede analizar en que se fue. La opcion de arriba no es elegible,
+      // solo esta para que no quede una preseleccionada por accidente.
       f.actividad.innerHTML = lista.length
-        ? `<option value="">Sin especificar</option>` +
+        ? `<option value="" disabled selected>Elegí la actividad…</option>` +
           lista.map((a) => `<option>${esc(a)}</option>`).join("")
         : "";
+      // Solo se exige cuando el area tiene lista propia: un area sin
+      // actividades cargadas no puede frenar el registro.
+      f.actividad.required = lista.length > 0;
     };
     f.area?.addEventListener("change", verActividades);
     verActividades();
@@ -2501,6 +2507,9 @@ function prepararHoras() {
     const horas = aNumero(f.horas.value);
     if (!(horas > 0 && horas <= 24)) return aviso("Las horas deben ser un número entre 0 y 24.", true);
     if (!f.area.value) return aviso("Elegí el área.", true);
+    if (f.actividad && f.actividad.required && !f.actividad.value) {
+      return aviso("Elegí la actividad.", true);
+    }
     // El nombre elegido queda como el de este teléfono: la próxima vez viene puesto.
     escribir(LS.nombre, f.integrante.value);
     guardarRegistro("horas", {
