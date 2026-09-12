@@ -1182,7 +1182,7 @@ function pintarRanking() {
     <div class="puesto${r.jugador === yo ? " yo" : ""}">
       <span class="n">${i + 1}</span>
       <span class="quien">${r.jugador}</span>
-      <span class="datos">nivel ${r.nivel} · ${r.partidas} partida${r.partidas > 1 ? "s" : ""}</span>
+      <span class="datos">nivel ${r.nivel}</span>
       <span class="pts">${r.puntos}</span>
     </div>`).join("");
 }
