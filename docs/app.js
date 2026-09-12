@@ -972,8 +972,9 @@ const plantillas = {
     </div>` : ""}
     ${(d.pagos_sin_persona || []).length ? `<div class="tarjeta">
       <h2>Pagos sin dueño <small>${d.pagos_sin_persona.length}</small></h2>
-      <p class="nota">Quedaron sin nombre en Bioma, así que no entran en ninguna
-      cuenta. Se corrigen en la app de Bioma.</p>
+      <p class="nota">Salieron como sueldo pero sin nombre, así que no entran en
+      ninguna cuenta. O le falta la persona, o no era un sueldo y va en otro
+      concepto: un honorario, por ejemplo. Se corrige en la app de Bioma.</p>
       ${d.pagos_sin_persona.map((g) => `<div class="registro">
         <div><div class="detalle">${pesos(g.monto)}</div>
           <div class="cuando">${fechaCorta(g.fecha)}${g.obs ? " · " + esc(g.obs) : ""}</div></div>
