@@ -323,7 +323,8 @@ function atender(p) {
       var quien = permiso.persona || p.persona || "";
       if (!quien) return respuesta(rechazo("No se pudo saber de quién es este teléfono."));
       try {
-        return respuesta(cuentasParaElTelefono(chacra, quien));
+        return respuesta(cuentasParaElTelefono(chacra, quien,
+                                               p.refrescar && esAdmin(p.clave)));
       } catch (err) {
         return respuesta({ ok: false, error: "No se pudieron leer las cuentas: " + err });
       }
@@ -1034,12 +1035,15 @@ function puedeVerTodasLasCuentas(chacra, persona) {
 // Se cachea unos minutos: los numeros cambian cuando se importan horas o se
 // registra un pago, no a cada rato, y asi seis telefonos abriendo la seccion no
 // son seis viajes a Bioma.
-function traerCuentasDeBioma(chacra) {
+function traerCuentasDeBioma(chacra, forzar) {
   var url = urlCuentasDe(chacra);
   if (!url) return null;
   var cache = CacheService.getScriptCache();
   var llave = "cuentas_" + chacra;
-  var guardado = cache.get(llave);
+  // Al corregir algo en Bioma se quiere ver el efecto ya, no dentro de diez
+  // minutos. Forzar es solo para la administracion: si cualquiera pudiera, seis
+  // telefonos abriendo la seccion serian seis viajes y la cache no serviria.
+  var guardado = forzar ? null : cache.get(llave);
   if (guardado) return JSON.parse(guardado);
 
   var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
@@ -1054,8 +1058,8 @@ function traerCuentasDeBioma(chacra) {
 
 // Lo que ve este telefono. Devuelve siempre la cuenta propia; las demas solo si
 // la persona esta habilitada.
-function cuentasParaElTelefono(chacra, persona) {
-  var datos = traerCuentasDeBioma(chacra);
+function cuentasParaElTelefono(chacra, persona, forzar) {
+  var datos = traerCuentasDeBioma(chacra, forzar);
   if (!datos) return { ok: false, error: "Esta chacra no tiene cuentas de sueldos." };
 
   var todo = puedeVerTodasLasCuentas(chacra, persona);
