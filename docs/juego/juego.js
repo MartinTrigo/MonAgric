@@ -1170,7 +1170,7 @@ function pintarRanking() {
   if (!hayEquipo()) {
     caja.innerHTML = `<p class="vacio">Tu récord en este teléfono:
       <b>${record}</b> puntos.<br>Para competir con el equipo, abrí el juego
-      desde MonAgric y elegí tu nombre.</p>`;
+      desde AMA y elegí tu nombre.</p>`;
     return;
   }
   if (!ranking.length) {

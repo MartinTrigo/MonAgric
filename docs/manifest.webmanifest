@@ -1,14 +1,22 @@
 {
-  "name": "MonAgric",
-  "short_name": "MonAgric",
-  "description": "Monitor agrícola: carga de horas y cosechas en campo",
+  "name": "AMA - App de Monitoreo Agrícola Agroecológico",
+  "short_name": "AMA",
+  "description": "Monitoreo agrícola agroecológico: siembras, trasplantes, cosechas y horas de trabajo",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#EEF2EC",
   "theme_color": "#5C7A5E",
   "lang": "es",
   "icons": [
-    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }

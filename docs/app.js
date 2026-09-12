@@ -1,5 +1,8 @@
 // ==========================================================
-// MonAgric Web — monitoreo agrícola desde el celular
+// AMA — App de Monitoreo Agrícola Agroecológico, desde el celular.
+// El nombre interno sigue siendo monagric: las claves de almacenamiento, la
+// direccion del repositorio y las planillas no se tocan, porque cambiarlas le
+// borraria a cada telefono su credencial y lo que tenga sin enviar.
 //
 // Los registros se guardan primero en el teléfono (funciona sin señal) y se
 // envían a la planilla de Google (Apps Script) cuando hay conexión.
@@ -19,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 17 · 12/9/2026";
+const VERSION_APP = "versión 20 · 12/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1444,7 +1447,7 @@ const plantillas = {
       <p class="nota">Con elegir tu nombre alcanza: las dos planillas ya vienen
       conectadas. Los campos de abajo son para cuando cambie algún servicio.</p>
 
-      <label>Servicio de siembras, cosechas y tareas <small>(planilla MonAgric)</small></label>
+      <label>Servicio de siembras, cosechas y tareas <small>(planilla de la chacra)</small></label>
       <input type="url" id="aj-url" value="${esc(leer(LS.scriptUrl, ""))}"
              placeholder="ya viene configurado — dejalo vacío">
 
@@ -1466,7 +1469,7 @@ const plantillas = {
     </div>` : ""}
     <div class="tarjeta">
       <h2>Acerca de</h2>
-      <p class="nota">MonAgric — monitoreo agrícola para emprendimientos agroecológicos.
+      <p class="nota"><b>AMA</b> — App de Monitoreo Agrícola Agroecológico.
       Los registros se guardan en este teléfono (funciona sin señal) y se envían a la
       planilla de la chacra cuando hay conexión.</p>
       <p class="nota" style="margin-top:8px">
