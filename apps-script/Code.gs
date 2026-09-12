@@ -1032,6 +1032,77 @@ function puedeVerTodasLasCuentas(chacra, persona) {
   return false;
 }
 
+// ---------- Resumen economico del proyecto ----------
+//
+// Mismo trato que las cuentas: bioma-db calcula, AMA muestra. Otro endpoint de
+// solo lectura, otra propiedad, y solo para las chacras que lo tengan.
+//   ECONOMIA_URLS      {"tica":"https://script.google.com/macros/s/..../exec"}
+//   ECONOMIA_VEN_TODO  {"tica":["Marto","Tomi"]}
+//
+// Si ECONOMIA_VEN_TODO no esta, vale la lista de las cuentas: quien ya ve la
+// plata de todo el equipo no descubre nada nuevo viendo el balance. Se puede
+// separar despues sin tocar codigo.
+function urlEconomiaDe(chacra) {
+  try {
+    var p = PropertiesService.getScriptProperties().getProperty("ECONOMIA_URLS");
+    if (!p) return "";
+    return JSON.parse(p)[String(chacra).toLowerCase()] || "";
+  } catch (e) { return ""; }
+}
+
+function puedeVerLaEconomia(chacra, persona) {
+  try {
+    var p = PropertiesService.getScriptProperties().getProperty("ECONOMIA_VEN_TODO");
+    if (p) {
+      var lista = JSON.parse(p)[String(chacra).toLowerCase()] || [];
+      for (var i = 0; i < lista.length; i++) {
+        if (claveNombre(lista[i]) === claveNombre(persona)) return true;
+      }
+      return false;
+    }
+  } catch (e) { /* mal escrita: se cae a la lista de las cuentas */ }
+  return puedeVerTodasLasCuentas(chacra, persona);
+}
+
+function traerEconomiaDeBioma(chacra, forzar) {
+  var url = urlEconomiaDe(chacra);
+  if (!url) return null;
+  var cache = CacheService.getScriptCache();
+  var llave = "economia_" + chacra;
+  var guardado = forzar ? null : cache.get(llave);
+  if (guardado) return JSON.parse(guardado);
+
+  var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+  var datos = JSON.parse(r.getContentText());
+  if (!datos || datos.api !== 1) {
+    throw new Error(datos && datos.error ? datos.error : "Respuesta inesperada de Bioma.");
+  }
+  cache.put(llave, JSON.stringify(datos), 600);
+  return datos;
+}
+
+// Lo que ve este telefono del estado economico. Quien no esta habilitado ve
+// como viene la liquidacion de sueldos y en que se trabajo: eso responde "el
+// proyecto esta pagando?" y "en que se nos fue la temporada?", que es lo que
+// legitimamente le importa a alguien que trabaja, sin abrir ingresos, egresos
+// ni margen.
+function economiaParaElTelefono(chacra, persona, forzar) {
+  var d = traerEconomiaDeBioma(chacra, forzar);
+  if (!d) return null;
+  var todo = puedeVerLaEconomia(chacra, persona);
+  var base = {
+    actualizado: d.actualizado, moneda: d.moneda || "ARS",
+    temporada: d.temporada || "", ve_todo: todo,
+    sueldos: d.sueldos || null, horas: d.horas || null,
+  };
+  if (!todo) return base;
+  base.resumen = d.resumen || null;
+  base.meses = d.meses || [];
+  base.ingresos_por_concepto = d.ingresosPorConcepto || [];
+  base.egresos_por_concepto = d.egresosPorConcepto || [];
+  return base;
+}
+
 // Se cachea unos minutos: los numeros cambian cuando se importan horas o se
 // registra un pago, no a cada rato, y asi seis telefonos abriendo la seccion no
 // son seis viajes a Bioma.
@@ -1079,6 +1150,12 @@ function cuentasParaElTelefono(chacra, persona, forzar) {
     // los ve quien puede ver todo. Al lado de una sola cuenta confundirian.
     totales: todo ? datos.totales : null,
     pagos_sin_persona: todo ? (datos.pagosSinPersona || []) : null,
+    // Va en el mismo viaje para no hacer dos pedidos desde un celular con mala
+    // señal, pero en su propio try: si la economia falla, las cuentas se ven.
+    economia: (function () {
+      try { return economiaParaElTelefono(chacra, persona, forzar); }
+      catch (e) { return { error: String(e) }; }
+    })(),
   };
 }
 

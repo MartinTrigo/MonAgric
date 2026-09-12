@@ -599,3 +599,16 @@ h3.sub {
   margin-top: 10px;
 }
 .barra-llena { height: 100%; background: var(--sage); }
+
+/* ---- barras de composición (áreas, conceptos) ---- */
+.linea-barra { margin-top: 12px; }
+.linea-barra:first-child { margin-top: 4px; }
+.linea-barra-tope {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: .9rem;
+}
+.linea-barra .barra { margin-top: 5px; }
+.linea-barra .cuando { margin-top: 4px; font-size: .76rem; }

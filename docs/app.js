@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 20 · 12/9/2026";
+const VERSION_APP = "versión 21 · 12/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -946,7 +946,9 @@ const plantillas = {
       ? `<p class="nota">Calculado por Bioma el ${fechaCorta(String(d.actualizado).slice(0,10))}.</p>`
       : "";
 
-    if (abierta) return `${detalleDeCuenta(abierta, d)}${aviso_}${cuando}`;
+    if (abierta) return `${detalleDeCuenta(abierta, d)}
+      ${(d.trabajadores || []).length === 1 ? tarjetasDeEconomia(d.economia) : ""}
+      ${aviso_}${cuando}`;
 
     if (!gente.length) {
       return `<div class="tarjeta"><h2>Cuentas</h2>
@@ -983,6 +985,7 @@ const plantillas = {
           <div class="cuando">${fechaCorta(g.fecha)}${g.obs ? " · " + esc(g.obs) : ""}</div></div>
       </div>`).join("")}
     </div>` : ""}
+    ${tarjetasDeEconomia(d.economia)}
     ${aviso_}${cuando}`;
   },
 
@@ -2259,6 +2262,74 @@ const pesos = (n) => {
   return "$" + Math.round(Math.abs(v)).toLocaleString("es-AR") ;
 };
 const conSigno = (n) => (Number(n) < 0 ? "-" : "") + pesos(n);
+
+// El estado economico del proyecto. Quien no esté habilitado ve solo cómo viene
+// la liquidación de sueldos y en qué se trabajó; el resto no le llega ni al
+// teléfono, porque el filtro se hace en el servicio.
+function tarjetasDeEconomia(e) {
+  if (!e || e.error) return "";
+  const barras = (lista, clave) => (lista || []).map((x) => `
+    <div class="linea-barra">
+      <div class="linea-barra-tope">
+        <span>${esc(x[clave])}</span>
+        <b>${clave === "area" ? num(x.horas, 1) + " h" : pesos(x.monto)}</b>
+      </div>
+      <div class="barra"><div class="barra-llena" style="width:${Math.min(100, Number(x.porcentaje) || 0)}%"></div></div>
+      ${(x.actividades || []).length ? `<div class="cuando">${
+        x.actividades.map((a) => `${esc(a.actividad)} ${num(a.horas, 1)} h`).join(" · ")
+      }</div>` : ""}
+    </div>`).join("");
+
+  const s = e.sueldos;
+  const liq = s && s.devengado ? (s.pagado / s.devengado) * 100 : 0;
+
+  return `
+  ${s ? `<div class="tarjeta">
+    <h2>Sueldos del proyecto</h2>
+    <div class="cifras">
+      ${cifraClara(pesos(s.devengado), "devengado")}
+      ${cifraClara(pesos(s.pagado), "pagado")}
+      ${cifraClara(pesos(s.saldo), "se debe")}
+    </div>
+    <div class="barra" style="margin-top:10px"><div class="barra-llena" style="width:${liq}%"></div></div>
+    <p class="nota">${num(liq, 1)}% de lo trabajado ya está pago.</p>
+  </div>` : ""}
+
+  ${e.horas && (e.horas.porArea || []).length ? `<div class="tarjeta">
+    <h2>En qué se trabajó <small>${num(e.horas.total, 1)} h</small></h2>
+    ${barras(e.horas.porArea, "area")}
+  </div>` : ""}
+
+  ${e.resumen ? `<div class="tarjeta">
+    <h2>Balance de la temporada <small>${esc(e.temporada || "")}</small></h2>
+    <div class="cifras">
+      ${cifraClara(pesos(e.resumen.ingresos), "ingresos")}
+      ${cifraClara(pesos(e.resumen.egresos), "egresos")}
+      ${cifraClara(conSigno(e.resumen.balance), Number(e.resumen.balance) < 0 ? "en rojo" : "balance")}
+    </div>
+    ${e.resumen.disponible === null || e.resumen.disponible === undefined ? ""
+      : `<p class="nota">Disponible hoy: <b>${pesos(e.resumen.disponible)}</b></p>`}
+  </div>` : ""}
+
+  ${(e.meses || []).length ? `<div class="tarjeta">
+    <h2>Ingresos y egresos, mes a mes</h2>
+    ${e.meses.map((m) => `<div class="registro">
+      <div><div class="detalle">${esc(m.mes)}</div>
+        <div class="cuando">${pesos(m.ingresos)} entró · ${pesos(m.egresos)} salió</div></div>
+      <div class="saldo${Number(m.balance) < 0 ? " alerta" : ""}">${conSigno(m.balance)}</div>
+    </div>`).join("")}
+  </div>` : ""}
+
+  ${(e.ingresos_por_concepto || []).length ? `<div class="tarjeta">
+    <h2>De dónde vino la plata</h2>
+    ${barras(e.ingresos_por_concepto, "concepto")}
+  </div>` : ""}
+
+  ${(e.egresos_por_concepto || []).length ? `<div class="tarjeta">
+    <h2>En qué se fue</h2>
+    ${barras(e.egresos_por_concepto, "concepto")}
+  </div>` : ""}`;
+}
 
 // La cuenta de una persona: qué ganó, qué cobró y qué le queda.
 function detalleDeCuenta(x, d) {
