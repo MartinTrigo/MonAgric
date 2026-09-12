@@ -576,3 +576,26 @@ h3.sub {
   main { max-width: 1720px; }
   #vista { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---- cuentas de sueldos ---- */
+.cuenta-fila { cursor: pointer; }
+.saldo { font-weight: 700; color: var(--sage-dark); white-space: nowrap; }
+.saldo.alerta { color: var(--peligro); }
+.saldo-grande {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--crema);
+  font-size: .95rem;
+}
+.saldo-grande b { display: block; font-size: 1.5rem; margin-top: 2px; }
+.saldo-grande.alerta b { color: var(--peligro); }
+/* Cuánto de lo ganado ya se cobró. */
+.barra {
+  height: 8px;
+  border-radius: 6px;
+  background: var(--sage-light);
+  overflow: hidden;
+  margin-top: 10px;
+}
+.barra-llena { height: 100%; background: var(--sage); }

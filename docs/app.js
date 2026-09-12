@@ -19,7 +19,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 16 · 12/9/2026";
+const VERSION_APP = "versión 17 · 12/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -58,6 +58,8 @@ const LS = {
   urlHoras: "monagric_url_horas",
   resumen: "monagric_resumen",
   nombresPlanilla: "monagric_nombres_planilla",
+  cuentas: "monagric_cuentas",
+  cuentasError: "monagric_cuentas_error",
   ultimasHoras: "monagric_ultimas_horas",
   tareas: "monagric_tareas",
   ultimos: "monagric_ultimos",
@@ -75,6 +77,8 @@ let resumen = leer(LS.resumen, null);   // totales de la chacra (desde su planil
 let CAT = null;                         // catálogo común (catalogo.json)
 let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
+// Qué cuenta de sueldos se está mirando. Vacío = la lista.
+let cuentaAbierta = "";
 let vistaTareas = "hoy";        // "hoy" o "areas"
 
 // Hasta no haber leído la configuración de la chacra en el servicio no se puede
@@ -912,6 +916,72 @@ const plantillas = {
     ${historialDe("trasplantes")}`;
   },
 
+  // Cada uno ve su cuenta; quien esté habilitado ve la de todo el equipo. Eso
+  // lo decide el servicio a partir de la credencial del teléfono, no de un
+  // nombre elegido en una lista.
+  cuentas() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
+
+    const d = leer(LS.cuentas, null);
+    const error = leer(LS.cuentasError, "");
+    if (!d) {
+      return `<div class="tarjeta">
+        <h2>Cuentas</h2>
+        <p class="nota">${error ? esc(error)
+          : "Buscando tus cuentas… Si no aparecen, revisá la señal."}</p>
+      </div>`;
+    }
+
+    const gente = d.trabajadores || [];
+    const abierta = gente.find((x) => claveArea(x.nombre) === claveArea(cuentaAbierta))
+      || (gente.length === 1 ? gente[0] : null);
+
+    const aviso_ = error ? `<p class="nota alerta">${esc(error)} Estás viendo los
+      últimos números que se pudieron bajar.</p>` : "";
+    const cuando = d.actualizado
+      ? `<p class="nota">Calculado por Bioma el ${fechaCorta(String(d.actualizado).slice(0,10))}.</p>`
+      : "";
+
+    if (abierta) return `${detalleDeCuenta(abierta, d)}${aviso_}${cuando}`;
+
+    if (!gente.length) {
+      return `<div class="tarjeta"><h2>Cuentas</h2>
+        <p class="nota">Todavía no hay cuenta a tu nombre. Aparece en cuanto se
+        carguen tus horas o un pago.</p>${aviso_}</div>`;
+    }
+
+    const orden = [...gente].sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
+    return `
+    <div class="tarjeta">
+      <h2>Cuentas del equipo <small>${orden.length}</small></h2>
+      <p class="nota">Lo que el proyecto le debe a cada une. Tocá para ver el detalle.</p>
+      ${orden.map((x) => `<div class="registro cuenta-fila" data-cuenta="${esc(x.nombre)}">
+        <div><div class="detalle">${esc(x.nombre)}</div>
+          <div class="cuando">${num(x.horas, 1)} h · ${pesos(x.devengado)} ganado</div></div>
+        <div class="saldo${(x.saldo || 0) < 0 ? " alerta" : ""}">${conSigno(x.saldo)}</div>
+      </div>`).join("")}
+    </div>
+    ${d.totales ? `<div class="tarjeta">
+      <h2>Todo el proyecto</h2>
+      <div class="cifras">
+        ${cifraClara(num(d.totales.horas, 1), "horas")}
+        ${cifraClara(pesos(d.totales.pagado), "pagado")}
+        ${cifraClara(pesos(d.totales.saldo), "se debe")}
+      </div>
+    </div>` : ""}
+    ${(d.pagos_sin_persona || []).length ? `<div class="tarjeta">
+      <h2>Pagos sin dueño <small>${d.pagos_sin_persona.length}</small></h2>
+      <p class="nota">Quedaron sin nombre en Bioma, así que no entran en ninguna
+      cuenta. Se corrigen en la app de Bioma.</p>
+      ${d.pagos_sin_persona.map((g) => `<div class="registro">
+        <div><div class="detalle">${pesos(g.monto)}</div>
+          <div class="cuando">${fechaCorta(g.fecha)}${g.obs ? " · " + esc(g.obs) : ""}</div></div>
+      </div>`).join("")}
+    </div>` : ""}
+    ${aviso_}${cuando}`;
+  },
+
   horas() {
     if (!chacraActual()) return tarjetaElegirChacra();
     if (!tieneAcceso()) return tarjetaCanje();
@@ -1641,6 +1711,7 @@ function filaRegistro(r) {
 // RENDER Y FORMULARIOS
 // ==========================================================
 function render(vista) {
+  if (vista !== "cuentas") cuentaAbierta = "";
   vistaActual = vista;
   $("#vista").innerHTML = plantillas[vista]();
   window.scrollTo(0, 0);
@@ -1650,7 +1721,7 @@ function render(vista) {
   ({ siembras: prepararSiembras, horas: prepararHoras, cosechas: prepararCosechas,
      tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes,
      configuracion: prepararConfiguracion, plan: prepararInicio,
-     trasplantes: prepararTrasplantes
+     trasplantes: prepararTrasplantes, cuentas: prepararCuentas
    }[vista] || (() => {}))();
 
   prepararComunes();
@@ -1660,6 +1731,14 @@ function render(vista) {
   // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
   // aunque la sección que se está mirando sea Trasplantes.
   if (vista === "trasplantes") traerUltimos("siembras");
+  if (vista === "cuentas") traerCuentas().then(() => {
+    if (vistaActual === "cuentas") render("cuentas");
+  });
+
+  // La pestaña de Cuentas solo existe para las chacras que tienen economía
+  // compartida. Hoy es solo Chacra Tica: las demás ni la ven.
+  const tabCuentas = document.querySelector('[data-vista="cuentas"]');
+  if (tabCuentas) tabCuentas.hidden = !hayCuentas();
 
   // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
   const activa = document.querySelector(".tabs-medio .tab.activa");
@@ -2153,6 +2232,87 @@ async function traerConfig() {
   } catch { /* sin conexión: se usa la última configuración guardada */ }
 }
 
+// ---- Cuentas de sueldos ----
+// Los números los calcula el proyecto Bioma; acá solo se piden y se dibujan.
+// El servicio decide qué puede ver este teléfono según de quién es, así que la
+// app no filtra nada: muestra lo que le llega.
+const hayCuentas = () => !!CFG?.cuentas;
+
+async function traerCuentas() {
+  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+  try {
+    const d = await (await fetch(
+      `${urlServicio()}?${conCredenciales("micuenta=1")}`)).json();
+    // Si falla, se conserva lo último bueno: una pantalla en blanco es peor
+    // que un número de ayer, sobre todo si alguien está por cobrar.
+    if (d.ok) escribir(LS.cuentas, Object.assign({}, d, { bajado_en: ahora() }));
+    else escribir(LS.cuentasError, d.error || "No se pudieron leer las cuentas.");
+  } catch { /* sin señal: queda lo guardado */ }
+}
+
+const pesos = (n) => {
+  const v = Number(n) || 0;
+  return "$" + Math.round(Math.abs(v)).toLocaleString("es-AR") ;
+};
+const conSigno = (n) => (Number(n) < 0 ? "-" : "") + pesos(n);
+
+// La cuenta de una persona: qué ganó, qué cobró y qué le queda.
+function detalleDeCuenta(x, d) {
+  const propia = claveArea(x.nombre) === claveArea(d.yo || "");
+  const liquidado = Math.max(0, Math.min(100, Number(x.liquidado) || 0));
+  const saldo = Number(x.saldo) || 0;
+
+  // horasPagadas puede venir nula: si alguien cobró antes de cargar horas, no
+  // hay tarifa con qué convertir y el contrato pide no inventar el número.
+  const enHoras = (v) => (v === null || v === undefined)
+    ? "" : ` <small>(~${num(v, 1)} h)</small>`;
+
+  return `
+  <div class="tarjeta">
+    ${d.ve_todo && (d.trabajadores || []).length > 1
+      ? `<button type="button" class="secundario" id="btn-volver-cuentas">← Todas las cuentas</button>`
+      : ""}
+    <h2>${propia ? `Tu cuenta <small>${esc(x.nombre)}</small>` : esc(x.nombre)}</h2>
+
+    <div class="cifras">
+      ${cifraClara(num(x.horas, 1), "horas")}
+      ${cifraClara(pesos(x.devengado), "ganado")}
+      ${cifraClara(pesos(x.pagado), "cobrado")}
+    </div>
+
+    <div class="saldo-grande${saldo < 0 ? " alerta" : ""}">
+      ${saldo < 0 ? "Cobraste de más" : "Te queda por cobrar"}
+      <b>${conSigno(saldo)}</b>${enHoras(saldo < 0 ? null : x.horasAdeudadas)}
+    </div>
+    <div class="barra"><div class="barra-llena" style="width:${liquidado}%"></div></div>
+    <p class="nota">${num(liquidado, 1)}% de lo ganado ya está cobrado.
+      Tarifa ${pesos(x.tarifa)} por hora.
+      ${x.ultimoPago ? `Último pago el ${fechaCorta(x.ultimoPago)}.` : "Todavía sin pagos."}</p>
+    ${saldo < 0 ? `<p class="nota">Es un adelanto: cobraste antes de trabajar
+      esas horas. Se descuenta solo a medida que las cargues.</p>` : ""}
+  </div>
+
+  <div class="tarjeta">
+    <h2>Mes a mes</h2>
+    ${(x.meses || []).length ? (x.meses || []).map((m) => `<div class="registro">
+      <div><div class="detalle">${esc(m.mes)} — ${num(m.horas, 1)} h</div>
+        <div class="cuando">${(m.areas || []).map((a) =>
+          `${esc(a.area)} ${num(a.horas, 1)} h`).join(" · ")}</div></div>
+      <div class="saldo">${pesos(m.devengado)}</div>
+    </div>`).join("") : `<p class="nota">Todavía no hay horas cargadas.</p>`}
+  </div>
+
+  <div class="tarjeta">
+    <h2>Pagos recibidos <small>${(x.pagos || []).length}</small></h2>
+    ${(x.pagos || []).length ? (x.pagos || []).map((g) => `<div class="registro">
+      <div><div class="detalle">${pesos(g.monto)}</div>
+        <div class="cuando">${fechaCorta(g.fecha)}${g.obs ? " · " + esc(g.obs) : ""}</div></div>
+    </div>`).join("") : `<p class="nota">Todavía no recibiste pagos.</p>`}
+    <p class="nota">Los pagos se registran en la app de Bioma. Si falta alguno o
+    hay un número que no cierra, avisá: se corrige allá, no acá.</p>
+  </div>`;
+}
+
 // ---- Tareas ----
 // Se juntan las que ya están en la planilla con las que se cargaron en este
 // teléfono y todavía no viajaron, y se aplican las marcas de "hecha" que están
@@ -2475,6 +2635,14 @@ function prepararTrasplantes() {
       Object.assign({}, comun, { sector: l.sector, bancal: l.bancal }), aviso_));
     render("trasplantes");
   };
+}
+
+function prepararCuentas() {
+  document.querySelectorAll("[data-cuenta]").forEach((fila) => {
+    fila.onclick = () => { cuentaAbierta = fila.dataset.cuenta; render("cuentas"); };
+  });
+  const volver = $("#btn-volver-cuentas");
+  if (volver) volver.onclick = () => { cuentaAbierta = ""; render("cuentas"); };
 }
 
 function prepararHoras() {

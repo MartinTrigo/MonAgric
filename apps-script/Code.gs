@@ -311,12 +311,31 @@ function atender(p) {
   // Todo lo que entregue datos de una chacra exige credencial de esa chacra.
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
-  if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos) {
+  if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
 
-    if (p.config) return respuesta({ ok: true, config: leerConfig(chacra) });
+    // Las cuentas de sueldos van con la persona del telefono, que sale de la
+    // credencial: nadie puede pedir la cuenta de otro escribiendo otro nombre.
+    // Con clave de admin no hay persona asociada, asi que se pide el nombre.
+    if (p.micuenta) {
+      var quien = permiso.persona || p.persona || "";
+      if (!quien) return respuesta(rechazo("No se pudo saber de quién es este teléfono."));
+      try {
+        return respuesta(cuentasParaElTelefono(chacra, quien));
+      } catch (err) {
+        return respuesta({ ok: false, error: "No se pudieron leer las cuentas: " + err });
+      }
+    }
+
+    if (p.config) {
+      var cfg = leerConfig(chacra);
+      // Le avisa a la app si esta chacra tiene cuentas de sueldos. Las que no,
+      // ni siquiera ven la seccion.
+      cfg.cuentas = !!urlCuentasDe(chacra);
+      return respuesta({ ok: true, config: cfg });
+    }
     if (p.resumen) return respuesta(calcularResumen(chacra));
     if (p.tareas) return respuesta({ ok: true, tareas: listaDeTareas(chacra) });
     if (p.ranking) return respuesta({ ok: true, ranking: rankingDelJuego(chacra) });
@@ -969,6 +988,94 @@ function espejarHorasDeTica() {
   }
   if (salida.length) hoja.getRange(2, 1, salida.length, def.encabezados.length).setValues(salida);
   return { ok: true, copiadas: salida.length };
+}
+
+// ---------- Cuentas de sueldos, leidas del proyecto Bioma ----------
+//
+// La deuda la calcula bioma-db, que es el unico lugar que tiene los dos lados:
+// las horas y los pagos. MonAgric no calcula ni guarda nada de esto: lo pide y
+// lo muestra. Llevar la cuenta en dos lados daria dos verdades sobre la misma
+// plata, que es justo lo que este arreglo viene a evitar.
+//
+// Esto es SOLO de Chacra Tica. Las demas chacras no tienen esta seccion: sus
+// horas van a su propia planilla y no hay ninguna economia compartida. Por eso
+// la direccion vive en una propiedad con el codigo de chacra adelante, y si una
+// chacra no figura ahi, para ella la seccion no existe.
+//
+// Propiedades del script (Configuracion del proyecto > Propiedades):
+//   CUENTAS_URLS      {"tica":"https://script.google.com/macros/s/..../exec"}
+//   CUENTAS_VEN_TODO  {"tica":["Marto","Tomi"]}
+//
+// La direccion NO va en el codigo: el repositorio es publico.
+function urlCuentasDe(chacra) {
+  try {
+    var p = PropertiesService.getScriptProperties().getProperty("CUENTAS_URLS");
+    if (!p) return "";
+    return JSON.parse(p)[String(chacra).toLowerCase()] || "";
+  } catch (e) { return ""; }
+}
+
+// Quienes pueden ver las cuentas de todo el equipo. El resto ve la suya y nada
+// mas. El endpoint de Bioma no puede distinguir quien pregunta, pero MonAgric
+// si: sabe de quien es cada telefono por su credencial, no por el nombre que
+// eligio en una lista. Por eso el filtro se hace aca.
+function puedeVerTodasLasCuentas(chacra, persona) {
+  try {
+    var p = PropertiesService.getScriptProperties().getProperty("CUENTAS_VEN_TODO");
+    if (!p) return false;
+    var lista = JSON.parse(p)[String(chacra).toLowerCase()] || [];
+    for (var i = 0; i < lista.length; i++) {
+      if (claveNombre(lista[i]) === claveNombre(persona)) return true;
+    }
+  } catch (e) { /* si la propiedad esta mal escrita, nadie ve de mas */ }
+  return false;
+}
+
+// Se cachea unos minutos: los numeros cambian cuando se importan horas o se
+// registra un pago, no a cada rato, y asi seis telefonos abriendo la seccion no
+// son seis viajes a Bioma.
+function traerCuentasDeBioma(chacra) {
+  var url = urlCuentasDe(chacra);
+  if (!url) return null;
+  var cache = CacheService.getScriptCache();
+  var llave = "cuentas_" + chacra;
+  var guardado = cache.get(llave);
+  if (guardado) return JSON.parse(guardado);
+
+  var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+  var datos = JSON.parse(r.getContentText());
+  // Si no viene "api", la respuesta no es del contrato que conocemos.
+  if (!datos || datos.api !== 1) {
+    throw new Error(datos && datos.error ? datos.error : "Respuesta inesperada de Bioma.");
+  }
+  cache.put(llave, JSON.stringify(datos), 600);
+  return datos;
+}
+
+// Lo que ve este telefono. Devuelve siempre la cuenta propia; las demas solo si
+// la persona esta habilitada.
+function cuentasParaElTelefono(chacra, persona) {
+  var datos = traerCuentasDeBioma(chacra);
+  if (!datos) return { ok: false, error: "Esta chacra no tiene cuentas de sueldos." };
+
+  var todo = puedeVerTodasLasCuentas(chacra, persona);
+  var mios = (datos.trabajadores || []).filter(function (t) {
+    return claveNombre(t.nombre) === claveNombre(persona);
+  });
+
+  return {
+    ok: true,
+    api: datos.api,
+    actualizado: datos.actualizado,
+    moneda: datos.moneda || "ARS",
+    yo: persona,
+    ve_todo: todo,
+    trabajadores: todo ? (datos.trabajadores || []) : mios,
+    // Los totales del proyecto y los pagos sin dueño son del colectivo: solo
+    // los ve quien puede ver todo. Al lado de una sola cuenta confundirian.
+    totales: todo ? datos.totales : null,
+    pagos_sin_persona: todo ? (datos.pagosSinPersona || []) : null,
+  };
 }
 
 // ---------- Cuenta individual de cada trabajador ----------
