@@ -27,6 +27,18 @@ TIPOS_BANDEJA = [72, 98, 128, 162]
 TIPOS_RIEGO = ["Aspersión", "Goteo", "Surco", "Superficie"]
 IMPORTANCIAS = ["Alta", "Media", "Baja"]
 
+# Cultivos que no estaban en la base vieja de Kivy y se agregaron despues.
+# Van sin perfil a proposito: los dias de almacigo, el marco y el rinde los
+# carga quien los cultiva, desde la app. Inventarlos aca seria peor que no
+# tenerlos, porque despues nadie sabria cuales son medidos y cuales supuestos.
+CULTIVOS_AGREGADOS = [
+    "Ají",          # pedido por Huerma, sept 2026
+    "Cilantro",
+    "Mizuna",
+    "Pepinillo",
+    "Pepino",
+]
+
 
 def numero(valor, defecto=0.0) -> float:
     try:
@@ -52,7 +64,7 @@ def main() -> None:
         }
 
     extra = [r["nombre"] for r in conn.execute("SELECT nombre FROM cultivos_extra")]
-    cultivos = sorted(set(perfiles) | set(extra))
+    cultivos = sorted(set(perfiles) | set(extra) | set(CULTIVOS_AGREGADOS))
 
     datos = {
         "generado": datetime.now().isoformat(timespec="seconds"),
@@ -67,7 +79,10 @@ def main() -> None:
     SALIDA.parent.mkdir(parents=True, exist_ok=True)
     SALIDA.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Catalogo comun exportado a {SALIDA}")
-    print(f"  {len(cultivos)} cultivos · {len(perfiles)} con perfil · ")
+    sin_perfil = [c for c in cultivos if c not in perfiles]
+    print(f"  {len(cultivos)} cultivos · {len(perfiles)} con perfil")
+    if sin_perfil:
+        print(f"  sin perfil todavia: {', '.join(sin_perfil)}")
 
 
 if __name__ == "__main__":

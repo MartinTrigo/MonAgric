@@ -310,7 +310,8 @@ function atender(p) {
   // Todo lo que entregue datos de una chacra exige credencial de esa chacra.
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
-  if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta) {
+  if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
+      || p.catalogo) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -327,6 +328,11 @@ function atender(p) {
       } catch (err) {
         return respuesta({ ok: false, error: "No se pudieron leer las cuentas: " + err });
       }
+    }
+
+    if (p.catalogo) {
+      return respuesta(Object.assign({ ok: true },
+        cultivosAgregados(p.refrescar && esAdmin(p.clave))));
     }
 
     if (p.config) {
@@ -377,6 +383,7 @@ function doPost(e) {
         else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
         else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
         else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
+        else if (r.tipo === "cultivo") { guardarCultivo(chacra, r); guardados++; }
       });
 
       var porTipo = {};
@@ -1219,6 +1226,98 @@ function claveNombre(n) {
   return String(n || "").trim().toLowerCase()
     .replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
     .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
+}
+
+// ---------- Catalogo de cultivos que aportan las chacras ----------
+//
+// El catalogo base (docs/catalogo.json) lo definimos nosotros y viaja con la
+// app, asi que anda sin señal. Lo que se agrega desde los telefonos vive en una
+// planilla aparte y se suma a ese base: un cultivo que carga Huerma queda
+// disponible para todas, que es el punto de que lo carguen ellos.
+//
+// Propiedad del script:  PLANILLA_CATALOGO  <id de la planilla>
+// Si no esta, todo sigue funcionando con el catalogo base y nada mas.
+var CATALOGO_ENCABEZADOS = [
+  "Cultivo", "Tipo de siembra", "Días en almácigo", "Días de trasplante a cosecha",
+  "Días a cosecha", "Días en cosecha", "Líneas por bancal", "Distancia cm",
+  "Rinde kg/m²", "Agregado por", "Chacra", "Fecha", "Observaciones"];
+
+function idCatalogo() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty("PLANILLA_CATALOGO") || "";
+  } catch (e) { return ""; }
+}
+
+function hojaCatalogo() {
+  var id = idCatalogo();
+  if (!id) return null;
+  return hojaSuelta(id, "Cultivos", CATALOGO_ENCABEZADOS);
+}
+
+// Los cultivos aportados, con su perfil. Se cachea: cambian muy de vez en
+// cuando y los piden todos los telefonos al arrancar.
+function cultivosAgregados(forzar) {
+  var cache = CacheService.getScriptCache();
+  if (!forzar) {
+    var guardado = cache.get("catalogo_aportado");
+    if (guardado) return JSON.parse(guardado);
+  }
+  var hoja = hojaCatalogo();
+  var salida = { cultivos: [], perfiles: {} };
+  if (hoja && hoja.getLastRow() > 1) {
+    var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, CATALOGO_ENCABEZADOS.length)
+                    .getValues();
+    filas.forEach(function (f) {
+      var nombre = String(f[0] || "").trim();
+      if (!nombre) return;
+      // Si el mismo cultivo se cargo dos veces, vale el ultimo: alguien lo
+      // corrigio. Se compara sin tildes para que "Ají" y "Aji" no convivan.
+      salida.perfiles[nombre] = {
+        tipo_siembra: String(f[1] || ""),
+        dias_almacigo: Number(f[2]) || 0,
+        dias_trasplante_cosecha: Number(f[3]) || 0,
+        dias_a_cosecha: Number(f[4]) || 0,
+        dias_en_cosecha: Number(f[5]) || 0,
+        lineas_bancal: Number(f[6]) || 0,
+        distancia_cm: Number(f[7]) || 0,
+        rinde_ref_kg_m2: Number(f[8]) || 0,
+        aportado_por: String(f[9] || ""),
+        chacra: String(f[10] || ""),
+      };
+    });
+    var vistos = {};
+    Object.keys(salida.perfiles).forEach(function (n) {
+      var k = claveNombre(n);
+      if (!vistos[k]) { vistos[k] = true; salida.cultivos.push(n); }
+    });
+    salida.cultivos.sort();
+  }
+  cache.put("catalogo_aportado", JSON.stringify(salida), 600);
+  return salida;
+}
+
+// Alta de un cultivo desde la app. Se rechaza el repetido antes de escribirlo:
+// dos filas del mismo cultivo con datos distintos serian dos verdades.
+function guardarCultivo(chacra, r) {
+  var hoja = hojaCatalogo();
+  if (!hoja) throw new Error("Falta la propiedad PLANILLA_CATALOGO.");
+  var d = r.datos || {};
+  var nombre = String(d.cultivo || "").trim();
+  if (!nombre) return;
+
+  if (hoja.getLastRow() > 1) {
+    var ya = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+    for (var i = 0; i < ya.length; i++) {
+      if (claveNombre(ya[i][0]) === claveNombre(nombre)) return;   // ya estaba
+    }
+  }
+  hoja.appendRow([
+    nombre, String(d.tipo_siembra || ""), d.dias_almacigo || "",
+    d.dias_trasplante_cosecha || "", d.dias_a_cosecha || "", d.dias_en_cosecha || "",
+    d.lineas_bancal || "", d.distancia_cm || "", d.rinde_ref_kg_m2 || "",
+    r.dispositivo || "", chacra, new Date(), String(d.observaciones || ""),
+  ]);
+  CacheService.getScriptCache().remove("catalogo_aportado");
 }
 
 // ---------- Diagnostico de las fechas de Registro Horas ----------

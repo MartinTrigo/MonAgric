@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 23 · 15/9/2026";
+const VERSION_APP = "versión 24 · 18/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -63,6 +63,7 @@ const LS = {
   nombresPlanilla: "monagric_nombres_planilla",
   cuentas: "monagric_cuentas",
   cuentasError: "monagric_cuentas_error",
+  catalogoExtra: "monagric_catalogo_extra",
   ultimasHoras: "monagric_ultimas_horas",
   tareas: "monagric_tareas",
   ultimos: "monagric_ultimos",
@@ -202,7 +203,30 @@ function aviso(msg, esError = false) {
 }
 
 // Del catálogo común (igual para todas las chacras)
-const perfil = (cultivo) => (CAT?.perfiles || {})[cultivo] || {};
+// Lo que aportaron las chacras se suma al catálogo base. Queda guardado para
+// que la app siga conociendo esos cultivos sin señal: el base viaja con la
+// app, pero un cultivo que cargó Huerma no.
+const catalogoExtra = () => leer(LS.catalogoExtra, { cultivos: [], perfiles: {} });
+
+const cultivosDisponibles = () => [...new Set([
+  ...(CAT?.cultivos || []), ...(catalogoExtra().cultivos || []),
+])].sort((a, b) => a.localeCompare(b, "es"));
+
+// Gana el aportado: si alguien cargó el perfil de un cultivo que estaba sin
+// datos, eso es más nuevo que el catálogo base.
+const perfil = (cultivo) => Object.assign(
+  {}, (CAT?.perfiles || {})[cultivo] || {}, (catalogoExtra().perfiles || {})[cultivo] || {});
+
+async function traerCatalogo() {
+  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+  try {
+    const d = await (await fetch(
+      `${urlServicio()}?${conCredenciales("catalogo=1")}`)).json();
+    if (d.ok && Array.isArray(d.cultivos)) {
+      escribir(LS.catalogoExtra, { cultivos: d.cultivos, perfiles: d.perfiles || {} });
+    }
+  } catch { /* sin señal: queda lo último que se bajó */ }
+}
 const actividades = () => CAT?.actividades || [];
 const tiposSiembra = () => CAT?.tipos_siembra || [];
 const tiposBandeja = () => CAT?.tipos_bandeja || [72, 128];
@@ -462,7 +486,8 @@ async function sincronizar(silencioso = true) {
     aviso("No se pudo enviar. Revisá la señal y los Ajustes.", true);
   }
 
-  await Promise.all([traerResumen(), traerDatosHoras(), traerTareas(), traerConfig()]);
+  await Promise.all([traerResumen(), traerDatosHoras(), traerTareas(),
+                     traerConfig(), traerCatalogo()]);
   refrescarEstado();
   if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) render(vistaActual);
 }
@@ -544,7 +569,7 @@ function buscador(nombre, opciones, { placeholder = "Buscá o tocá para ver la 
 
 function cultivosOrdenados() {
   const delPlan = (CFG?.plan || []).map((p) => p.cultivo);
-  const otros = (CAT?.cultivos || []).filter((c) => !delPlan.includes(c));
+  const otros = cultivosDisponibles().filter((c) => !delPlan.includes(c));
   return { lista: [...delPlan, ...otros], delPlan };
 }
 
@@ -1387,10 +1412,68 @@ const plantillas = {
                       : `<p class="nota">Todavía no planificaste ningún cultivo.</p>`}
       </div>
 
+      <details id="alta-cultivo">
+        <summary>¿No encontrás un cultivo? Agregalo</summary>
+        <p class="nota">Queda disponible para todas las chacras, no solo para la
+        tuya. Por eso conviene escribirlo como se lo conoce y cargar lo que
+        sepas: lo que dejes vacío se puede completar después.</p>
+        <form id="form-cultivo">
+          <label>Nombre del cultivo</label>
+          <input type="text" name="cultivo" maxlength="40" placeholder="Ej: Cilantro" required>
+
+          <label>¿Cómo se siembra?</label>
+          <select name="tipo_siembra">
+            ${tiposSiembra().map((s) => `<option>${esc(s)}</option>`).join("")}
+          </select>
+
+          <div class="fila">
+            <div>
+              <label>Días en almácigo</label>
+              <input type="text" name="dias_almacigo" inputmode="numeric" placeholder="Ej: 35">
+            </div>
+            <div>
+              <label>De trasplante a cosecha</label>
+              <input type="text" name="dias_trasplante_cosecha" inputmode="numeric" placeholder="Ej: 52">
+            </div>
+          </div>
+          <div class="fila">
+            <div>
+              <label>Días a cosecha <small>(desde la siembra)</small></label>
+              <input type="text" name="dias_a_cosecha" inputmode="numeric" placeholder="Ej: 87">
+            </div>
+            <div>
+              <label>Días en cosecha</label>
+              <input type="text" name="dias_en_cosecha" inputmode="numeric" placeholder="Ej: 30">
+            </div>
+          </div>
+
+          <h3 class="sub">Marco de plantación</h3>
+          <div class="fila">
+            <div>
+              <label>Líneas por bancal</label>
+              <input type="text" name="lineas_bancal" inputmode="numeric" placeholder="Ej: 3">
+            </div>
+            <div>
+              <label>Distancia (cm)</label>
+              <input type="text" name="distancia_cm" inputmode="numeric" placeholder="Ej: 40">
+            </div>
+          </div>
+
+          <label>Rinde de referencia <small>(kg por m²)</small></label>
+          <input type="text" name="rinde_ref_kg_m2" inputmode="decimal" placeholder="Ej: 5,5">
+
+          <label>Observaciones</label>
+          <input type="text" name="observaciones" maxlength="120"
+                 placeholder="Variedad, de dónde salen los datos, lo que sirva">
+
+          <button class="secundario">Agregar al catálogo</button>
+        </form>
+      </details>
+
       <form id="form-plan" class="alta">
         <div id="titulo-plan"></div>
         <label>Cultivo</label>
-        ${buscador("cultivo", (CAT?.cultivos || []), { placeholder: "Buscá el cultivo…" })}
+        ${buscador("cultivo", cultivosDisponibles(), { placeholder: "Buscá el cultivo…" })}
 
         <label>¿Cuántos bancales le vas a dar?</label>
         <input type="text" name="bancales" inputmode="decimal" placeholder="Ej: 5" required>
@@ -1479,7 +1562,7 @@ const plantillas = {
         Chacra: ${esc(chacraActual()?.nombre || "sin elegir")} ·
         ${hayConfig() ? `temporada ${esc(CFG.temporada?.nombre || "")},
           ${(CFG.plan || []).length} cultivos` : "sin configurar"} ·
-        catálogo de ${(CAT?.cultivos || []).length} cultivos.</p>
+        catálogo de ${cultivosDisponibles().length} cultivos.</p>
     </div>`;
   },
 };
@@ -2075,6 +2158,36 @@ function prepararConfiguracion() {
     if (equipo.includes(nombre)) return aviso(`${nombre} ya está en la lista.`, true);
     equipo.push(nombre);
     guardarConfig({ integrantes: equipo }, `${nombre} agregado ✓`);
+  };
+
+  // ---- un cultivo nuevo para el catálogo de todas las chacras
+  const fCult = $("#form-cultivo");
+  if (fCult) fCult.onsubmit = (e) => {
+    e.preventDefault();
+    const nombre = fCult.cultivo.value.trim();
+    if (!nombre) return aviso("Escribí el nombre del cultivo.", true);
+    // Se compara sin tildes ni mayúsculas: "Ají" y "aji" son el mismo.
+    if (cultivosDisponibles().some((c) => claveArea(c) === claveArea(nombre))) {
+      return aviso(`${nombre} ya está en el catálogo.`, true);
+    }
+    guardarRegistro("cultivo", {
+      cultivo: nombre,
+      tipo_siembra: fCult.tipo_siembra.value,
+      dias_almacigo: aNumero(fCult.dias_almacigo.value) || "",
+      dias_trasplante_cosecha: aNumero(fCult.dias_trasplante_cosecha.value) || "",
+      dias_a_cosecha: aNumero(fCult.dias_a_cosecha.value) || "",
+      dias_en_cosecha: aNumero(fCult.dias_en_cosecha.value) || "",
+      lineas_bancal: aNumero(fCult.lineas_bancal.value) || "",
+      distancia_cm: aNumero(fCult.distancia_cm.value) || "",
+      rinde_ref_kg_m2: aNumero(fCult.rinde_ref_kg_m2.value) || "",
+      observaciones: fCult.observaciones.value.trim(),
+    }, `${nombre} agregado al catálogo ✓`);
+    // Se muestra ya, sin esperar a que vuelva del servicio: quien lo carga
+    // suele querer usarlo en el mismo momento.
+    const extra = catalogoExtra();
+    extra.cultivos = [...new Set([...(extra.cultivos || []), nombre])];
+    escribir(LS.catalogoExtra, extra);
+    render("configuracion");
   };
 
   // ---- plan de cultivos
@@ -3057,6 +3170,7 @@ window.addEventListener("online", () => sincronizar());
   refrescarEstado();
   if (horasVanAparte()) await traerDatosHoras();   // nombres del equipo del proyecto
   await traerConfig();
+  await traerCatalogo();
   if (["inicio", "plan"].includes(vistaActual)) render(vistaActual);
   sincronizar();
 })();
