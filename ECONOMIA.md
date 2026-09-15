@@ -57,7 +57,9 @@ muestra el último resumen bueno con un aviso, nunca una pantalla en blanco.
   },
 
   "meses": [                         // del más nuevo al más viejo
-    { "mes": "2026-09", "ingresos": 610000, "egresos": 520000, "balance": 90000 }
+    { "mes": "2026-09", "ingresos": 610000, "egresos": 520000,
+      "balance": 90000,              // del mes
+      "acumulado": 910000 }          // arrastrado desde el inicio de la temporada
   ],
 
   "ingresosPorConcepto": [           // ordenado de mayor a menor
@@ -91,9 +93,40 @@ fueron. `porActividad` es el mismo dato aplanado, para cuando se quiere el
 ranking sin abrir áreas. Las horas de un área **siempre** son la suma de sus
 actividades: si no dieran, hay un error de este lado.
 
-El **gráfico de flujo ingresos–egresos** sale de `meses`: no hace falta un campo
-aparte. Cada elemento ya trae ingresos, egresos y balance del mes, del más nuevo
-al más viejo.
+**Sobre `meses`:** de ahí sale el flujo mes a mes completo, tabla y gráfico, sin
+ningún campo aparte. Cada elemento trae ingresos, egresos, balance del mes y
+**acumulado** de la temporada, del más nuevo al más viejo.
+
+El `acumulado` viaja calculado aunque se pudiera sumar del otro lado: si AMA lo
+arrastrara por su cuenta, habría dos acumulados de la misma plata. Ojo con una
+trampa: se arrastra **del mes más viejo al más nuevo**, pero la lista viene al
+revés. El primer elemento del arreglo es el mes actual y su `acumulado` es el
+balance de toda la temporada.
+
+**El gráfico que se quiere** (así quedó en la app de Bioma): **tres series en
+un mismo par de ejes**.
+
+- **Barras** = `balance` del mes. Verdes hacia arriba, rojas hacia abajo. Van
+  de fondo y translúcidas, para que las líneas se lean por encima.
+- **Línea verde** = `ingresos` mes a mes.
+- **Línea marrón** = `egresos` mes a mes.
+
+No son dos columnas de ingresos y egresos: la barra es la **diferencia**. Lo
+que se busca ver de un vistazo es en qué meses el proyecto ganó y en cuáles
+perdió, y además de dónde salió ese saldo — un mes puede cerrar en cero
+moviendo mucho o moviendo nada, y no es lo mismo.
+
+**Comparten un solo eje a propósito.** Como el saldo es la resta, la distancia
+vertical entre las dos líneas *es* la altura de la barra: las dos cosas cuentan
+lo mismo y se refuerzan. Donde la línea verde cruza por debajo de la marrón, la
+barra se pone roja sola. El precio es que en meses de mucho movimiento y poco
+saldo la barra queda chica, pero eso es exactamente el dato.
+
+La receta está en `graficoFlujo()` de `js/resumen.js` y en las clases `.fg-*`
+de `styles.css`: SVG escrito a mano, sin librerías, unas treinta líneas. El eje
+llega hasta el mayor de los tres valores y baja hasta el saldo más negativo, si
+hay alguno. Ancho fijo por mes con scroll horizontal, para que una temporada
+entera no apriete las barras hasta volverlas indistinguibles.
 
 ### Lo que hace que esto sea usable
 

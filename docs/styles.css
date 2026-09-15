@@ -622,3 +622,32 @@ h3.sub {
 }
 .linea-barra .barra { margin-top: 5px; }
 .linea-barra .cuando { margin-top: 4px; font-size: .76rem; }
+
+/* ---- Flujo de fondos mes a mes ----
+   Tres series en el mismo par de ejes: barras con el saldo, y dos líneas con
+   lo que entró y lo que salió. Las barras van de fondo y translúcidas; las
+   líneas, sólidas encima. Ver graficoDelFlujo() en app.js. */
+.gf-scroll { overflow-x: auto; padding-bottom: 2px; margin-bottom: 10px; }
+.gf-scroll svg { display: block; min-width: 100%; }
+
+.gf-barra { fill: var(--sage); opacity: .38; }
+.gf-barra.neg { fill: var(--peligro); opacity: .38; }
+.gf-cero { stroke: var(--tenue); stroke-width: 1; }
+
+.gf-linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.gf-linea.in { stroke: var(--sage-dark); }
+.gf-linea.out { stroke: var(--amber); }
+.gf-punto.in { fill: var(--sage-dark); }
+.gf-punto.out { fill: var(--amber); }
+.gf-lbl { font-size: 9px; fill: var(--tenue); }
+
+.gf-leyenda {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: .72rem; color: var(--tenue); margin: 4px 0 6px;
+}
+.gf-leyenda span { display: inline-flex; align-items: center; gap: 4px; }
+.gf-leyenda i { display: inline-block; }
+.gf-leyenda .gf-m-barra { width: 9px; height: 9px; border-radius: 2px;
+  background: var(--sage); opacity: .38; }
+.gf-leyenda .gf-m-in { width: 13px; height: 2px; background: var(--sage-dark); }
+.gf-leyenda .gf-m-out { width: 13px; height: 2px; background: var(--amber); }

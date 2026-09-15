@@ -2284,6 +2284,73 @@ const pesos = (n) => {
 };
 const conSigno = (n) => (Number(n) < 0 ? "-" : "") + pesos(n);
 
+/* El flujo mes a mes, en tres series sobre el mismo par de ejes.
+
+   - Barras: el saldo del mes. Verdes hacia arriba, rojas hacia abajo. Van de
+     fondo y translúcidas para que las líneas se lean por encima.
+   - Línea verde: lo que entró. Línea ámbar: lo que salió.
+
+   Comparten un solo eje a propósito. Como el saldo es la resta, la distancia
+   vertical entre las dos líneas es la altura de la barra: las dos cosas
+   cuentan lo mismo y se refuerzan, y donde la línea verde cruza por debajo de
+   la ámbar la barra se pone roja sola.
+
+   Los números vienen calculados de Bioma; acá solo se dibujan. SVG a mano,
+   sin librerías, igual que el resto de la app.
+
+   La lista llega del mes más nuevo al más viejo: se da vuelta para dibujar,
+   porque el tiempo en un gráfico va hacia la derecha. */
+function graficoDelFlujo(meses) {
+  const lista = (meses || []).slice().reverse();
+  if (lista.length < 2) return "";   // con un solo mes no hay nada que comparar
+
+  const ANCHO_MES = 46, ALTO = 150, ARRIBA = 12, ABAJO = 20;
+  const util = ALTO - ARRIBA - ABAJO;
+  const ancho = lista.length * ANCHO_MES;
+  const v = (m, k) => Number(m[k]) || 0;
+
+  const techo = Math.max(...lista.map((m) =>
+    Math.max(v(m, "ingresos"), v(m, "egresos"), v(m, "balance"))), 1);
+  const piso = Math.min(0, ...lista.map((m) => v(m, "balance")));
+  const y = (n) => ARRIBA + ((techo - n) / ((techo - piso) || 1)) * util;
+  const x = (i) => i * ANCHO_MES + ANCHO_MES / 2;
+  const cero = y(0);
+
+  const barras = lista.map((m, i) => {
+    const b = v(m, "balance"), pos = b >= 0;
+    return `<g><title>${esc(m.mes)}
+${pesos(v(m, "ingresos"))} entró · ${pesos(v(m, "egresos"))} salió
+saldo ${conSigno(b)}</title>
+      <rect class="gf-barra${pos ? "" : " neg"}" x="${x(i) - 11}"
+        y="${(pos ? y(b) : cero).toFixed(1)}" width="22"
+        height="${Math.max(Math.abs(cero - y(b)), 1).toFixed(1)}" rx="2"/></g>`;
+  }).join("");
+
+  const serie = (clave, clase) =>
+    `<polyline class="gf-linea ${clase}" points="${
+      lista.map((m, i) => `${x(i)},${y(v(m, clave)).toFixed(1)}`).join(" ")}"/>` +
+    lista.map((m, i) => `<circle class="gf-punto ${clase}" cx="${x(i)}"
+      cy="${y(v(m, clave)).toFixed(1)}" r="2.5"/>`).join("");
+
+  return `
+  <div class="gf-leyenda">
+    <span><i class="gf-m-barra"></i> saldo del mes</span>
+    <span><i class="gf-m-in"></i> entró</span>
+    <span><i class="gf-m-out"></i> salió</span>
+  </div>
+  <div class="gf-scroll">
+    <svg viewBox="0 0 ${ancho} ${ALTO}" width="${ancho}" height="${ALTO}"
+         role="img" aria-label="Flujo de fondos mes a mes">
+      <line class="gf-cero" x1="0" y1="${cero.toFixed(1)}" x2="${ancho}" y2="${cero.toFixed(1)}"/>
+      ${barras}
+      ${serie("egresos", "out")}
+      ${serie("ingresos", "in")}
+      ${lista.map((m, i) => `<text class="gf-lbl" x="${x(i)}" y="${ALTO - 6}"
+        text-anchor="middle">${esc(String(m.mes).slice(5))}/${esc(String(m.mes).slice(2, 4))}</text>`).join("")}
+    </svg>
+  </div>`;
+}
+
 // El estado economico del proyecto. Quien no esté habilitado ve solo cómo viene
 // la liquidación de sueldos y en qué se trabajó; el resto no le llega ni al
 // teléfono, porque el filtro se hace en el servicio.
@@ -2334,9 +2401,12 @@ function tarjetasDeEconomia(e) {
 
   ${(e.meses || []).length ? `<div class="tarjeta">
     <h2>Ingresos y egresos, mes a mes</h2>
+    ${graficoDelFlujo(e.meses)}
     ${e.meses.map((m) => `<div class="registro">
       <div><div class="detalle">${esc(m.mes)}</div>
-        <div class="cuando">${pesos(m.ingresos)} entró · ${pesos(m.egresos)} salió</div></div>
+        <div class="cuando">${pesos(m.ingresos)} entró · ${pesos(m.egresos)} salió${
+          m.acumulado === undefined || m.acumulado === null ? ""
+            : ` · acumulado ${conSigno(m.acumulado)}`}</div></div>
       <div class="saldo${Number(m.balance) < 0 ? " alerta" : ""}">${conSigno(m.balance)}</div>
     </div>`).join("")}
   </div>` : ""}
