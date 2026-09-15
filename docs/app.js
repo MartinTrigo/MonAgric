@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 22 · 15/9/2026";
+const VERSION_APP = "versión 23 · 15/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2351,6 +2351,31 @@ saldo ${conSigno(b)}</title>
   </div>`;
 }
 
+// En qué etapa del ciclo estamos. Sin esto, un balance de septiembre se lee
+// como una alarma: los ingresos por venta recién llegan en noviembre, mientras
+// que las horas y los insumos se gastan desde julio. La plata que entra antes
+// suele ser préstamos, y eso es parte del plan, no un problema.
+const ETAPAS = [
+  [7, "julio: se planifica la temporada. Todavía no hay nada para vender, así que lo que entra suele ser préstamos para semillas, fertilizantes y horas."],
+  [8, "agosto: primeras siembras. Se gasta en insumos y horas; las ventas todavía no empiezan."],
+  [9, "septiembre: almácigos y primeros trasplantes. El balance negativo en esta etapa es lo esperable."],
+  [10, "octubre: trasplantes. Sigue siendo mes de gasto más que de ingreso."],
+  [11, "noviembre: primeras cosechas, empiezan a entrar las ventas."],
+  [12, "diciembre: cosecha y venta en marcha."],
+  [1, "enero: plena cosecha, el mes fuerte de ingresos."],
+  [2, "febrero: plena cosecha."],
+  [3, "marzo: cosecha y venta."],
+  [4, "abril: últimas cosechas de la temporada."],
+  [5, "mayo: cierre de la temporada de venta."],
+  [6, "junio: receso de invierno."],
+];
+
+function etapaDeLaTemporada() {
+  const mes = new Date().getMonth() + 1;
+  const e = ETAPAS.find(([m]) => m === mes);
+  return e ? e[1] : "";
+}
+
 // El estado economico del proyecto. Quien no esté habilitado ve solo cómo viene
 // la liquidación de sueldos y en qué se trabajó; el resto no le llega ni al
 // teléfono, porque el filtro se hace en el servicio.
@@ -2397,6 +2422,7 @@ function tarjetasDeEconomia(e) {
     </div>
     ${e.resumen.disponible === null || e.resumen.disponible === undefined ? ""
       : `<p class="nota">Disponible hoy: <b>${pesos(e.resumen.disponible)}</b></p>`}
+    <p class="nota">${etapaDeLaTemporada()}</p>
   </div>` : ""}
 
   ${(e.meses || []).length ? `<div class="tarjeta">

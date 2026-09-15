@@ -651,3 +651,15 @@ h3.sub {
   background: var(--sage); opacity: .38; }
 .gf-leyenda .gf-m-in { width: 13px; height: 2px; background: var(--sage-dark); }
 .gf-leyenda .gf-m-out { width: 13px; height: 2px; background: var(--amber); }
+
+/* El nombre largo al lado de la sigla, mas chico. En pantallas angostas se
+   esconde: la barra ya lleva el estado de sincronizacion debajo y no entra. */
+.topbar h1 small {
+  font-weight: 400;
+  font-size: .62rem;
+  opacity: .85;
+  margin-left: 5px;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+@media (max-width: 359px) { .topbar h1 small { display: none; } }
