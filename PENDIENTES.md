@@ -8,6 +8,35 @@ que falta hacer.
 
 ## Lo próximo, en orden
 
+### 0. Importar el catálogo de cultivos desde la planilla de planificación
+
+La hoja **"información de cultivos"** de
+`1pJgIx7oG0qqSluiCpF8-zeS0Ni_gSwNrGGBz1d6juLk` tiene 30 cultivos con datos más
+finos que los del catálogo de AMA. Dos diferencias que valen el trabajo:
+
+- **Los días de almácigo son dos, no uno**: máximo en otoño-invierno y mínimo
+  en primavera-verano. Las diferencias llegan a 20 días (Albahaca 50/30, Apio
+  60/45, Lechuga 45/30). AMA usa el promedio, y eso explica que el Coliflor
+  sembrado el 20/07 tardara 48 días reales contra los 35 que estimaba.
+- **Días en cosecha**, también con máximo y mínimo. AMA no lo tiene.
+
+**Decidido sobre los nombres** (los mismos cultivos escritos distinto en cada
+lado; hay que elegir uno porque queda escrito en los datos de las cinco
+chacras): **Choclo** y **Pimiento**, no "Choclos" ni "Morron".
+
+**Falta decidir**, mismo criterio:
+- ¿`Repollo` o `Repollo bco`?
+- ¿`Hakurei` o `Nabo Hakurei`?
+- `Verdeo` — ¿es lo mismo que algo que ya está, o un cultivo nuevo?
+
+**Falta también** el id de la planilla de catálogo (una planilla vacía nueva;
+la hoja se arma sola) para cargarlo en la propiedad `PLANILLA_CATALOGO` del
+script. Sin eso, los cultivos que agreguen las chacras no tienen dónde
+guardarse: el alta ya está en la app pero el servicio los rechaza.
+
+*La hoja NO resuelve los cinco que pidió Huerma —cilantro, pepino, pepinillo,
+ají y mizuna—: no están ahí. Esos los carga quien los cultiva.*
+
 ### 1. Migrar la app de economía — domingo 20/9, con los dos teléfonos
 
 Decidido: el repositorio pasa a llamarse **`ama-economia`** y se suma
