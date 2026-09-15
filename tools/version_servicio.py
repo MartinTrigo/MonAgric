@@ -32,7 +32,9 @@ def main() -> None:
     clave = CLAVE_PATH.read_text(encoding="utf-8").strip()
 
     def pedir(que: str) -> dict:
-        direccion = f"{url}?{que}=1&chacra=tica&clave={parse.quote(clave)}"
+        # "que" puede ser un campo suelto ("resumen") o una consulta entera
+        cola = que if "=" in que else f"{que}=1&chacra=tica"
+        direccion = f"{url}?{cola}&clave={parse.quote(clave)}"
         try:
             with request.urlopen(direccion, timeout=180) as r:
                 return json.loads(r.read().decode("utf-8"))
@@ -55,6 +57,22 @@ def main() -> None:
             viejas.append(que_es)
         else:
             print(f"  [?]        {que_es}: no encontre ni '{nuevo}' ni '{viejo}'")
+
+    # La economia no se detecta por un nombre de campo sino por si la clave
+    # llega o no: si el codigo desplegado es anterior, ni aparece.
+    print()
+    mc = pedir("micuenta=1&chacra=tica&persona=Marto")
+    if "economia" not in mc:
+        print("  [ANTERIOR] el resumen economico (la clave ni llega)")
+        viejas.append("el resumen economico")
+    elif mc["economia"] is None:
+        print("  [al dia]   el codigo del resumen economico")
+        print("             pero falta la propiedad ECONOMIA_URLS, o esta mal escrita")
+    elif mc["economia"].get("error"):
+        print("  [al dia]   el codigo del resumen economico")
+        print("             pero Bioma respondio: " + str(mc["economia"]["error"])[:90])
+    else:
+        print("  [al dia]   el resumen economico, y Bioma responde bien")
 
     if viejas:
         print("\nEl servicio esta corriendo codigo anterior.\n")
