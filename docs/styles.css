@@ -96,9 +96,19 @@ main {
 .temporada-cab h2 { color: #fff; }
 .temporada-cab .chacra { font-size: .86rem; opacity: .9; }
 .temporada-cab .rango { font-size: .8rem; opacity: .82; margin-top: 2px; }
-.cifras { display: flex; gap: 10px; margin-top: 13px; }
-.cifra { flex: 1; background: rgba(255,255,255,.14); border-radius: 11px; padding: 9px 10px; }
-.cifra b { display: block; font-size: 1.22rem; line-height: 1.2; }
+/* Columnas de igual ancho que bajan de renglon cuando no entran. Antes era una
+   fila flexible: con montos de siete digitos las tres celdas pedian 360px en
+   316 disponibles, y cada una terminaba con un ancho distinto, asi que las
+   cifras de una tarjeta no se alineaban con las de la de al lado. */
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 10px;
+  margin-top: 13px;
+}
+.cifra { background: rgba(255,255,255,.14); border-radius: 11px; padding: 9px 10px; min-width: 0; }
+/* Un monto largo baja el cuerpo antes que desbordar la celda. */
+.cifra b { display: block; font-size: 1.22rem; line-height: 1.2; overflow-wrap: anywhere; }
 .cifra span { font-size: .7rem; opacity: .88; }
 
 /* ---- formularios ---- */

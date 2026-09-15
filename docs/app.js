@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 21 · 12/9/2026";
+const VERSION_APP = "versión 22 · 15/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1717,11 +1717,14 @@ function filaRegistro(r) {
 // ==========================================================
 // RENDER Y FORMULARIOS
 // ==========================================================
-function render(vista) {
+function render(vista, conservarScroll = false) {
   if (vista !== "cuentas") cuentaAbierta = "";
   vistaActual = vista;
+  const scroll = window.scrollY;
   $("#vista").innerHTML = plantillas[vista]();
-  window.scrollTo(0, 0);
+  // Al cambiar de sección se arranca de arriba; al redibujar la misma porque
+  // llegaron datos, se deja donde estaba.
+  window.scrollTo(0, conservarScroll ? scroll : 0);
   document.querySelectorAll(".tab").forEach((t) =>
     t.classList.toggle("activa", t.dataset.vista === vista));
 
@@ -1738,8 +1741,10 @@ function render(vista) {
   // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
   // aunque la sección que se está mirando sea Trasplantes.
   if (vista === "trasplantes") traerUltimos("siembras");
-  if (vista === "cuentas") traerCuentas().then(() => {
-    if (vistaActual === "cuentas") render("cuentas");
+  // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
+  // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
+  if (vista === "cuentas") traerCuentas().then((cambio) => {
+    if (cambio && vistaActual === "cuentas") render("cuentas", true);
   });
 
   // La pestaña de Cuentas solo existe para las chacras que tienen economía
@@ -2245,16 +2250,32 @@ async function traerConfig() {
 // app no filtra nada: muestra lo que le llega.
 const hayCuentas = () => !!CFG?.cuentas;
 
-async function traerCuentas() {
-  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+// Devuelve true solo si llegaron datos DISTINTOS de los que ya estaban. Quien
+// llama usa eso para decidir si vale la pena redibujar: redibujar por gusto
+// manda la pantalla arriba y, si encima vuelve a pedir, queda en un lazo.
+let ultimoPedidoCuentas = 0;
+async function traerCuentas(forzar = false) {
+  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return false;
+  if (!forzar && Date.now() - ultimoPedidoCuentas < 20000) return false;
+  ultimoPedidoCuentas = Date.now();
   try {
     const d = await (await fetch(
       `${urlServicio()}?${conCredenciales("micuenta=1")}`)).json();
-    // Si falla, se conserva lo último bueno: una pantalla en blanco es peor
+    if (!d.ok) {
+      escribir(LS.cuentasError, d.error || "No se pudieron leer las cuentas.");
+      return true;
+    }
+    escribir(LS.cuentasError, "");
+    // Se compara sin la marca de bajada, que cambia siempre y haria parecer
+    // que hay novedades en cada pedido.
+    const antes = JSON.stringify(leer(LS.cuentas, null));
+    escribir(LS.cuentas, d);
+    return JSON.stringify(d) !== antes;
+  } catch {
+    // Sin señal se conserva lo último bueno: una pantalla en blanco es peor
     // que un número de ayer, sobre todo si alguien está por cobrar.
-    if (d.ok) escribir(LS.cuentas, Object.assign({}, d, { bajado_en: ahora() }));
-    else escribir(LS.cuentasError, d.error || "No se pudieron leer las cuentas.");
-  } catch { /* sin señal: queda lo guardado */ }
+    return false;
+  }
 }
 
 const pesos = (n) => {
