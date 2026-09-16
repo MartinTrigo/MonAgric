@@ -8,7 +8,39 @@ que falta hacer.
 
 ## Lo próximo, en orden
 
-### 0. Importar el catálogo de cultivos desde la planilla de planificación
+### 0. Tres agujeros del alta de personas — salieron del caso de Mili
+
+Mili cargó 7 horas el 15/09 y le calcularon $10.000 la hora en vez de $7.500.
+No fue un error de cálculo: **nadie le había asignado tarifa**, y bioma-db usa
+`TARIFA_POR_DEFECTO = 10000` para quien no figura.
+
+**Lo que hay que arreglar a mano, ya:** agregar a Mili en la hoja `Config` de
+`Registro_Horas_Proyecto_Bioma_T26-27` (la que dice "Configuración —
+Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
+
+**Y lo que hay que arreglar en el código, para que no vuelva a pasar:**
+
+1. **Avisar cuando alguien carga horas sin tarifa.** Hoy dar de alta a una
+   persona son tres lugares sin relación entre sí: el código de invitación en
+   la planilla de accesos, el nombre en la configuración de la chacra (que es
+   lo que llena el desplegable "¿Quién trabajó?") y la tarifa en la hoja
+   `Config` de la planilla de horas. Si falta el tercero, la persona trabaja y
+   cobra mal sin que nada avise. En verano entran cinco personas.
+
+2. **La planilla de horas no guarda quién cargó cada fila.** Escribe
+   `marca · fecha · trabajador · horas · actividad · observaciones · área` y
+   nada más. Siembras, cosechas y tareas sí guardan "Cargado por"; las horas de
+   Tica viajan por el camino viejo de Bioma, que nunca lo tuvo. Para un
+   registro del que sale la liquidación de sueldos, no poder saber quién lo
+   cargó es un agujero. La app ya sabe de qué teléfono es: hay que mandarlo y
+   agregar la columna en `Codigo-horas-bioma.gs`.
+
+3. **Ojo al borrar las hojas "Cuenta individual"**: además de las cuentas, son
+   la fuente de respaldo de tarifas si alguien no está en `Config`. Hoy están
+   todos en `Config`, así que borrarlas no cambia ninguna tarifa — pero
+   conviene confirmarlo antes, que es justo el agujero por el que se coló Mili.
+
+### 1. Importar el catálogo de cultivos desde la planilla de planificación
 
 La hoja **"información de cultivos"** de
 `1pJgIx7oG0qqSluiCpF8-zeS0Ni_gSwNrGGBz1d6juLk` tiene 30 cultivos con datos más
@@ -37,7 +69,7 @@ guardarse: el alta ya está en la app pero el servicio los rechaza.
 *La hoja NO resuelve los cinco que pidió Huerma —cilantro, pepino, pepinillo,
 ají y mizuna—: no están ahí. Esos los carga quien los cultiva.*
 
-### 1. Migrar la app de economía — domingo 20/9, con los dos teléfonos
+### 2. Migrar la app de economía — domingo 20/9, con los dos teléfonos
 
 Decidido: el repositorio pasa a llamarse **`ama-economia`** y se suma
 **credencial por dispositivo**, como en AMA. Hay que hacerlo con los dos
@@ -72,19 +104,19 @@ ventana en la que algo pueda dejar de andar:
 Conviene dejar unas semanas entre el renombre y el acceso: son dos cambios
 grandes y mezclarlos hace imposible saber cuál rompió qué.
 
-### 2. Jubilar "Registro de pagos realizados" — de Martín
+### 3. Jubilar "Registro de pagos realizados" — de Martín
 En la planilla de horas. Ya está destrabado: la pantalla de AMA funciona, así
 que la contabilidad de sueldos vive solo en bioma-db. Es el punto 4 de la
 Fase 4.8 de bioma-mov.
 
-### 3. Dos cosas de los datos, no del código — de Martín
+### 4. Dos cosas de los datos, no del código — de Martín
 - **El 91,4% de los ingresos de la temporada son préstamos** ($7.070.000 de
   $7.733.211). Coherente con septiembre, pero es lo primero que van a ver los
   socios al abrir la pantalla. Vale una frase de contexto si sorprende.
 - **"Planificación" en Hortícola son 100 h**, la actividad más grande de la
   temporada, un cuarto del total. Cuadra con julio; conviene confirmarlo.
 
-### 4. Qué hojas de la planilla de horas se pueden borrar
+### 5. Qué hojas de la planilla de horas se pueden borrar
 Lo que AMA necesita sí o sí: **`Respuestas de formulario 1`** y **`Config`**.
 Sin uso y se pueden borrar: las 12 pestañas "Cuenta individual", "Resumen
 general de horas y pagos" y "Gestión de pagos". AMA ya **no lee** `Registro Horas` ni `Pagos`: se apagó el espejo de las
