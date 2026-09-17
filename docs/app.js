@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 24 · 18/9/2026";
+const VERSION_APP = "versión 25 · 17/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -30,6 +30,7 @@ const CHACRAS = [
   { codigo: "focoverde", nombre: "Foco Verde" },
   { codigo: "huerma", nombre: "Huerma" },
   { codigo: "huertota", nombre: "La Huertota" },
+  { codigo: "tierralinda", nombre: "Tierra Linda" },
 ];
 
 // Los tipos que nacen en bandeja: el formulario pide bandejas en vez de bancal.
