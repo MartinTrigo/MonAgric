@@ -1317,22 +1317,49 @@ function guardarCultivo(chacra, r) {
   var nombre = String(d.cultivo || "").trim();
   if (!nombre) return;
 
+  // Si el cultivo ya esta, se completa en su lugar en vez de agregar otra fila,
+  // pero SOLO si estaba sin datos. Los cinco que entraron con el catalogo base
+  // (cilantro, pepino, pepinillo, aji, mizuna) existen sin un solo numero, y
+  // quien los cultiva tiene que poder llenarlos desde el telefono.
+  //
+  // Un cultivo con datos NO se sobreescribe: dos chacras discutiendo el marco
+  // de plantacion desde sus celulares, sin que nadie vea el cambio, es peor que
+  // no poder corregirlo. Esas correcciones van a mano en la planilla.
+  var filaExistente = 0;
   if (hoja.getLastRow() > 1) {
-    var ya = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+    var ya = hoja.getRange(2, 1, hoja.getLastRow() - 1, CATALOGO_ENCABEZADOS.length)
+                 .getValues();
     for (var i = 0; i < ya.length; i++) {
-      if (claveNombre(ya[i][0]) === claveNombre(nombre)) return;   // ya estaba
+      if (claveNombre(ya[i][0]) !== claveNombre(nombre)) continue;
+      // Columnas 5 a 9: dias a cosecha, dias en cosecha, lineas, distancia, rinde
+      var tieneDatos = false;
+      for (var c = 4; c <= 8; c++) if (Number(ya[i][c]) > 0) tieneDatos = true;
+      if (tieneDatos) return;            // completo: no se toca
+      filaExistente = i + 2;
+      // Se conserva como estaba escrito en el catalogo. Si alguien tipea
+      // "cilantro" para completarlo, no tiene por que renombrarlo en minuscula
+      // para las seis chacras.
+      nombre = String(ya[i][0]).trim();
+      break;
     }
   }
-  // El origen permite marcar de donde salio: una chacra, o el catalogo base
-  // que venia de la app vieja. Sin eso, los 38 originales figurarian como
-  // aportados por Chacra Tica, que no es lo que paso.
-  hoja.appendRow([
+
+  var fila = [
     nombre, String(d.tipo_siembra || ""), d.dias_almacigo || "",
     d.dias_trasplante_cosecha || "", d.dias_a_cosecha || "", d.dias_en_cosecha || "",
     d.lineas_bancal || "", d.distancia_cm || "", d.rinde_ref_kg_m2 || "",
     r.dispositivo || "", String(d.origen || chacra), new Date(),
     String(d.observaciones || ""),
-  ]);
+  ];
+  if (filaExistente) {
+    hoja.getRange(filaExistente, 1, 1, CATALOGO_ENCABEZADOS.length).setValues([fila]);
+    CacheService.getScriptCache().remove("catalogo_aportado");
+    return;
+  }
+  // El origen marca de donde salio: una chacra, o el catalogo base que venia de
+  // la app vieja. Sin eso, los 38 originales figurarian como aportados por
+  // Chacra Tica, que no es lo que paso.
+  hoja.appendRow(fila);
   CacheService.getScriptCache().remove("catalogo_aportado");
 }
 

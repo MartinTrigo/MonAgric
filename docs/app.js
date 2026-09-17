@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 27 · 17/9/2026";
+const VERSION_APP = "versión 28 · 17/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -209,9 +209,28 @@ function aviso(msg, esError = false) {
 // app, pero un cultivo que cargó Huerma no.
 const catalogoExtra = () => leer(LS.catalogoExtra, { cultivos: [], perfiles: {} });
 
-const cultivosDisponibles = () => [...new Set([
-  ...(CAT?.cultivos || []), ...(catalogoExtra().cultivos || []),
-])].sort((a, b) => a.localeCompare(b, "es"));
+// Cultivos que existen pero sin un solo dato agronómico. Vinieron así del
+// catálogo viejo y quien los cultiva puede completarlos desde el teléfono.
+const cultivoSinDatos = (nombre) => {
+  const p = perfil(nombre);
+  if (!Object.keys(p).length) return true;
+  return !["dias_a_cosecha", "lineas_bancal", "distancia_cm", "rinde_ref_kg_m2"]
+    .some((k) => Number(p[k]) > 0);
+};
+const cultivosPorCompletar = () => cultivosDisponibles().filter(cultivoSinDatos);
+
+// Se juntan el catálogo base y lo aportado, descartando las formas repetidas
+// del mismo nombre: gana la primera que aparece, que es la del catálogo base.
+// Sin esto, alguien que completa "cilantro" en minúscula deja dos entradas en
+// el desplegable y nadie sabe cuál elegir.
+const cultivosDisponibles = () => {
+  const vistos = new Map();
+  [...(CAT?.cultivos || []), ...(catalogoExtra().cultivos || [])].forEach((c) => {
+    const k = claveArea(c);
+    if (k && !vistos.has(k)) vistos.set(k, c);
+  });
+  return [...vistos.values()].sort((a, b) => a.localeCompare(b, "es"));
+};
 
 // Gana el aportado: si alguien cargó el perfil de un cultivo que estaba sin
 // datos, eso es más nuevo que el catálogo base.
@@ -1425,10 +1444,13 @@ const plantillas = {
       </div>
 
       <details id="alta-cultivo">
-        <summary>¿No encontrás un cultivo? Agregalo</summary>
+        <summary>Agregar o completar un cultivo</summary>
         <p class="nota">Queda disponible para todas las chacras, no solo para la
-        tuya. Por eso conviene escribirlo como se lo conoce y cargar lo que
-        sepas: lo que dejes vacío se puede completar después.</p>
+        tuya. Por eso conviene escribirlo como se lo conoce, y hay que cargar
+        todos los datos: un cultivo a medias no le sirve a nadie.</p>
+        ${cultivosPorCompletar().length ? `<p class="nota">Estos están en el
+        catálogo pero sin datos. Si cultivás alguno, escribí su nombre acá y
+        completalo: <b>${cultivosPorCompletar().map(esc).join(", ")}</b>.</p>` : ""}
         <form id="form-cultivo">
           <label>Nombre del cultivo</label>
           <input type="text" name="cultivo" maxlength="40" placeholder="Ej: Cilantro" required>
@@ -2220,9 +2242,13 @@ function prepararConfiguracion() {
     e.preventDefault();
     const nombre = fCult.cultivo.value.trim();
     if (!nombre) return aviso("Escribí el nombre del cultivo.", true);
-    // Se compara sin tildes ni mayúsculas: "Ají" y "aji" son el mismo.
-    if (cultivosDisponibles().some((c) => claveArea(c) === claveArea(nombre))) {
-      return aviso(`${nombre} ya está en el catálogo.`, true);
+    // Se compara sin tildes ni mayúsculas: "Ají" y "aji" son el mismo. Un
+    // cultivo que ya tiene datos no se puede pisar desde el teléfono; uno que
+    // está sin datos sí se completa, que es el caso de los cinco que vinieron
+    // del catálogo viejo.
+    const yaEsta = cultivosDisponibles().find((c) => claveArea(c) === claveArea(nombre));
+    if (yaEsta && !cultivoSinDatos(yaEsta)) {
+      return aviso(`${yaEsta} ya está cargado con sus datos.`, true);
     }
     // Todo lo que se pregunta es obligatorio: un cultivo a medio cargar en el
     // catálogo de seis chacras sirve menos que no tenerlo, porque nadie sabe
@@ -2253,7 +2279,7 @@ function prepararConfiguracion() {
         : aNumero(fCult.dias_a_cosecha.value) || 0;
 
     guardarRegistro("cultivo", {
-      cultivo: nombre,
+      cultivo: yaEsta || nombre,
       tipo_siembra: fCult.tipo_siembra.value,
       dias_almacigo: alm ? aNumero(fCult.dias_almacigo.value) : "",
       dias_trasplante_cosecha: (alm || yaPlantado())
@@ -2264,11 +2290,11 @@ function prepararConfiguracion() {
       distancia_cm: aNumero(fCult.distancia_cm.value),
       rinde_ref_kg_m2: aNumero(fCult.rinde_ref_kg_m2.value),
       observaciones: fCult.observaciones.value.trim(),
-    }, `${nombre} agregado al catálogo ✓`);
+    }, yaEsta ? `${yaEsta} completado ✓` : `${nombre} agregado al catálogo ✓`);
     // Se muestra ya, sin esperar a que vuelva del servicio: quien lo carga
     // suele querer usarlo en el mismo momento.
     const extra = catalogoExtra();
-    extra.cultivos = [...new Set([...(extra.cultivos || []), nombre])];
+    extra.cultivos = [...new Set([...(extra.cultivos || []), yaEsta || nombre])];
     escribir(LS.catalogoExtra, extra);
     render("configuracion");
   };
