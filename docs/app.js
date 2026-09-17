@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 25 · 17/9/2026";
+const VERSION_APP = "versión 26 · 17/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -466,7 +466,18 @@ async function sincronizar(silencioso = true) {
         return;
       }
       if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
-      enviadosAhora.push(...otros);
+      // El servicio dice cuáles no pudo guardar. Esos quedan en la cola para
+      // el próximo intento; borrarlos sería perderlos sin que nadie se enterara.
+      const fallidos = new Set((datos.no_guardados || []).map((x) => String(x.id)));
+      otros.forEach((r) => {
+        if (fallidos.has(String(r.id))) fallaron.push(r);
+        else enviadosAhora.push(r);
+      });
+      if (fallidos.size) {
+        const primero = (datos.no_guardados || [])[0] || {};
+        aviso(`${fallidos.size} registro(s) no se pudieron guardar. ${
+          String(primero.error || "").slice(0, 80)}`, true);
+      }
     } catch (e) {
       fallaron.push(...otros);
       if (!silencioso) aviso("No se pudo enviar: " + e.message, true);

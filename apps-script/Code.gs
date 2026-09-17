@@ -377,13 +377,24 @@ function doPost(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
+      // Cada uno en su propio try: si uno falla, los demas se guardan igual.
+      // Antes un solo registro problematico tumbaba el lote entero, y como la
+      // app no borra nada de la cola cuando la respuesta no es ok, ese telefono
+      // dejaba de poder subir siembras, cosechas y tareas hasta que alguien
+      // arreglara la causa. Los que fallan viajan de vuelta por id para que la
+      // app los conserve y reintente, en lugar de perderlos en silencio.
+      var noGuardados = [];
       registros.forEach(function (r) {
-        if (r.tipo === "tareas_hecha") { marcarTareaHecha(libro, r); guardados++; }
-        else if (r.tipo === "tareas_reabrir") { reabrirTarea(libro, r); guardados++; }
-        else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
-        else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
-        else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
-        else if (r.tipo === "cultivo") { guardarCultivo(chacra, r); guardados++; }
+        try {
+          if (r.tipo === "tareas_hecha") { marcarTareaHecha(libro, r); guardados++; }
+          else if (r.tipo === "tareas_reabrir") { reabrirTarea(libro, r); guardados++; }
+          else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
+          else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
+          else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
+          else if (r.tipo === "cultivo") { guardarCultivo(chacra, r); guardados++; }
+        } catch (err) {
+          noGuardados.push({ id: r.id, tipo: r.tipo, error: String(err) });
+        }
       });
 
       var porTipo = {};
@@ -413,7 +424,8 @@ function doPost(e) {
     }
     CacheService.getScriptCache().remove("resumen_" + chacra);
     if (permiso.fila) marcarActividad(permiso.fila, guardados);
-    return respuesta({ ok: true, recibidos: registros.length, guardados: guardados });
+    return respuesta({ ok: true, recibidos: registros.length, guardados: guardados,
+                       no_guardados: noGuardados });
   } catch (err) {
     return respuesta({ ok: false, error: String(err) });
   }
