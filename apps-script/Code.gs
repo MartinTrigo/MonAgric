@@ -1323,11 +1323,15 @@ function guardarCultivo(chacra, r) {
       if (claveNombre(ya[i][0]) === claveNombre(nombre)) return;   // ya estaba
     }
   }
+  // El origen permite marcar de donde salio: una chacra, o el catalogo base
+  // que venia de la app vieja. Sin eso, los 38 originales figurarian como
+  // aportados por Chacra Tica, que no es lo que paso.
   hoja.appendRow([
     nombre, String(d.tipo_siembra || ""), d.dias_almacigo || "",
     d.dias_trasplante_cosecha || "", d.dias_a_cosecha || "", d.dias_en_cosecha || "",
     d.lineas_bancal || "", d.distancia_cm || "", d.rinde_ref_kg_m2 || "",
-    r.dispositivo || "", chacra, new Date(), String(d.observaciones || ""),
+    r.dispositivo || "", String(d.origen || chacra), new Date(),
+    String(d.observaciones || ""),
   ]);
   CacheService.getScriptCache().remove("catalogo_aportado");
 }
