@@ -127,6 +127,33 @@ lee bioma-db antes de borrarlas.
 
 ## Lo viejo que sigue esperando
 
+- **Una persona en varias chacras, desde un solo teléfono.** Juanfra trabaja en
+  Tica, Tierra Linda y La Huertota. Por ahora se resolvió con **tres
+  navegadores distintos** en el mismo teléfono (Chrome/Firefox/otro), que
+  funciona porque cada uno tiene su propio almacenamiento y el servicio ya
+  acepta varias credenciales del mismo dispositivo. Se decidió así en sept 2026
+  porque es el único caso; cuando sean varios, el diseño es este:
+
+  1. **Una credencial por chacra** en lugar de una sola. Hoy cambiar de chacra
+     borra la credencial.
+  2. **Cada registro de la cola guarda su chacra**, y al sincronizar se agrupa
+     por chacra. **Esto primero, antes que la interfaz**: hoy la cola no guarda
+     la chacra y `sincronizar()` manda todo a la activa, así que cargar sin
+     señal y después cambiar de chacra escribe los datos en la planilla
+     equivocada, sin aviso y sin rastro.
+  3. **Los cachés separados por chacra** (config, resumen, tareas, últimos):
+     hoy hay uno solo y se sobrescribe, así que sin señal después de cambiar se
+     ven los sectores de la otra chacra.
+  4. **La chacra activa, siempre visible en la barra superior.** El peor error
+     posible acá es humano: cargar media jornada en la chacra equivocada. La
+     única defensa es que se lea sin buscarlo.
+
+  Nada de esto toca el servidor: `canjearInvitacion` ya permite que un mismo
+  dispositivo canjee en varias chacras, y `permitido()` busca por la huella de
+  la credencial, así que tres filas del mismo teléfono no se confunden. Sí toca
+  el almacenamiento de los teléfonos en uso, así que necesita migración y no
+  conviene hacerlo el mismo día que la migración de la app de economía.
+
 - **Editar y borrar registros** desde AMA. Es lo que hoy obliga a compartir las
   planillas como Lector en vez de Editor.
 - **Identificadores por persona** en lugar del nombre como llave. Ya falló una
