@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 29 · 17/9/2026";
+const VERSION_APP = "versión 30 · 22/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1113,7 +1113,13 @@ const plantillas = {
     const yo = leer(LS.nombre, "");
     const lista = tareasParaMostrar();
     const pendientes_ = lista.filter((t) => !t.hecha);
-    const hechas = lista.filter((t) => t.hecha).slice(0, 8);
+    // Las hechas se ordenan por cuándo se marcaron, al revés que las pendientes
+    // —que van por fecha de vencimiento, lo más urgente arriba—. Antes salían de
+    // esa misma lista, así que mostraban las ocho más viejas y no se movían
+    // nunca: la fecha "para cuándo" ya no cambia después de hacerla.
+    const hechas = lista.filter((t) => t.hecha)
+      .sort((a, b) => (b.hecha_el || "").localeCompare(a.hecha_el || ""))
+      .slice(0, 8);
     const porArea = vistaTareas === "areas";
 
     return `
@@ -1178,8 +1184,10 @@ const plantillas = {
     </div>
 
     ${hechas.length ? `<div class="tarjeta">
-      <h2>Hechas hace poco</h2>
+      <h2>Hechas hace poco <small>lo último arriba</small></h2>
       ${hechas.map(filaTarea).join("")}
+      <a class="enlace-planilla" href="${esc(enlacePlanilla())}" target="_blank" rel="noopener">
+        Ver el historial completo en la planilla</a>
     </div>` : ""}`;
   },
 
@@ -2738,18 +2746,25 @@ function tareasParaMostrar() {
     .map((r) => ({ ...r.datos, id: r.id, sinEnviar: true }));
   // La cola se recorre en orden: si alguien marcó, se arrepintió y volvió a
   // marcar, vale lo último que hizo.
+  // Se guarda también el día en que se marcó, no solo que está hecha: es lo que
+  // la ordena en "Hechas hace poco". Sin eso, una tarea recién marcada acá se
+  // iba al fondo hasta que viajaba a la planilla.
   const estadoLocal = {};
   pendientes.forEach((r) => {
-    if (r.tipo === "tareas_hecha") estadoLocal[r.datos.tarea_id] = true;
-    else if (r.tipo === "tareas_reabrir") estadoLocal[r.datos.tarea_id] = false;
+    if (r.tipo === "tareas_hecha") {
+      estadoLocal[r.datos.tarea_id] = {
+        hecha: true,
+        hecha_el: r.datos.hecha_el || hoy(),
+        hecha_por: r.datos.hecha_por || "",
+      };
+    } else if (r.tipo === "tareas_reabrir") {
+      estadoLocal[r.datos.tarea_id] = { hecha: false, hecha_el: "", hecha_por: "" };
+    }
   });
 
   const todas = [...nuevasLocales, ...deLaPlanilla]
     .filter((t, i, arr) => arr.findIndex((o) => o.id === t.id) === i)
-    .map((t) => ({
-      ...t,
-      hecha: t.id in estadoLocal ? estadoLocal[t.id] : t.hecha,
-    }));
+    .map((t) => (estadoLocal[t.id] ? { ...t, ...estadoLocal[t.id] } : t));
 
   const peso = { Alta: 0, Media: 1, Baja: 2 };
   return todas.sort((a, b) =>
@@ -2813,12 +2828,18 @@ function filaTarea(t) {
   const cuando = t.fecha === hoy() ? "hoy" : fechaCorta(t.fecha);
   const meta = [
     `<span class="punto-imp imp-${esc(t.importancia || "Media")}"></span>${esc(t.importancia || "Media")}`,
-    vencida ? `atrasada desde el ${cuando}` : `para ${cuando}`,
+    // En una tarea hecha, "para cuándo" ya no dice nada: lo que importa es
+    // cuándo se hizo, que además es lo que la ordena en la lista de abajo.
+    t.hecha ? "" : (vencida ? `atrasada desde el ${cuando}` : `para ${cuando}`),
     (t.proyecto ? esc(t.proyecto) : ""),
     (t.estado === "En curso" ? "<b>en curso</b>" : ""),
     (t.asignada ? `la toma ${esc(t.asignada)}` : ""),
     (t.personas > 1 ? `${t.personas} personas` : ""),
-    (t.hecha && t.hecha_por ? `hecha por ${esc(t.hecha_por)}` : ""),
+    (t.hecha
+      ? "hecha" + (t.hecha_el
+          ? (t.hecha_el === hoy() ? " hoy" : ` el ${fechaCorta(t.hecha_el)}`) : "")
+        + (t.hecha_por ? ` por ${esc(t.hecha_por)}` : "")
+      : ""),
     (t.sinEnviar ? "sin enviar" : ""),
   ].filter(Boolean).join(" · ");
 

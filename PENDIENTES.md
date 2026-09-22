@@ -40,6 +40,33 @@ Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
    todos en `Config`, así que borrarlas no cambia ninguna tarifa — pero
    conviene confirmarlo antes, que es justo el agujero por el que se coló Mili.
 
+### 0 bis. Cerrar el script de horas — es el único secreto a la vista
+
+Verificado el 17/09 con pedidos reales. El servicio de AMA está bien cerrado:
+sin credencial no entrega config, ni cuentas, ni economía, y no escribe nada.
+La URL de bioma-mov nunca entró al historial de git.
+
+Pero `Codigo-horas-bioma.gs` **no tiene ningún control de acceso**, y su URL
+está en `docs/app.js:43`, que es público. Con esa dirección cualquiera:
+
+- **lee** los 12 nombres del equipo y los últimos registros de horas
+  (comprobado: devolvió las 7 h de Mili del 17/09);
+- **escribe** filas de horas, y de esas filas bioma-db calcula los sueldos.
+
+**No sirve ponerle una clave**: tendría que viajar en `app.js`. Todo lo que
+sabe el navegador es público — por eso cuentas y economía las pide el servidor
+con `UrlFetchApp`.
+
+**El arreglo:** que las horas de Tica pasen por el servicio de AMA, que ya
+autentica por credencial, y que sea él quien escriba en la planilla de horas.
+Después se despublica el Web App de ese script. Resuelve de paso el punto 2 de
+arriba —**quién cargó cada fila de horas**—, porque el servicio ya sabe de qué
+teléfono viene el pedido.
+
+Toca el camino que ya se cayó dos días una vez (los tres `f.proyecto`). Hacerlo
+con tiempo, ejercitándolo en el navegador antes de publicar, y no el mismo día
+que otro cambio grande.
+
 ### 1. Importar el catálogo de cultivos desde la planilla de planificación
 
 La hoja **"información de cultivos"** de
