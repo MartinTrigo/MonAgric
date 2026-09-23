@@ -163,7 +163,23 @@ ventana en la que algo pueda dejar de andar:
 Conviene dejar unas semanas entre el renombre y el acceso: son dos cambios
 grandes y mezclarlos hace imposible saber cuál rompió qué.
 
-### 3. Jubilar "Registro de pagos realizados" — de Martín
+### 3. Jubilar "Registro de pagos realizados" — HECHO el 23/09
+
+Martín borró las hojas de pagos individuales y "Registro de pagos realizados".
+**Verificado después**: la tarifa de Mili sigue saliendo $7.500 (no los $10.000
+por defecto), así que `Config` quedó intacta y las cuentas se calculan bien.
+
+Quedan, y no se tocan: `Respuestas de formulario 1` (el buzón donde AMA
+escribe) y `Config` (trabajadores y tarifas).
+
+**Lo que queda abierto**: los trabajadores ahora solo pueden ver su cuenta en
+la app. Acordado que la planilla de horas se comparta **como Lector** para el
+detalle fila por fila —ojo: ahí cada uno ve las horas de todos—. Si hay gente
+que no va a usar la app, la opción es que el servidor genere una hoja por
+persona de solo lectura desde bioma-db; sería un reflejo, no una fuente, que
+es lo que diferenciaba a las hojas viejas. No hacerlo si no hace falta.
+
+### 3 bis. Jubilar "Registro de pagos realizados" — texto original
 En la planilla de horas. Ya está destrabado: la pantalla de AMA funciona, así
 que la contabilidad de sueldos vive solo en bioma-db. Es el punto 4 de la
 Fase 4.8 de bioma-mov.
