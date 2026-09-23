@@ -58,6 +58,18 @@ def main() -> None:
         else:
             print(f"  [?]        {que_es}: no encontre ni '{nuevo}' ni '{viejo}'")
 
+    # Los almacigos que esperan trasplante los cuenta el servidor sobre la hoja
+    # entera. Sin esto, la app se queda con las ultimas 15 siembras y lo
+    # sembrado en agosto no se puede trasplantar en septiembre: paso el 23/9 y
+    # no dio ningun error, simplemente no habia nada que elegir.
+    al = pedir("almacigos=1&chacra=tica")
+    if "almacigos" not in al:
+        print("  [ANTERIOR] los almacigos que esperan trasplante (la clave ni llega)")
+        viejas.append("los almacigos que esperan trasplante")
+    else:
+        print(f"  [al dia]   los almacigos que esperan trasplante "
+              f"({len(al['almacigos'])} esperando)")
+
     # La economia no se detecta por un nombre de campo sino por si la clave
     # llega o no: si el codigo desplegado es anterior, ni aparece.
     print()
