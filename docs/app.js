@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 31 · 23/9/2026";
+const VERSION_APP = "versión 32 · 23/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -283,9 +283,12 @@ function almacigosPendientes() {
   // falta: "últimos" trae solo 15 siembras, y lo sembrado en agosto que se
   // trasplanta en septiembre ya quedó afuera de esa ventana. Si el servicio
   // todavía no la conoce, se cae a las últimas, que es lo que había antes.
+  //
+  // null es "todavía no contestó"; una lista vacía es "contestó que no hay
+  // ninguno", y entonces hay que creerle en vez de volver a la ventana vieja.
   const delServicio = leer(LS.almacigos, null);
-  const fuente = Array.isArray(delServicio) && delServicio.length
-    ? delServicio : (ultimos.siembras || []);
+  const hayRespuesta = Array.isArray(delServicio);
+  const fuente = hayRespuesta ? delServicio : (ultimos.siembras || []);
 
   const deLaPlanilla = fuente.map((f) => ({
     id: String(f.Id), cultivo: f.Cultivo, variedad: f.Variedad || "",
@@ -303,7 +306,7 @@ function almacigosPendientes() {
     }));
 
   const vistos = new Set();
-  return [...locales, ...deLaPlanilla]
+  const lista = [...locales, ...deLaPlanilla]
     .filter((s) => /almácigo|almacigo/i.test(s.tipo || ""))
     .filter((s) => !yaHechos.has(s.id))
     .filter((s) => (vistos.has(s.id) ? false : vistos.add(s.id)))
@@ -311,6 +314,13 @@ function almacigosPendientes() {
     // pasarse de punto en la bandeja.
     .sort((a, b) => String(a.estimado || a.fecha).localeCompare(String(b.estimado || b.fecha)))
     .map((s) => Object.assign(s, { etiqueta: etiquetaAlmacigo(s) }));
+  // De dónde salió la lista, para que se vea en pantalla. Cuando faltaba un
+  // almácigo de agosto no había ningún error: simplemente no estaba, y desde
+  // afuera no se podía saber si el teléfono hablaba con el servicio o se había
+  // quedado con las últimas siembras.
+  lista.completa = hayRespuesta;
+  lista.yaTrasplantados = yaHechos.size;
+  return lista;
 }
 
 // Cuánto le falta o hace cuánto se pasó, según la fecha estimada. Es lo que
@@ -909,11 +919,20 @@ const plantillas = {
     const yo = leer(LS.nombre, "");
     const pend = almacigosPendientes();
 
+    // Si la lista salió de las últimas siembras y no del servicio, se dice:
+    // faltan los almácigos viejos, que son justo los que hay que trasplantar.
+    const origen = pend.completa ? "" : `<p class="nota alerta">Esta lista puede
+      estar incompleta: el teléfono no pudo pedirle al servicio los almácigos
+      que esperan, así que muestra solo los de las últimas siembras. Los
+      sembrados hace más de un mes pueden faltar. Revisá la señal; si sigue
+      igual, el Apps Script puede estar corriendo una versión anterior.</p>`;
+
     if (!pend.length) {
       return `<div class="tarjeta">
         <h2>&#127807; Trasplantes</h2>
-        <p class="nota">No hay almácigos esperando trasplante. Aparecen acá solos
-        en cuanto se carga una siembra de almácigo en la sección Siembras.</p>
+        ${origen || `<p class="nota">No hay almácigos esperando trasplante. Aparecen
+        acá solos en cuanto se carga una siembra de almácigo en la sección
+        Siembras.</p>`}
       </div>
       ${historialDe("trasplantes")}`;
     }
@@ -940,7 +959,8 @@ const plantillas = {
     </div>` : ""}
 
     <div class="tarjeta">
-      <h2>&#127807; Registrar trasplante</h2>
+      <h2>&#127807; Registrar trasplante <small>${pend.length} esperando</small></h2>
+      ${origen}
       <form id="form-trasplantes">
         <label>¿Qué almácigo estás trasplantando?</label>
         <select name="siembra_id" required>
