@@ -67,7 +67,14 @@ Toca el camino que ya se cayó dos días una vez (los tres `f.proyecto`). Hacerl
 con tiempo, ejercitándolo en el navegador antes de publicar, y no el mismo día
 que otro cambio grande.
 
-### 0 ter. Los trasplantes no se podían registrar — arreglado el 23/09
+### 0 ter. Los trasplantes no se podían registrar — CERRADO el 23/09
+
+**Verificado con un registro real**: Hakusai G1, 22/09, sector Primavera bancal
+4. La hoja se creó sola, 42 días en almácigo contra 38 teóricos, 180 plantines
+(30 m ÷ 50 cm × 3 líneas), marco "Modificado" porque el plan decía 40 cm. Los
+almácigos esperando bajaron de 23 a 22: la cadena almácigo → bancal cierra.
+
+Lo que sigue abajo queda como registro de la causa, porque el patrón se repite.
 
 Empezaron los trasplantes y no se podía cargar ninguno: no aparecían en la
 lista ni se creaba la hoja. **La causa: la app pedía `&n=15`**, o sea las
