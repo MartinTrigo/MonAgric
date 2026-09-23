@@ -311,7 +311,7 @@ function atender(p) {
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
-      || p.catalogo) {
+      || p.catalogo || p.almacigos) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -333,6 +333,10 @@ function atender(p) {
     if (p.catalogo) {
       return respuesta(Object.assign({ ok: true },
         cultivosAgregados(p.refrescar && esAdmin(p.clave))));
+    }
+
+    if (p.almacigos) {
+      return respuesta({ ok: true, almacigos: almacigosEsperando(chacra) });
     }
 
     if (p.config) {
@@ -397,10 +401,21 @@ function doPost(e) {
         }
       });
 
+      // Los tipos que ya atendio el bucle de arriba no tienen hoja propia: no
+      // son un error.
+      var SIN_HOJA = { tareas_hecha: 1, tareas_reabrir: 1, config: 1,
+                       puntaje: 1, sugerencia: 1, cultivo: 1 };
       var porTipo = {};
       registros.forEach(function (r) {
-        if (!HOJAS[r.tipo]) return;
-        (porTipo[r.tipo] = porTipo[r.tipo] || []).push(r);
+        if (HOJAS[r.tipo]) { (porTipo[r.tipo] = porTipo[r.tipo] || []).push(r); return; }
+        if (SIN_HOJA[r.tipo]) return;
+        // Un tipo desconocido se descartaba en silencio: no entraba en
+        // guardados ni en no_guardados, la respuesta salia ok, y la app lo
+        // borraba de la cola dandolo por enviado. Se perdia sin que nadie se
+        // enterara. Ahora vuelve por id, la app lo conserva y muestra por que.
+        noGuardados.push({ id: r.id, tipo: r.tipo,
+                           error: "El servicio no conoce el tipo '" + r.tipo +
+                                  "'. Puede estar corriendo una version anterior." });
       });
 
       Object.keys(porTipo).forEach(function (tipo) {
@@ -922,6 +937,45 @@ function rankingDelJuego(chacra) {
 // Para que en el celular se vea lo que viene cargando todo el equipo, no solo
 // lo de ese teléfono. Se leen nada más las últimas filas: no importa cuánto
 // crezca la planilla, siempre pesa lo mismo.
+/* Los almacigos que todavia esperan trasplante, mirando la hoja ENTERA.
+   La app no puede calcularlo: solo recibe las ultimas 15 siembras, y un
+   almacigo de agosto que se trasplanta en septiembre queda afuera de esa
+   ventana. Es el mismo error que tenian las horas cuando se sumaban las
+   ultimas diez. Lo que se cuenta sobre todo el historial se cuenta aca. */
+function almacigosEsperando(chacra) {
+  var libro = planillaDe(chacra);
+  var siembras = libro.getSheetByName(HOJAS.siembras.nombre);
+  if (!siembras || siembras.getLastRow() < 2) return [];
+
+  // Las siembras que ya tienen trasplante salen de la lista. La hoja puede no
+  // existir todavia: la primera temporada no hay ninguno.
+  var hechos = {};
+  var tras = libro.getSheetByName(HOJAS.trasplantes.nombre);
+  if (tras && tras.getLastRow() > 1) {
+    tras.getRange(2, 4, tras.getLastRow() - 1, 1).getValues()
+        .forEach(function (f) { if (f[0]) hechos[String(f[0])] = true; });
+  }
+
+  var tz = Session.getScriptTimeZone();
+  var texto = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+
+  var cols = HOJAS.siembras.encabezados.length;
+  return siembras.getRange(2, 1, siembras.getLastRow() - 1, cols).getValues()
+    .filter(function (f) {
+      return f[0] && !hechos[String(f[0])] && /alm.cigo/i.test(String(f[5] || ""));
+    })
+    .map(function (f) {
+      return {
+        Id: String(f[0]), Fecha: texto(f[2]), Cultivo: String(f[3] || ""),
+        Variedad: String(f[4] || ""), Tipo: String(f[5] || ""),
+        "Generación": Number(f[6]) || 1, Plantines: Number(f[9]) || 0,
+        "Trasplante estimado": texto(f[12]),
+      };
+    });
+}
+
 function ultimosDeHoja(chacra, cual, cuantos) {
   var def = HOJAS[String(cual).toLowerCase()];
   if (!def) return [];

@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 30 · 22/9/2026";
+const VERSION_APP = "versión 31 · 23/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -68,6 +68,7 @@ const LS = {
   ultimasHoras: "monagric_ultimas_horas",
   tareas: "monagric_tareas",
   ultimos: "monagric_ultimos",
+  almacigos: "monagric_almacigos",
 };
 
 const leer = (k, def) => {
@@ -278,7 +279,15 @@ function almacigosPendientes() {
                  .map((r) => String(r.datos.siembra_id || "")),
   ].filter(Boolean));
 
-  const deLaPlanilla = (ultimos.siembras || []).map((f) => ({
+  // El servicio manda los almácigos que esperan mirando la hoja entera. Hace
+  // falta: "últimos" trae solo 15 siembras, y lo sembrado en agosto que se
+  // trasplanta en septiembre ya quedó afuera de esa ventana. Si el servicio
+  // todavía no la conoce, se cae a las últimas, que es lo que había antes.
+  const delServicio = leer(LS.almacigos, null);
+  const fuente = Array.isArray(delServicio) && delServicio.length
+    ? delServicio : (ultimos.siembras || []);
+
+  const deLaPlanilla = fuente.map((f) => ({
     id: String(f.Id), cultivo: f.Cultivo, variedad: f.Variedad || "",
     generacion: Number(f["Generación"]) || 1, tipo: f.Tipo,
     plantines: Number(f.Plantines) || 0, fecha: f.Fecha,
@@ -506,7 +515,11 @@ async function sincronizar(silencioso = true) {
   if (enviadosAhora.length) {
     // Lo recién enviado ya está en la planilla: se vuelve a pedir para que
     // aparezca en la lista de la chacra y no solo como "por enviar".
-    new Set(enviadosAhora.map((r) => r.tipo)).forEach((t) => traerUltimos(t, true));
+    const tipos = new Set(enviadosAhora.map((r) => r.tipo));
+    tipos.forEach((t) => traerUltimos(t, true));
+    // Un trasplante recién subido saca su almácigo de la lista de pendientes,
+    // y una siembra nueva puede sumar uno: las dos cosas cambian esa lista.
+    if (tipos.has("trasplantes") || tipos.has("siembras")) traerAlmacigos(true);
     const ids = new Set(enviadosAhora.map((r) => r.id));
     enviados = enviadosAhora.map((r) => ({ ...r, enviado_en: ahora() })).concat(enviados).slice(0, 60);
     pendientes = pendientes.filter((r) => !ids.has(r.id));
@@ -1777,6 +1790,22 @@ function filaEquipo(tipo, f) {
 // Trae del servicio las últimas filas de una hoja y las guarda para verlas
 // aunque después no haya señal.
 const pedidoReciente = {};
+// Los almácigos que esperan trasplante los cuenta el servicio sobre la hoja
+// entera, no sobre las últimas 15 siembras que recibe el teléfono.
+async function traerAlmacigos(forzar = false) {
+  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+  if (!forzar && Date.now() - (pedidoReciente.almacigos || 0) < 20000) return;
+  pedidoReciente.almacigos = Date.now();
+  try {
+    const d = await (await fetch(
+      `${urlServicio()}?${conCredenciales("almacigos=1")}`)).json();
+    if (!d.ok || !Array.isArray(d.almacigos)) return;
+    const cambio = JSON.stringify(leer(LS.almacigos, null)) !== JSON.stringify(d.almacigos);
+    escribir(LS.almacigos, d.almacigos);
+    if (cambio && vistaActual === "trasplantes") render("trasplantes", true);
+  } catch { /* sin conexión: se usa lo último que se bajó */ }
+}
+
 async function traerUltimos(tipo, forzar = false) {
   if (!chacraCodigo() || !navigator.onLine) return;
   // Sin esto, cada render pediría de nuevo y el redibujado se volvería un lazo.
@@ -1866,7 +1895,7 @@ function render(vista, conservarScroll = false) {
   if (["siembras", "cosechas", "horas", "trasplantes"].includes(vista)) traerUltimos(vista);
   // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
   // aunque la sección que se está mirando sea Trasplantes.
-  if (vista === "trasplantes") traerUltimos("siembras");
+  if (vista === "trasplantes") { traerUltimos("siembras"); traerAlmacigos(); }
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {

@@ -67,6 +67,31 @@ Toca el camino que ya se cayó dos días una vez (los tres `f.proyecto`). Hacerl
 con tiempo, ejercitándolo en el navegador antes de publicar, y no el mismo día
 que otro cambio grande.
 
+### 0 ter. Los trasplantes no se podían registrar — arreglado el 23/09
+
+Empezaron los trasplantes y no se podía cargar ninguno: no aparecían en la
+lista ni se creaba la hoja. **La causa: la app pedía `&n=15`**, o sea las
+últimas quince siembras. La hoja tiene 27, así que los almácigos de agosto
+—Lechuga, Acelga, Repollo bco, Kale, Hakusai, Coliflor, justo los que se
+trasplantan ahora— quedaban fuera de esa ventana. Como el formulario exige
+elegir un almácigo de la lista, no había nada que elegir.
+
+Es **el mismo error que tuvieron las horas**, que sumaban solo los últimos diez
+registros. La regla que sale de esto: *lo que se cuenta sobre todo el historial
+se calcula en el servidor, nunca sobre la ventana que recibe el teléfono.*
+
+Arreglado con un endpoint nuevo, `?almacigos=1`, que recorre la hoja Siembras
+entera y descuenta lo que ya figura en Trasplantes.
+
+**De paso se tapó un agujero de pérdida de datos**: un registro de un tipo que
+el servicio no reconocía se descartaba en silencio —no entraba en `guardados`
+ni en `no_guardados`, la respuesta salía `ok` y la app lo borraba de la cola
+dándolo por enviado—. Ahora vuelve por id y se muestra el motivo.
+
+**Falta que Martín redespliegue el Apps Script** (Nueva versión, no Nueva
+implementación). Hasta que lo haga, la app cae en el comportamiento viejo y
+sigue sin poder registrar los almácigos de agosto.
+
 ### 1. Importar el catálogo de cultivos desde la planilla de planificación
 
 La hoja **"información de cultivos"** de
