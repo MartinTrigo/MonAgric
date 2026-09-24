@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 32 · 23/9/2026";
+const VERSION_APP = "versión 33 · 24/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -235,8 +235,21 @@ const cultivosDisponibles = () => {
 
 // Gana el aportado: si alguien cargó el perfil de un cultivo que estaba sin
 // datos, eso es más nuevo que el catálogo base.
-const perfil = (cultivo) => Object.assign(
-  {}, (CAT?.perfiles || {})[cultivo] || {}, (catalogoExtra().perfiles || {})[cultivo] || {});
+// El perfil que viene de la planilla completa al del catálogo base, pero no lo
+// pisa con vacíos: una celda sin llenar quiere decir "no sé", no "cero". Sin
+// esto, agregar una columna nueva a la planilla —que arranca vacía para los 38
+// cultivos que ya estaban— borraría ese dato en todos los teléfonos.
+const perfil = (cultivo) => {
+  const base = (CAT?.perfiles || {})[cultivo] || {};
+  const aportado = (catalogoExtra().perfiles || {})[cultivo] || {};
+  const salida = Object.assign({}, base);
+  Object.keys(aportado).forEach((k) => {
+    const v = aportado[k];
+    if (v === "" || v === null || v === undefined || v === 0) return;
+    salida[k] = v;
+  });
+  return salida;
+};
 
 async function traerCatalogo() {
   if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
@@ -256,6 +269,31 @@ const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 
 // De la configuración de esta chacra
 const enPlan = (cultivo) => (CFG?.plan || []).find((p) => p.cultivo === cultivo);
+
+// Los días que un cultivo pasa en la bandeja no son uno solo: en otoño-invierno
+// tarda más que en primavera-verano, y la diferencia llega a 20 días (Albahaca
+// 50 contra 30, Apio 60 contra 45). Usar el promedio se equivoca en las dos
+// estaciones: en septiembre sugería trasplantar 6 días tarde en promedio, y el
+// Hakusai sembrado en agosto tardó 42 días contra los 38 que estimaba.
+//
+// Se elige por el mes en que se sembró, que es cuando empieza a contar. De
+// abril a septiembre manda el valor de invierno; de octubre a marzo, el de
+// verano. Si el cultivo no tiene los dos valores, queda el de siempre.
+function diasAlmacigo(cultivo, fecha) {
+  const p = perfil(cultivo) || {};
+  const mes = Number(String(fecha || hoy()).slice(5, 7)) || 0;
+  const invierno = mes >= 4 && mes <= 9;
+  const elegido = invierno ? p.dias_almacigo_oi : p.dias_almacigo_pv;
+  return Number(elegido || p.dias_almacigo) || 0;
+}
+
+// Los dos extremos, para mostrar que la fecha es un rango y no un dato exacto.
+function rangoAlmacigo(cultivo) {
+  const p = perfil(cultivo) || {};
+  const a = Number(p.dias_almacigo_pv) || 0;
+  const b = Number(p.dias_almacigo_oi) || 0;
+  return (a && b && a !== b) ? { min: Math.min(a, b), max: Math.max(a, b) } : null;
+}
 
 // ---- Trasplantes ----
 // Cómo se acomodan las plantas dentro del bancal. En tresbolillo entran más
@@ -1511,6 +1549,19 @@ const plantillas = {
               <input type="text" name="dias_trasplante_cosecha" inputmode="numeric" placeholder="Ej: 52">
             </div>
           </div>
+          <!-- Opcionales a propósito: nadie sabe de memoria, parado en la
+               huerta, cuántos días tarda un pepinillo en invierno. Si quedan
+               vacíos el cultivo entra igual y se usa el número de arriba. -->
+          <div id="bloque-estacion" class="fila">
+            <div>
+              <label>Almácigo en invierno <small>(opcional)</small></label>
+              <input type="text" name="dias_almacigo_oi" inputmode="numeric" placeholder="Ej: 45">
+            </div>
+            <div>
+              <label>Almácigo en verano <small>(opcional)</small></label>
+              <input type="text" name="dias_almacigo_pv" inputmode="numeric" placeholder="Ej: 30">
+            </div>
+          </div>
           <div class="fila">
             <div id="bloque-directa">
               <label>Días a cosecha <small>(desde la siembra)</small></label>
@@ -2051,7 +2102,13 @@ function prepararSiembras() {
     if (conBandeja) {
       const total = (parseInt(f.bandejas.value, 10) || 0) * (parseInt(f.tipo_bandeja.value, 10) || 0);
       partes.push(`<b>${num(total)}</b> plantines`);
-      if (p.dias_almacigo) partes.push(`trasplante estimado: <b>${fechaCorta(sumarDias(f.fecha.value, p.dias_almacigo))}</b>`);
+      // Los días dependen de la estación: se cuentan desde la fecha de siembra.
+      const alm = diasAlmacigo(f.cultivo.value, f.fecha.value);
+      if (alm) {
+        const r = rangoAlmacigo(f.cultivo.value);
+        partes.push(`trasplante estimado: <b>${fechaCorta(sumarDias(f.fecha.value, alm))}</b>`
+          + (r ? ` <small>(${alm} días; entre ${r.min} y ${r.max} según la estación)</small>` : ""));
+      }
       if (p.dias_a_cosecha) partes.push(`cosecha estimada: <b>${fechaCorta(sumarDias(f.fecha.value, p.dias_a_cosecha))}</b>`);
     } else {
       const dias = tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha;
@@ -2096,7 +2153,8 @@ function prepararSiembras() {
     }
 
     const p = perfil(datos.cultivo);
-    datos.trasplante_estimado = conBandeja ? sumarDias(datos.fecha, p.dias_almacigo) : "";
+    datos.trasplante_estimado = conBandeja
+      ? sumarDias(datos.fecha, diasAlmacigo(datos.cultivo, datos.fecha)) : "";
     datos.cosecha_estimada = sumarDias(datos.fecha,
       tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha);
 
@@ -2273,6 +2331,8 @@ function prepararConfiguracion() {
       // a que dos números de la misma fila se contradigan.
       blDir.hidden = alm || yaPlantado();
       fCult.dias_almacigo.parentElement.hidden = !alm;
+      // Los estacionales solo tienen sentido si el cultivo pasa por bandeja.
+      $("#bloque-estacion").hidden = !alm;
       recalcular();
     };
 
@@ -2339,6 +2399,9 @@ function prepararConfiguracion() {
       cultivo: yaEsta || nombre,
       tipo_siembra: fCult.tipo_siembra.value,
       dias_almacigo: alm ? aNumero(fCult.dias_almacigo.value) : "",
+      // Opcionales: si vienen vacíos se usa el de arriba en las dos estaciones.
+      dias_almacigo_oi: alm ? aNumero(fCult.dias_almacigo_oi.value) : "",
+      dias_almacigo_pv: alm ? aNumero(fCult.dias_almacigo_pv.value) : "",
       dias_trasplante_cosecha: (alm || yaPlantado())
         ? aNumero(fCult.dias_trasplante_cosecha.value) : "",
       dias_a_cosecha: aCosecha,
@@ -3083,7 +3146,9 @@ function prepararTrasplantes() {
     // Lo que de verdad tardó en la bandeja, contra lo que decía la tabla. Es el
     // dato que en unas temporadas permite corregir los días teóricos con lo que
     // pasa en esta chacra y no en un manual.
-    const teoricos = perfil(s.cultivo)?.dias_almacigo || 0;
+    // Los teóricos se cuentan con la estación en que se SEMBRÓ, no con la de
+    // hoy: es contra eso que se compara lo que de verdad tardó en la bandeja.
+    const teoricos = diasAlmacigo(s.cultivo, s.fecha);
     const reales = diasEntre(s.fecha, f.fecha.value);
     const lugares = destinos();
     if (!lugares.length) return aviso("Elegí al menos un bancal.", true);

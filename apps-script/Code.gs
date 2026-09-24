@@ -395,7 +395,7 @@ function doPost(e) {
           else if (r.tipo === "config") { guardarConfig(libro, r.datos); guardados++; }
           else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
           else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
-          else if (r.tipo === "cultivo") { guardarCultivo(chacra, r); guardados++; }
+          else if (r.tipo === "cultivo") { guardarCultivo(chacra, r, esAdmin(cuerpo.clave)); guardados++; }
         } catch (err) {
           noGuardados.push({ id: r.id, tipo: r.tipo, error: String(err) });
         }
@@ -1303,10 +1303,17 @@ function claveNombre(n) {
 //
 // Propiedad del script:  PLANILLA_CATALOGO  <id de la planilla>
 // Si no esta, todo sigue funcionando con el catalogo base y nada mas.
+// Las dos ultimas se agregaron el 24/09 y van AL FINAL a proposito: la planilla
+// ya tenia 38 cultivos cargados, y meter columnas en el medio habria corrido de
+// lugar todos los datos que ya estaban.
+//
+// "Dias en almacigo" sigue siendo el valor unico de siempre, y es el respaldo
+// de los cultivos que no tengan los estacionales.
 var CATALOGO_ENCABEZADOS = [
   "Cultivo", "Tipo de siembra", "Días en almácigo", "Días de trasplante a cosecha",
   "Días a cosecha", "Días en cosecha", "Líneas por bancal", "Distancia cm",
-  "Rinde kg/m²", "Agregado por", "Chacra", "Fecha", "Observaciones"];
+  "Rinde kg/m²", "Agregado por", "Chacra", "Fecha", "Observaciones",
+  "Almácigo otoño-invierno", "Almácigo primavera-verano"];
 
 function idCatalogo() {
   try {
@@ -1349,6 +1356,8 @@ function cultivosAgregados(forzar) {
         rinde_ref_kg_m2: Number(f[8]) || 0,
         aportado_por: String(f[9] || ""),
         chacra: String(f[10] || ""),
+        dias_almacigo_oi: Number(f[13]) || 0,
+        dias_almacigo_pv: Number(f[14]) || 0,
       };
     });
     var vistos = {};
@@ -1364,7 +1373,7 @@ function cultivosAgregados(forzar) {
 
 // Alta de un cultivo desde la app. Se rechaza el repetido antes de escribirlo:
 // dos filas del mismo cultivo con datos distintos serian dos verdades.
-function guardarCultivo(chacra, r) {
+function guardarCultivo(chacra, r, esAdministrador) {
   var hoja = hojaCatalogo();
   if (!hoja) throw new Error("Falta la propiedad PLANILLA_CATALOGO.");
   var d = r.datos || {};
@@ -1388,7 +1397,10 @@ function guardarCultivo(chacra, r) {
       // Columnas 5 a 9: dias a cosecha, dias en cosecha, lineas, distancia, rinde
       var tieneDatos = false;
       for (var c = 4; c <= 8; c++) if (Number(ya[i][c]) > 0) tieneDatos = true;
-      if (tieneDatos) return;            // completo: no se toca
+      // La clave de administracion si puede corregir: la regla es para que dos
+      // chacras no se pisen el marco de plantacion desde el celular, no para
+      // trabar a quien mantiene el catalogo desde las herramientas.
+      if (tieneDatos && !esAdministrador) return;
       filaExistente = i + 2;
       // Se conserva como estaba escrito en el catalogo. Si alguien tipea
       // "cilantro" para completarlo, no tiene por que renombrarlo en minuscula
@@ -1404,6 +1416,7 @@ function guardarCultivo(chacra, r) {
     d.lineas_bancal || "", d.distancia_cm || "", d.rinde_ref_kg_m2 || "",
     r.dispositivo || "", String(d.origen || chacra), new Date(),
     String(d.observaciones || ""),
+    d.dias_almacigo_oi || "", d.dias_almacigo_pv || "",
   ];
   if (filaExistente) {
     hoja.getRange(filaExistente, 1, 1, CATALOGO_ENCABEZADOS.length).setValues([fila]);
