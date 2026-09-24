@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 33 · 24/9/2026";
+const VERSION_APP = "versión 34 · 24/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -673,18 +673,17 @@ function buscadorCultivo(valor = "", nombre = "cultivo") {
   });
 }
 
-// Un cultivo con sus kilos. Se pueden apilar varios en una misma cosecha.
-function renglonCosecha(i) {
+// Un cultivo con sus kilos, en un solo renglón. Una cosecha de pizarra son
+// veinte cultivos: con el formato anterior —dos etiquetas y dos campos apilados
+// por cultivo— eran veinte pantallas de scroll. Acá cada uno ocupa una línea y
+// los encabezados se escriben una sola vez, arriba de la lista.
+function renglonCosecha(i, valor = "", kg = "") {
   return `<div class="renglon-cosecha" data-renglon="${i}">
-    <div class="renglon-cab">
-      <label>Cultivo</label>
-      ${i > 0 ? `<button type="button" class="quitar" data-quitar-renglon="${i}"
-                         aria-label="Quitar este cultivo">&times;</button>` : ""}
-    </div>
-    ${buscadorCultivo("", "cultivo_" + i)}
-    <label>Kilos cosechados</label>
+    ${buscadorCultivo(valor, "cultivo_" + i)}
     <input type="text" name="kg_${i}" inputmode="decimal" autocomplete="off"
-           placeholder="Ej: 12,5">
+           value="${esc(kg)}" placeholder="kg" aria-label="Kilos cosechados">
+    <button type="button" class="quitar" data-quitar-renglon="${i}"
+            aria-label="Quitar este cultivo">&times;</button>
   </div>`;
 }
 
@@ -721,6 +720,13 @@ function enlazarBuscadores(form) {
       oculto.value = valor;
       lista.hidden = true;
       form.dispatchEvent(new Event("change", { bubbles: true }));
+      // En un renglón de cosecha el paso siguiente es siempre el número, así
+      // que el foco va solo: pasar una pizarra de veinte es escribir cultivo,
+      // Enter, kilos, Enter, sin levantar la mano del teclado ni buscar el
+      // campo con el dedo. Fuera de esos renglones no se toca el foco.
+      const renglon = caja.closest(".renglon-cosecha");
+      const kg = renglon?.querySelector("input[name^=kg_]");
+      if (kg) setTimeout(() => kg.focus(), 0);
     };
 
     texto.addEventListener("focus", () => pintar(""));
@@ -1270,15 +1276,17 @@ const plantillas = {
     <div class="tarjeta">
       <h2>&#127807; Registrar cosecha</h2>
       <p class="nota">Los kilos totales de cada cultivo, de todos los bancales juntos.
-      Podés cargar varios cultivos de una vez con el botón +.</p>
+      Un renglón por cultivo: con el + sumás otro, y con el × sacás el que sobre.</p>
       <form id="form-cosechas">
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
 
+        <!-- Los encabezados van una sola vez, no uno por renglón. -->
+        <div class="cosecha-cab"><span>Cultivo</span><span>Kilos</span></div>
         <div id="renglones-cosecha">${renglonCosecha(0)}</div>
 
-        <button type="button" class="secundario mas" id="btn-mas-cultivo">
-          + Agregar otro cultivo</button>
+        <button type="button" class="secundario mas" id="btn-mas-cultivo"
+                aria-label="Agregar otro cultivo">+</button>
 
         <div class="calculo" id="calculo-cosecha"></div>
 
@@ -3291,13 +3299,33 @@ function prepararCosechas() {
   };
   engancharQuitar();
 
-  $("#btn-mas-cultivo").onclick = () => {
+  const sumarRenglon = () => {
     renglones.insertAdjacentHTML("beforeend", renglonCosecha(proximo++));
     enlazarBuscadores(f);          // enciende solo el buscador nuevo
     engancharQuitar();
+    engancharEnter();
     actualizar();
     renglones.lastElementChild.querySelector(".buscador-texto").focus();
   };
+  $("#btn-mas-cultivo").onclick = sumarRenglon;
+
+  // Enter en los kilos abre el renglón siguiente. Pasar una pizarra de veinte
+  // cultivos es teclear, no apuntar: sin esto hay que bajar la mano al + entre
+  // cada uno. El submit del formulario queda para el botón Guardar.
+  function engancharEnter() {
+    renglones.querySelectorAll("input[name^=kg_]").forEach((campo) => {
+      if (campo.dataset.enter) return;
+      campo.dataset.enter = "1";
+      campo.onkeydown = (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const ultimo = campo.closest(".renglon-cosecha") === renglones.lastElementChild;
+        if (ultimo) sumarRenglon();
+        else renglones.lastElementChild.querySelector(".buscador-texto").focus();
+      };
+    });
+  }
+  engancharEnter();
 
   f.onsubmit = (e) => {
     e.preventDefault();

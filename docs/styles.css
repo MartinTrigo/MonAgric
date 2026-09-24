@@ -322,18 +322,55 @@ button.secundario {
 }
 .registro .editar:active { color: var(--sage-dark); }
 
-/* ---- renglones de cosecha (varios cultivos de una vez) ---- */
+/* ---- renglones de cosecha (varios cultivos de una vez) ----
+   Una línea por cultivo: pasar una pizarra de veinte cultivos con el formato
+   apilado era veinte pantallas de scroll. El campo de kilos es angosto a
+   propósito —nunca se escriben más de cuatro dígitos— y la × queda al ras. */
 .renglon-cosecha {
-  padding-top: 12px;
-  margin-top: 12px;
-  border-top: 1px dashed var(--sage-light);
+  display: grid;
+  grid-template-columns: 1fr 5.2rem 1.6rem;
+  gap: 6px;
+  align-items: start;
+  margin-bottom: 6px;
 }
-.renglon-cosecha:first-child { padding-top: 0; margin-top: 0; border-top: none; }
-.renglon-cab { display: flex; align-items: center; justify-content: space-between; }
-.renglon-cab label { margin-bottom: 0; }
+.renglon-cosecha input { margin-bottom: 0; }
+.renglon-cosecha .buscador-texto { margin-bottom: 0; }
+.renglon-cosecha .quitar {
+  border: none;
+  background: none;
+  color: var(--tenue);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 10px 0 0 0;
+  cursor: pointer;
+}
+.renglon-cosecha .quitar:active { color: #c0392b; }
+/* Un solo renglón no se puede quitar: sin él no queda nada que cargar. */
+.renglon-cosecha:only-child .quitar { visibility: hidden; }
+
+.cosecha-cab {
+  display: grid;
+  grid-template-columns: 1fr 5.2rem 1.6rem;
+  gap: 6px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--sage-dark);
+  margin-bottom: 4px;
+}
+
 button.mas {
   margin-top: 12px;
   border-style: dashed;
+}
+/* En cosechas el + va chico, debajo del último renglón: un botón de ancho
+   completo ahí compite con "Guardar cosecha". El de bancales sigue con su
+   texto, que son dos o tres y no una lista larga. */
+#btn-mas-cultivo {
+  margin-top: 4px;
+  width: 2.8rem;
+  padding: 7px 0;
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 #avanzado-plan { margin-top: 12px; }
