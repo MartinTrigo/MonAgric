@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 34 · 24/9/2026";
+const VERSION_APP = "versión 35 · 24/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -69,6 +69,7 @@ const LS = {
   tareas: "monagric_tareas",
   ultimos: "monagric_ultimos",
   almacigos: "monagric_almacigos",
+  modoCosecha: "monagric_modo_cosecha",
 };
 
 const leer = (k, def) => {
@@ -86,6 +87,14 @@ let vistaActual = "inicio";
 // Qué cuenta de sueldos se está mirando. Vacío = la lista.
 let cuentaAbierta = "";
 let vistaTareas = "hoy";        // "hoy" o "areas"
+
+// Dos maneras de cargar una cosecha, porque son dos situaciones distintas.
+// "lista": se van eligiendo los cultivos de a uno, que sirve cuando se
+// cosecharon tres o cuatro. "pizarra": todos los del plan de la temporada a la
+// vista con su casillero, que sirve para pasar la lista entera de una jornada
+// sin buscar cada nombre. Queda elegido en el teléfono: cada chacra trabaja
+// distinto y no tiene sentido preguntarlo cada vez.
+let modoCosecha = leer(LS.modoCosecha, "lista");
 
 // Hasta no haber leído la configuración de la chacra en el servicio no se puede
 // guardar nada: guardar reescribe la hoja Config entera, así que hacerlo con la
@@ -671,6 +680,23 @@ function buscadorCultivo(valor = "", nombre = "cultivo") {
     placeholder: "Elegí el cultivo (escribí para buscar)…",
     valor, destacadas: delPlan,
   });
+}
+
+// Los cultivos de la pizarra: los del plan de la temporada de esta chacra, que
+// son los que se sembraron y por lo tanto los únicos que se pueden cosechar.
+// No el catálogo entero: son 38 y la mayoría no los cultiva nadie acá.
+const cultivosDelPlan = () => (CFG?.plan || [])
+  .map((p) => p.cultivo)
+  .filter(Boolean);
+
+// Un renglón de pizarra: el nombre ya puesto y solo el casillero del número.
+// Sin buscador, que es lo que hace lenta la carga cuando son veinte.
+function renglonPizarra(cultivo, i) {
+  return `<div class="renglon-pizarra">
+    <label for="pz_${i}">${esc(cultivo)}</label>
+    <input type="text" id="pz_${i}" name="pz_${i}" data-cultivo="${esc(cultivo)}"
+           inputmode="decimal" autocomplete="off" placeholder="kg">
+  </div>`;
 }
 
 // Un cultivo con sus kilos, en un solo renglón. Una cosecha de pizarra son
@@ -1272,21 +1298,47 @@ const plantillas = {
     if (!chacraActual()) return tarjetaElegirChacra();
     if (!tieneAcceso()) return tarjetaCanje();
     const yo = leer(LS.nombre, "");
+    const delPlan = cultivosDelPlan();
+    // Sin plan de temporada no hay pizarra posible: no habría qué poner. Pasa
+    // en las chacras que todavía no lo cargaron.
+    const pizarra = modoCosecha === "pizarra" && delPlan.length > 0;
+
     return `
     <div class="tarjeta">
       <h2>&#127807; Registrar cosecha</h2>
-      <p class="nota">Los kilos totales de cada cultivo, de todos los bancales juntos.
-      Un renglón por cultivo: con el + sumás otro, y con el × sacás el que sobre.</p>
+
+      <div class="pestanas-tareas">
+        <button type="button" class="pestana${pizarra ? "" : " activa"}"
+                data-modo-cosecha="lista">Lista</button>
+        <button type="button" class="pestana${pizarra ? " activa" : ""}"
+                data-modo-cosecha="pizarra">Pizarra</button>
+      </div>
+
+      <p class="nota">${pizarra
+        ? `Todos los cultivos del plan, como en la pizarra: escribí los kilos
+           solo en los que cosechaste y dejá el resto vacío.`
+        : `Los kilos totales de cada cultivo, de todos los bancales juntos.
+           Un renglón por cultivo: con el + sumás otro, y con el × sacás el que sobre.`}</p>
+
+      ${modoCosecha === "pizarra" && !delPlan.length ? `<p class="nota alerta">
+        El modo pizarra muestra los cultivos del plan de la temporada, y esta
+        chacra todavía no tiene ninguno cargado. Cargalos en Plan, o usá el
+        modo lista.</p>` : ""}
+
       <form id="form-cosechas">
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
 
+        ${pizarra ? `
+        <div id="pizarra-cosecha">
+          ${delPlan.map((c, i) => renglonPizarra(c, i)).join("")}
+        </div>` : `
         <!-- Los encabezados van una sola vez, no uno por renglón. -->
         <div class="cosecha-cab"><span>Cultivo</span><span>Kilos</span></div>
         <div id="renglones-cosecha">${renglonCosecha(0)}</div>
 
         <button type="button" class="secundario mas" id="btn-mas-cultivo"
-                aria-label="Agregar otro cultivo">+</button>
+                aria-label="Agregar otro cultivo">+</button>`}
 
         <div class="calculo" id="calculo-cosecha"></div>
 
@@ -3257,22 +3309,42 @@ function prepararCosechas() {
   if (!f) return;
   const calculo = $("#calculo-cosecha");
   const renglones = $("#renglones-cosecha");
+  const pizarra = $("#pizarra-cosecha");
   let proximo = 1;
+
+  // Elegir el modo: queda guardado en el teléfono para la próxima vez.
+  document.querySelectorAll("[data-modo-cosecha]").forEach((b) => {
+    b.onclick = () => {
+      modoCosecha = b.dataset.modoCosecha;
+      escribir(LS.modoCosecha, modoCosecha);
+      render("cosechas");
+    };
+  });
 
   enlazarBuscadores(f);
 
-  // Lee los renglones cargados: cada uno es un cultivo con sus kilos.
-  const leerRenglones = () => [...renglones.querySelectorAll(".renglon-cosecha")]
-    .map((div) => {
-      const i = div.dataset.renglon;
-      return { cultivo: f["cultivo_" + i]?.value || "", kg: aNumero(f["kg_" + i]?.value) || 0 };
-    })
-    .filter((r) => r.cultivo || r.kg);
+  // Los dos modos se leen igual de afuera: una lista de cultivo + kilos. En
+  // pizarra se descartan los que quedaron vacíos, que son la mayoría.
+  const leerRenglones = () => {
+    if (pizarra) {
+      return [...pizarra.querySelectorAll("input[data-cultivo]")]
+        .map((inp) => ({ cultivo: inp.dataset.cultivo, kg: aNumero(inp.value) || 0 }))
+        .filter((r) => r.kg > 0);
+    }
+    return [...renglones.querySelectorAll(".renglon-cosecha")]
+      .map((div) => {
+        const i = div.dataset.renglon;
+        return { cultivo: f["cultivo_" + i]?.value || "", kg: aNumero(f["kg_" + i]?.value) || 0 };
+      })
+      .filter((r) => r.cultivo || r.kg);
+  };
 
   const actualizar = () => {
     const cargados = leerRenglones().filter((r) => r.cultivo && r.kg > 0);
     if (!cargados.length) {
-      calculo.innerHTML = "Cargá el cultivo y los kilos. Con el + sumás más cultivos.";
+      calculo.innerHTML = pizarra
+        ? "Escribí los kilos en los cultivos que cosechaste. Los vacíos no se guardan."
+        : "Cargá el cultivo y los kilos. Con el + sumás más cultivos.";
       return;
     }
     const total = cargados.reduce((a, r) => a + r.kg, 0);
@@ -3288,6 +3360,21 @@ function prepararCosechas() {
   f.addEventListener("input", actualizar);
   f.addEventListener("change", actualizar);
   actualizar();
+
+  // En pizarra no hay renglones que agregar ni quitar: la lista es fija y los
+  // vacíos simplemente no se guardan. Enter pasa al casillero siguiente.
+  if (pizarra) {
+    const campos = [...pizarra.querySelectorAll("input[data-cultivo]")];
+    campos.forEach((campo, i) => {
+      campo.onkeydown = (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        (campos[i + 1] || campo).focus();
+      };
+    });
+    engancharSubmit();
+    return;
+  }
 
   const engancharQuitar = () => {
     renglones.querySelectorAll("[data-quitar-renglon]").forEach((b) => {
@@ -3327,10 +3414,17 @@ function prepararCosechas() {
   }
   engancharEnter();
 
+  engancharSubmit();
+
+  function engancharSubmit() {
   f.onsubmit = (e) => {
     e.preventDefault();
     const cargados = leerRenglones();
-    if (!cargados.length) return aviso("Cargá al menos un cultivo con sus kilos.", true);
+    if (!cargados.length) {
+      return aviso(pizarra
+        ? "Escribí los kilos de al menos un cultivo."
+        : "Cargá al menos un cultivo con sus kilos.", true);
+    }
 
     const incompleto = cargados.find((r) => !r.cultivo || !(r.kg > 0));
     if (incompleto) {
@@ -3354,6 +3448,7 @@ function prepararCosechas() {
     });
     render("inicio");
   };
+  }
 }
 
 function prepararAjustes() {

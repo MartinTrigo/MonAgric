@@ -348,6 +348,43 @@ button.secundario {
 /* Un solo renglón no se puede quitar: sin él no queda nada que cargar. */
 .renglon-cosecha:only-child .quitar { visibility: hidden; }
 
+/* ---- modo pizarra: todos los cultivos del plan a la vista ----
+   Dos columnas en pantallas anchas, una en el teléfono. El nombre ya está
+   escrito, así que el único trabajo es el número. */
+#pizarra-cosecha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0 18px;
+  margin-bottom: 10px;
+}
+.renglon-pizarra {
+  display: grid;
+  grid-template-columns: 1fr 4.6rem;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px dotted var(--sage-light);
+}
+.renglon-pizarra label {
+  margin-bottom: 0;
+  font-weight: 500;
+  font-size: .93rem;
+  /* Un nombre largo no puede empujar el casillero fuera de la pantalla. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.renglon-pizarra input {
+  margin-bottom: 0;
+  padding: 7px 9px;
+  text-align: right;
+}
+/* El que tiene kilos se destaca: de un vistazo se ve qué se cargó. */
+.renglon-pizarra input:not(:placeholder-shown) {
+  background: var(--sage-suave);
+  font-weight: 600;
+}
+
 .cosecha-cab {
   display: grid;
   grid-template-columns: 1fr 5.2rem 1.6rem;
