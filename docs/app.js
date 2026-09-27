@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 40 · 26/9/2026";
+const VERSION_APP = "versión 41 · 26/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1841,6 +1841,25 @@ function tramosDe(g) {
 
 const diaDe = (iso) => Math.floor(new Date(iso + "T00:00:00").getTime() / 86400000);
 
+// Una fecha de JavaScript a "aaaa-mm-dd", que es como viajan todas acá.
+const isoDe = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  + `-${String(d.getDate()).padStart(2, "0")}`;
+
+// El primer día de la temporada: el 1° de julio del año que corresponda. Sale
+// de la fecha de inicio que cargó la chacra; si no está, se deduce de hoy.
+function inicioDeTemporada() {
+  const cargada = CFG?.temporada?.inicio;
+  if (cargada && /^\d{4}-\d{2}/.test(cargada)) {
+    const d = new Date(cargada + "T00:00:00");
+    // Si arrancó en junio o antes, la temporada es la que empezó el julio
+    // anterior; el campo guarda el día real de arranque, no el del calendario.
+    const anio = d.getMonth() + 1 >= 7 ? d.getFullYear() : d.getFullYear() - 1;
+    return new Date(anio, 6, 1);
+  }
+  const h = new Date();
+  return new Date(h.getMonth() + 1 >= 7 ? h.getFullYear() : h.getFullYear() - 1, 6, 1);
+}
+
 function generacionesParaElPlan() {
   const todas = leer(LS.generaciones, []) || [];
   const filtradas = todas.filter((g) =>
@@ -1877,12 +1896,14 @@ function planEstrategico() {
     </div>`;
   }
 
-  // El eje: del primer día al último, redondeado a meses enteros para que las
-  // divisiones caigan en el 1 de cada mes y se lean como un calendario.
-  const desde = gens.reduce((a, g) => g.tramos.inicio < a ? g.tramos.inicio : a, gens[0].tramos.inicio);
-  const hasta = gens.reduce((a, g) => g.tramos.fin > a ? g.tramos.fin : a, gens[0].tramos.fin);
-  const d0 = new Date(desde + "T00:00:00"); d0.setDate(1);
-  const d1 = new Date(hasta + "T00:00:00"); d1.setMonth(d1.getMonth() + 1, 1);
+  // El eje es la temporada, de julio a junio, no el rango de los datos. Sin
+  // ese límite una sola generación de acelga —200 días de cosecha— estiraba el
+  // gráfico hasta septiembre del año siguiente y achicaba todo lo demás.
+  //
+  // Lo que sigue después de junio no se borra: la barra llega al borde y se
+  // marca, que es distinto de decir que ahí se termina.
+  const d0 = inicioDeTemporada();
+  const d1 = new Date(d0); d1.setFullYear(d1.getFullYear() + 1);
   const ini = Math.floor(d0.getTime() / 86400000);
   const fin = Math.floor(d1.getTime() / 86400000);
   const dias = Math.max(1, fin - ini);
@@ -1909,11 +1930,14 @@ function planEstrategico() {
 
   const filas = gens.map((g) => {
     const t = g.tramos;
+    // Recortado a la temporada: lo que empieza antes de julio o sigue después
+    // de junio se dibuja hasta el borde, no fuera de él.
     const seg = (a, b, clase, titulo) => {
-      const i = pct(a), f = pct(b);
+      const i = Math.max(0, pct(a)), f = Math.min(100, pct(b));
       if (f <= i) return "";
       return `<div class="${clase}" style="left:${i}%;width:${f - i}%" title="${esc(titulo)}"></div>`;
     };
+    const sigue = t.fin > isoDe(d1);
     return `<div class="plan-gen">
       <div class="plan-nombre" title="${esc(g.cultivo)} G${g.generacion}">
         ${esc(g.cultivo)} <span>G${g.generacion}</span>
@@ -1925,6 +1949,8 @@ function planEstrategico() {
           `${t.directa ? "sembrado" : "trasplantado"} el ${fechaCorta(t.campo)}`)}
         ${t.inicioCosecha ? seg(t.inicioCosecha, t.fin, "tramo cosecha",
           `cosecha: ${fechaCorta(t.inicioCosecha)} a ${fechaCorta(t.fin)}`) : ""}
+        ${sigue ? `<div class="sigue" title="sigue en cosecha hasta el ${
+          fechaCorta(t.fin)}, ya fuera de esta temporada">›</div>` : ""}
       </div>
     </div>`;
   }).join("");

@@ -451,6 +451,21 @@ button.secundario {
 .tramo.campo    { background: #8fae7d; }
 .tramo.cosecha  { background: #3d6b35; }
 
+/* La generación que sigue produciendo después de junio: la barra llega al
+   borde y esta marca avisa que no se termina ahí, solo se termina el gráfico. */
+.sigue {
+  position: absolute;
+  right: -9px;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: .95rem;
+  font-weight: 700;
+  color: #3d6b35;
+  cursor: help;
+}
+
 .linea-hoy {
   position: absolute;
   top: -6px;
