@@ -972,22 +972,69 @@ function rankingDelJuego(chacra) {
    todas para dibujar la temporada. */
 function generacionesDelPlan(chacra) {
   var def = HOJAS.generaciones;
-  var hoja = planillaDe(chacra).getSheetByName(def.nombre);
+  var libro = planillaDe(chacra);
+  var hoja = libro.getSheetByName(def.nombre);
   if (!hoja || hoja.getLastRow() < 2) return [];
   var tz = Session.getScriptTimeZone();
   var texto = function (v) {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
   };
+
+  /* Que una generacion este sembrada no lo dice el plan sino la hoja Siembras.
+     La columna Estado es una foto del dia en que se importo el plan: si se
+     sigue creyendo en ella, una generacion ya sembrada queda pidiendo que la
+     siembren para siempre. Se cruza por cultivo y generacion, que es la unica
+     llave que comparten las dos hojas. */
+  /* Se cruza por cultivo y FECHA, no por numero de generacion. Dos razones:
+
+     - Varias generaciones del plan comparten una misma siembra. El puerro son
+       ocho plantaciones escalonadas que salen de un solo almacigo sembrado el
+       mismo dia; cruzando por numero, siete quedarian reclamando para siempre.
+     - Los numeros no tienen por que coincidir: el plan viene de afuera y quien
+       carga la siembra en el telefono elige la generacion a ojo.
+
+     La ventana es amplia hacia adelante porque sembrar unos dias tarde es lo
+     normal, y angosta hacia atras porque adelantarse mucho no lo es. */
+  var ANTES = 10, DESPUES = 25;
+  var siembras = [];
+  var hs = libro.getSheetByName(HOJAS.siembras.nombre);
+  if (hs && hs.getLastRow() > 1) {
+    hs.getRange(2, 1, hs.getLastRow() - 1, HOJAS.siembras.encabezados.length)
+      .getValues().forEach(function (f) {
+        if (!f[0] || !f[3] || !f[2]) return;
+        siembras.push({ id: String(f[0]), cultivo: claveNombre(f[3]), fecha: texto(f[2]) });
+      });
+  }
+  var buscarSiembra = function (cultivo, cuando) {
+    if (!cuando) return null;
+    var k = claveNombre(cultivo);
+    var objetivo = new Date(cuando + "T12:00:00").getTime();
+    for (var i = 0; i < siembras.length; i++) {
+      if (siembras[i].cultivo !== k || !siembras[i].fecha) continue;
+      var d = (new Date(siembras[i].fecha + "T12:00:00").getTime() - objetivo) / 86400000;
+      if (d >= -ANTES && d <= DESPUES) return siembras[i];
+    }
+    return null;
+  };
+
   return hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length)
     .getValues()
     .filter(function (f) { return f[0] && f[2]; })
     .map(function (f) {
+      var gen = Number(f[3]) || 1;
+      // El dia que toca sembrar: la bandeja si va por almacigo, el bancal si
+      // es siembra directa.
+      var real = buscarSiembra(String(f[2]), texto(f[5]) || texto(f[6]));
       return {
-        id: String(f[0]), cultivo: String(f[2]), generacion: Number(f[3]) || 1,
+        id: String(f[0]), cultivo: String(f[2]), generacion: gen,
         metodo: String(f[4] || ""), fecha_almacigo: texto(f[5]),
         fecha_campo: texto(f[6]), camas: Number(f[7]) || 0,
         sector: String(f[8] || ""), bancales: String(f[9] || ""),
         estado: String(f[10] || "Planificado"),
+        // Lo que de verdad paso, calculado contra la hoja Siembras.
+        sembrada: !!real,
+        siembra_id: real ? real.id : "",
+        sembrada_el: real ? real.fecha : "",
       };
     });
 }

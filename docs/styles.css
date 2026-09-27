@@ -369,6 +369,14 @@ button.secundario {
 .dato b { font-size: .96rem; }
 .dato b small { font-weight: 400; color: var(--tenue); }
 
+/* Una siembra que se pasó de fecha se ve de otro color: es lo único de esa
+   lista que pide una decisión y no solo una tarea. */
+.etiqueta.alerta {
+  background: #fbe9e7;
+  color: var(--peligro);
+}
+.registro .gen { color: var(--tenue); font-weight: 400; }
+
 /* ---- plan estratégico: el calendario de barras de la temporada ----
    Se desliza en horizontal, que es lo que permite que entre en un teléfono sin
    volverse ilegible: el nombre del cultivo queda fijo a la izquierda y lo que

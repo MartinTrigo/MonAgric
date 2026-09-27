@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 41 · 26/9/2026";
+const VERSION_APP = "versión 42 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -893,6 +893,8 @@ const plantillas = {
         ${resumen ? "datos de toda la chacra" : "solo este teléfono"}
       </div>
     </div>
+
+    ${tarjetaSiembrasPendientes()}
 
     <div class="tarjeta">
       <h2>Lo cargado ${resumen ? "desde la chacra" : "<small>(solo este teléfono)</small>"}</h2>
@@ -1797,6 +1799,86 @@ async function traerFichasTexto() {
   finally { bajandoFichas = false; }
 }
 
+// Las siembras que toca hacer, según el plan de la temporada. Una generación
+// entra acá si su fecha ya llegó o está cerca y todavía no se cargó la siembra.
+//
+// "Todavía no se cargó" lo dice el servicio cruzando el plan con la hoja
+// Siembras, no la columna Estado del plan: esa es una foto del día en que se
+// importó, y creyéndole, una generación ya sembrada seguiría reclamando para
+// siempre. Mientras el servicio no lo mande, se cae en esa columna y se suma
+// lo que haya en la cola de este teléfono.
+function siembrasPendientes(dias = DIAS_AVISO) {
+  const gens = leer(LS.generaciones, []) || [];
+  if (!gens.length) return [];
+
+  // Lo cargado en este teléfono y todavía sin viajar también cuenta como hecho.
+  const enLaCola = new Set(pendientes.concat(enviados)
+    .filter((r) => r.tipo === "siembras")
+    .map((r) => `${claveArea(r.datos.cultivo)}|${Number(r.datos.generacion) || 1}`));
+
+  const limite = sumarDias(hoy(), dias);
+  return gens
+    .map((g) => {
+      // El día que toca sembrar: la bandeja si va por almácigo, el bancal si
+      // es siembra directa.
+      const cuando = g.fecha_almacigo || g.fecha_campo;
+      const hecha = ("sembrada" in g) ? g.sembrada : g.estado === "Sembrado";
+      return { ...g, cuando, hecha: hecha || enLaCola.has(`${claveArea(g.cultivo)}|${g.generacion}`) };
+    })
+    .filter((g) => g.cuando && !g.hecha && g.cuando <= limite)
+    .sort((a, b) => String(a.cuando).localeCompare(String(b.cuando)));
+}
+
+// Varias generaciones del plan pueden salir de una sola siembra: el puerro son
+// ocho plantaciones escalonadas que arrancan en la misma bandeja, el mismo día.
+// Para quien tiene que sembrar eso es UNA tarea, no ocho, así que se juntan.
+function siembrasAgrupadas(dias = DIAS_AVISO) {
+  const juntas = new Map();
+  siembrasPendientes(dias).forEach((g) => {
+    const k = `${claveArea(g.cultivo)}|${g.cuando}`;
+    if (!juntas.has(k)) juntas.set(k, { ...g, generaciones: [], camasTotal: 0 });
+    const j = juntas.get(k);
+    j.generaciones.push(g.generacion);
+    j.camasTotal += Number(g.camas) || 0;
+  });
+  return [...juntas.values()]
+    .sort((a, b) => String(a.cuando).localeCompare(String(b.cuando)));
+}
+
+function tarjetaSiembrasPendientes() {
+  const pend = siembrasAgrupadas();
+  if (!pend.length) return "";
+  const atrasadas = pend.filter((g) => g.cuando < hoy());
+
+  return `<div class="tarjeta">
+    <h2>&#127793; Para sembrar <small>${pend.length}</small></h2>
+    <p class="nota">Del plan de la temporada. Desaparecen solas al cargar la
+    siembra en su sección.</p>
+    ${pend.slice(0, 8).map((g) => {
+      const d = diasEntre(hoy(), g.cuando);
+      const cuando = d === 0 ? "hoy"
+        : d < 0 ? `atrasada ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`
+        : `en ${d} día${d === 1 ? "" : "s"}`;
+      const gs = g.generaciones;
+      const etiqueta = gs.length === 1 ? `G${gs[0]}`
+        : `G${Math.min(...gs)} a G${Math.max(...gs)} <small>(${gs.length} juntas)</small>`;
+      return `<div class="registro">
+        <div>
+          <div class="detalle">${esc(g.cultivo)} <span class="gen">${etiqueta}</span></div>
+          <div class="cuando">${g.fecha_almacigo ? "en bandeja" : "siembra directa"}${
+            g.camasTotal ? ` · ${num(g.camasTotal, 1)} cama(s)` : ""}${
+            g.sector ? ` · ${esc(g.sector)}` : ""} · ${fechaCorta(g.cuando)}</div>
+        </div>
+        <span class="etiqueta ${d < 0 ? "alerta" : "ok"}">${cuando}</span>
+      </div>`;
+    }).join("")}
+    ${pend.length > 8 ? `<p class="nota">y ${pend.length - 8} más en el plan estratégico.</p>` : ""}
+    ${atrasadas.length ? `<p class="nota">${atrasadas.length} ya pasó su fecha.
+      Si no se van a sembrar, conviene sacarlas de la hoja «Plan generaciones»
+      para que dejen de aparecer.</p>` : ""}
+  </div>`;
+}
+
 // ---- Plan estratégico ----
 // El calendario de la temporada: una barra por generación, con sus tres
 // tramos. Lo único que se guarda de cada generación es CUÁNDO se decidió
@@ -1813,7 +1895,9 @@ async function traerGeneraciones(forzar = false) {
     if (!d.ok || !Array.isArray(d.generaciones)) return;
     const cambio = JSON.stringify(leer(LS.generaciones, null)) !== JSON.stringify(d.generaciones);
     escribir(LS.generaciones, d.generaciones);
-    if (cambio && vistaActual === "plan" && verPlanEstrategico) render("plan", true);
+    if (!cambio) return;
+    if (vistaActual === "inicio") render("inicio", true);
+    else if (vistaActual === "plan" && verPlanEstrategico) render("plan", true);
   } catch { /* sin señal: se usa lo último que se bajó */ }
 }
 
@@ -1862,10 +1946,12 @@ function inicioDeTemporada() {
 
 function generacionesParaElPlan() {
   const todas = leer(LS.generaciones, []) || [];
+  // Vale lo que dice la hoja Siembras, no la columna Estado del plan. Si el
+  // servicio todavía no manda el cruce, se cae en esa columna.
+  const sembrada = (g) => ("sembrada" in g) ? g.sembrada : g.estado === "Sembrado";
   const filtradas = todas.filter((g) =>
     filtroPlan === "todas" ? true
-      : filtroPlan === "sembradas" ? g.estado === "Sembrado"
-      : g.estado !== "Sembrado");
+      : filtroPlan === "sembradas" ? sembrada(g) : !sembrada(g));
   return filtradas
     .map((g) => Object.assign({}, g, { tramos: tramosDe(g) }))
     .filter((g) => g.tramos)
@@ -1942,7 +2028,8 @@ function planEstrategico() {
       <div class="plan-nombre" title="${esc(g.cultivo)} G${g.generacion}">
         ${esc(g.cultivo)} <span>G${g.generacion}</span>
       </div>
-      <div class="plan-pista${g.estado === "Sembrado" ? " sembrada" : ""}">
+      <div class="plan-pista${
+        (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado") ? " sembrada" : ""}">
         ${t.directa ? "" : seg(t.inicio, t.campo, "tramo almacigo",
           `almácigo: ${fechaCorta(t.inicio)} a ${fechaCorta(t.campo)}`)}
         ${seg(t.campo, t.inicioCosecha || t.fin, "tramo campo",
@@ -2468,7 +2555,8 @@ function render(vista, conservarScroll = false) {
   document.querySelectorAll("[name=filtro-plan]").forEach((r) => {
     r.onchange = () => { filtroPlan = r.value; render("plan", true); };
   });
-  if (vista === "plan") traerGeneraciones();
+  // El plan también lo necesita Inicio, para avisar qué toca sembrar.
+  if (vista === "plan" || vista === "inicio") traerGeneraciones();
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {
