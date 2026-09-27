@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 39 · 26/9/2026";
+const VERSION_APP = "versión 40 · 26/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -71,6 +71,7 @@ const LS = {
   almacigos: "monagric_almacigos",
   modoCosecha: "monagric_modo_cosecha",
   fichas: "monagric_fichas",
+  generaciones: "monagric_generaciones",
 };
 
 const leer = (k, def) => {
@@ -89,6 +90,10 @@ let vistaActual = "inicio";
 let cuentaAbierta = "";
 // Qué cultivo del plan se está mirando en detalle. Vacío = el plan entero.
 let cultivoAbierto = "";
+// El plan estratégico: el calendario de barras de toda la temporada.
+let verPlanEstrategico = false;
+let ordenPlan = "cultivo";      // "cultivo" o "fecha"
+let filtroPlan = "todas";       // "todas", "planificadas" o "sembradas"
 let vistaTareas = "hoy";        // "hoy" o "areas"
 
 // Dos maneras de cargar una cosecha, porque son dos situaciones distintas.
@@ -1365,10 +1370,15 @@ const plantillas = {
     // Un cultivo abierto reemplaza la lista: en el teléfono no hay lugar para
     // las dos cosas, y en la notebook la ficha se lee mejor sola.
     if (cultivoAbierto) return fichaCultivo(cultivoAbierto);
+    if (verPlanEstrategico) return planEstrategico();
 
     return `
     <div class="tarjeta">
       <h2>Plan de la temporada <small>${plan.length} cultivos</small></h2>
+      <div class="pestanas-tareas">
+        <button type="button" class="pestana activa" data-plan-vista="lista">Lista</button>
+        <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
+      </div>
       ${plan.length ? plan.map((p) => {
         const logrado = porCultivo[p.cultivo] || 0;
         const pct = p.cosecha_esperada_kg ? (logrado / p.cosecha_esperada_kg) * 100 : 0;
@@ -1786,6 +1796,187 @@ async function traerFichasTexto() {
   } catch { /* sin señal la primera vez: se muestra el resto de la ficha */ }
   finally { bajandoFichas = false; }
 }
+
+// ---- Plan estratégico ----
+// El calendario de la temporada: una barra por generación, con sus tres
+// tramos. Lo único que se guarda de cada generación es CUÁNDO se decidió
+// sembrarla; el trasplante, el inicio y el fin de cosecha se calculan acá con
+// los días del catálogo. Así, cuando esos días se corrigen con lo que de
+// verdad pasa en la chacra, el plan entero se corrige solo.
+async function traerGeneraciones(forzar = false) {
+  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+  if (!forzar && Date.now() - (pedidoReciente.generaciones || 0) < 20000) return;
+  pedidoReciente.generaciones = Date.now();
+  try {
+    const d = await (await fetch(
+      `${urlServicio()}?${conCredenciales("generaciones=1")}`)).json();
+    if (!d.ok || !Array.isArray(d.generaciones)) return;
+    const cambio = JSON.stringify(leer(LS.generaciones, null)) !== JSON.stringify(d.generaciones);
+    escribir(LS.generaciones, d.generaciones);
+    if (cambio && vistaActual === "plan" && verPlanEstrategico) render("plan", true);
+  } catch { /* sin señal: se usa lo último que se bajó */ }
+}
+
+// Los cuatro momentos de una generación. En siembra directa no hay tramo de
+// almácigo: la planta arranca en el bancal.
+function tramosDe(g) {
+  const p = perfil(g.cultivo) || {};
+  const directa = !g.fecha_almacigo;
+  const inicioTodo = g.fecha_almacigo || g.fecha_campo;
+  if (!inicioTodo) return null;
+
+  const aCampo = g.fecha_campo || "";
+  // De la bandeja al bancal: si el plan trae la fecha se respeta, porque es
+  // una decisión; si no, se estima con los días de almácigo de la estación.
+  const campo = aCampo || sumarDias(inicioTodo, diasAlmacigo(g.cultivo, inicioTodo));
+  const aCosecha = directa
+    ? (p.dias_a_cosecha || 0)
+    : (p.dias_trasplante_cosecha || 0);
+  const inicioCosecha = aCosecha ? sumarDias(campo, aCosecha) : "";
+  const dura = p.dias_en_cosecha_max || p.dias_en_cosecha || 0;
+  const finCosecha = inicioCosecha && dura ? sumarDias(inicioCosecha, dura) : inicioCosecha;
+
+  return { inicio: inicioTodo, campo, inicioCosecha, fin: finCosecha || campo, directa };
+}
+
+const diaDe = (iso) => Math.floor(new Date(iso + "T00:00:00").getTime() / 86400000);
+
+function generacionesParaElPlan() {
+  const todas = leer(LS.generaciones, []) || [];
+  const filtradas = todas.filter((g) =>
+    filtroPlan === "todas" ? true
+      : filtroPlan === "sembradas" ? g.estado === "Sembrado"
+      : g.estado !== "Sembrado");
+  return filtradas
+    .map((g) => Object.assign({}, g, { tramos: tramosDe(g) }))
+    .filter((g) => g.tramos)
+    .sort((a, b) => ordenPlan === "fecha"
+      ? String(a.tramos.inicioCosecha || a.tramos.inicio)
+          .localeCompare(String(b.tramos.inicioCosecha || b.tramos.inicio))
+      : a.cultivo.localeCompare(b.cultivo) || a.generacion - b.generacion);
+}
+
+function planEstrategico() {
+  const gens = generacionesParaElPlan();
+  const total = (leer(LS.generaciones, []) || []).length;
+
+  const cabecera = `
+    <div class="pestanas-tareas">
+      <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
+      <button type="button" class="pestana activa" data-plan-vista="grafico">Plan estratégico</button>
+    </div>`;
+
+  if (!gens.length) {
+    return `<div class="tarjeta">
+      <h2>Plan estratégico</h2>
+      ${cabecera}
+      <p class="nota">${total
+        ? "Ningún generación coincide con el filtro elegido."
+        : `Todavía no hay generaciones planificadas. Se cargan desde la
+           planificación de la temporada con <code>tools/cargar_generaciones.py</code>.`}</p>
+    </div>`;
+  }
+
+  // El eje: del primer día al último, redondeado a meses enteros para que las
+  // divisiones caigan en el 1 de cada mes y se lean como un calendario.
+  const desde = gens.reduce((a, g) => g.tramos.inicio < a ? g.tramos.inicio : a, gens[0].tramos.inicio);
+  const hasta = gens.reduce((a, g) => g.tramos.fin > a ? g.tramos.fin : a, gens[0].tramos.fin);
+  const d0 = new Date(desde + "T00:00:00"); d0.setDate(1);
+  const d1 = new Date(hasta + "T00:00:00"); d1.setMonth(d1.getMonth() + 1, 1);
+  const ini = Math.floor(d0.getTime() / 86400000);
+  const fin = Math.floor(d1.getTime() / 86400000);
+  const dias = Math.max(1, fin - ini);
+  const pct = (iso) => ((diaDe(iso) - ini) / dias) * 100;
+
+  // Los meses del encabezado
+  const meses = [];
+  const cur = new Date(d0);
+  while (cur < d1) {
+    const desdeMes = Math.floor(cur.getTime() / 86400000);
+    const sig = new Date(cur); sig.setMonth(sig.getMonth() + 1);
+    const hastaMes = Math.min(fin, Math.floor(sig.getTime() / 86400000));
+    meses.push({
+      nombre: MESES_CORTOS[cur.getMonth()],
+      anio: cur.getFullYear(),
+      izq: ((desdeMes - ini) / dias) * 100,
+      ancho: ((hastaMes - desdeMes) / dias) * 100,
+    });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+
+  const hoyPct = pct(hoy());
+  const enPantalla = hoyPct >= 0 && hoyPct <= 100;
+
+  const filas = gens.map((g) => {
+    const t = g.tramos;
+    const seg = (a, b, clase, titulo) => {
+      const i = pct(a), f = pct(b);
+      if (f <= i) return "";
+      return `<div class="${clase}" style="left:${i}%;width:${f - i}%" title="${esc(titulo)}"></div>`;
+    };
+    return `<div class="plan-gen">
+      <div class="plan-nombre" title="${esc(g.cultivo)} G${g.generacion}">
+        ${esc(g.cultivo)} <span>G${g.generacion}</span>
+      </div>
+      <div class="plan-pista${g.estado === "Sembrado" ? " sembrada" : ""}">
+        ${t.directa ? "" : seg(t.inicio, t.campo, "tramo almacigo",
+          `almácigo: ${fechaCorta(t.inicio)} a ${fechaCorta(t.campo)}`)}
+        ${seg(t.campo, t.inicioCosecha || t.fin, "tramo campo",
+          `${t.directa ? "sembrado" : "trasplantado"} el ${fechaCorta(t.campo)}`)}
+        ${t.inicioCosecha ? seg(t.inicioCosecha, t.fin, "tramo cosecha",
+          `cosecha: ${fechaCorta(t.inicioCosecha)} a ${fechaCorta(t.fin)}`) : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<div class="tarjeta">
+    <h2>Plan estratégico <small>${gens.length} de ${total} generaciones</small></h2>
+    ${cabecera}
+
+    <div class="plan-controles">
+      <div class="chips">
+        ${[["cultivo", "Por cultivo"], ["fecha", "Por fecha de cosecha"]].map(([v, t]) =>
+          `<label class="chip"><input type="radio" name="orden-plan" value="${v}"${
+            ordenPlan === v ? " checked" : ""}><span>${t}</span></label>`).join("")}
+      </div>
+      <div class="chips">
+        ${[["todas", "Todas"], ["sembradas", "Sembradas"], ["planificadas", "Planificadas"]]
+          .map(([v, t]) => `<label class="chip"><input type="radio" name="filtro-plan" value="${v}"${
+            filtroPlan === v ? " checked" : ""}><span>${t}</span></label>`).join("")}
+      </div>
+    </div>
+
+    <p class="nota">Almácigo, tiempo en el bancal y ventana de cosecha. Los dos
+    últimos tramos los calcula la app con los días del catálogo: cuando esos
+    días se corrigen con lo que pasa acá, el plan se corrige solo.</p>
+
+    <div class="plan-scroll">
+      <div class="plan-grafico" style="--ancho:${Math.max(720, meses.length * 96)}px">
+        <div class="plan-meses">
+          <div class="plan-nombre"></div>
+          <div class="plan-pista">
+            ${meses.map((m) => `<div class="mes" style="left:${m.izq}%;width:${m.ancho}%">
+              ${m.nombre}${m.nombre === "ene" ? " " + String(m.anio).slice(2) : ""}</div>`).join("")}
+          </div>
+        </div>
+        <div class="plan-cuerpo">
+          ${enPantalla ? `<div class="linea-hoy" style="left:calc(var(--sangria) + (100% - var(--sangria)) * ${hoyPct / 100})"></div>` : ""}
+          ${filas}
+        </div>
+      </div>
+    </div>
+
+    <div class="plan-leyenda">
+      <span><i class="m-almacigo"></i> en almácigo</span>
+      <span><i class="m-campo"></i> en el bancal</span>
+      <span><i class="m-cosecha"></i> en cosecha</span>
+      ${enPantalla ? `<span><i class="m-hoy"></i> hoy</span>` : ""}
+    </div>
+  </div>`;
+}
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun",
+                      "jul", "ago", "sep", "oct", "nov", "dic"];
 
 // ---- Ficha de un cultivo ----
 // Todo lo que la app sabe de un cultivo, junto. Hoy, para responder "¿cuánto
@@ -2236,6 +2427,22 @@ function render(vista, conservarScroll = false) {
   const volver = $("#volver-plan");
   if (volver) volver.onclick = () => { cultivoAbierto = ""; render("plan"); };
   if (vista === "plan" && cultivoAbierto) { traerFicha(cultivoAbierto); traerFichasTexto(); }
+
+  // Plan estratégico: cambiar de vista, ordenar y filtrar.
+  document.querySelectorAll("[data-plan-vista]").forEach((b) => {
+    b.onclick = () => {
+      verPlanEstrategico = b.dataset.planVista === "grafico";
+      cultivoAbierto = "";
+      render("plan");
+    };
+  });
+  document.querySelectorAll("[name=orden-plan]").forEach((r) => {
+    r.onchange = () => { ordenPlan = r.value; render("plan", true); };
+  });
+  document.querySelectorAll("[name=filtro-plan]").forEach((r) => {
+    r.onchange = () => { filtroPlan = r.value; render("plan", true); };
+  });
+  if (vista === "plan") traerGeneraciones();
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {

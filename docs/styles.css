@@ -369,6 +369,125 @@ button.secundario {
 .dato b { font-size: .96rem; }
 .dato b small { font-weight: 400; color: var(--tenue); }
 
+/* ---- plan estratégico: el calendario de barras de la temporada ----
+   Se desliza en horizontal, que es lo que permite que entre en un teléfono sin
+   volverse ilegible: el nombre del cultivo queda fijo a la izquierda y lo que
+   se mueve es el tiempo. */
+.plan-controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 10px;
+}
+.plan-controles .chips { margin-bottom: 0; }
+
+.plan-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -14px;
+  padding: 0 14px;
+}
+.plan-grafico {
+  min-width: var(--ancho, 720px);
+  --sangria: 118px;
+}
+.plan-meses,
+.plan-gen {
+  display: grid;
+  grid-template-columns: var(--sangria) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.plan-meses {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--sage-light);
+  margin-bottom: 6px;
+}
+.plan-meses .plan-pista { height: 18px; }
+.plan-meses .mes {
+  position: absolute;
+  top: 0;
+  font-size: .72rem;
+  color: var(--tenue);
+  border-left: 1px solid var(--sage-light);
+  padding-left: 4px;
+  height: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.plan-nombre {
+  font-size: .8rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-nombre span { color: var(--tenue); }
+
+.plan-cuerpo { position: relative; }
+.plan-gen { margin-bottom: 3px; }
+.plan-pista {
+  position: relative;
+  height: 15px;
+  background: var(--crema);
+  border-radius: 4px;
+}
+/* Lo planificado se dibuja más tenue que lo que ya se sembró: de un vistazo se
+   ve qué es decisión tomada y qué es intención. */
+.plan-pista:not(.sembrada) .tramo { opacity: .55; }
+
+.tramo {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+}
+.tramo.almacigo { background: #b98a4a; }
+.tramo.campo    { background: #8fae7d; }
+.tramo.cosecha  { background: #3d6b35; }
+
+.linea-hoy {
+  position: absolute;
+  top: -6px;
+  bottom: -2px;
+  width: 2px;
+  background: #c0392b;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.plan-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  font-size: .8rem;
+  color: var(--tenue);
+}
+.plan-leyenda i {
+  display: inline-block;
+  width: 16px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.plan-leyenda .m-almacigo { background: #b98a4a; }
+.plan-leyenda .m-campo    { background: #8fae7d; }
+.plan-leyenda .m-cosecha  { background: #3d6b35; }
+.plan-leyenda .m-hoy      { background: #c0392b; width: 3px; height: 13px; }
+
+/* En la notebook el gráfico entra entero: no tiene sentido partirlo en dos
+   columnas como el resto de las tarjetas. */
+@media (min-width: 1000px) {
+  #vista > .tarjeta:has(.plan-grafico) { column-span: all; }
+}
+
 /* "Saber más": la referencia del cultivo va al final y plegada. Quien abre la
    ficha viene a ver cómo viene la temporada, no a leer sobre la especie. */
 .saber-mas { margin-top: 18px; }

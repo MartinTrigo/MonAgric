@@ -109,6 +109,28 @@ var HOJAS = {
   // cuatro bancales distintos, y cada uno rinde distinto: si fueran una sola
   // fila con un contador, el rinde por bancal no se podria calcular nunca. Las
   // filas de una misma tanda comparten siembra de origen y fecha.
+  /* Las generaciones planificadas de la temporada: cuando se decide sembrar
+     cada una. Es lo unico que se guarda de la planificacion; el trasplante
+     estimado, el inicio y el fin de cosecha NO se guardan, se calculan con el
+     catalogo cada vez que se dibuja. Asi, cuando los dias del catalogo se
+     corrigen con lo que pasa en la chacra, el plan entero se corrige solo.
+
+     "Planificado" es lo que todavia no se sembro; cuando se carga la siembra
+     de verdad, esa generacion pasa a tener su registro en Siembras y el plan
+     queda como lo que era: una intencion contra la cual comparar. */
+  generaciones: {
+    nombre: "Plan generaciones",
+    encabezados: ["Id", "Temporada", "Cultivo", "Generación", "Método",
+                  "Fecha almácigo", "Fecha a campo", "Camas", "Sector",
+                  "Bancales", "Estado", "Origen", "Recibido"],
+    fila: function (r) {
+      var d = r.datos;
+      return [r.id, r.temporada || "", d.cultivo, d.generacion || 1,
+              d.metodo || "", d.fecha_almacigo || "", d.fecha_campo || "",
+              d.camas || "", d.sector || "", d.bancales || "",
+              d.estado || "Planificado", d.origen || "", new Date()];
+    },
+  },
   trasplantes: {
     nombre: "Trasplantes",
     encabezados: ["Id", "Temporada", "Fecha", "Siembra origen", "Fecha siembra",
@@ -311,7 +333,7 @@ function atender(p) {
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
-      || p.catalogo || p.almacigos || p.ficha) {
+      || p.catalogo || p.almacigos || p.ficha || p.generaciones) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -341,6 +363,10 @@ function atender(p) {
 
     if (p.ficha) {
       return respuesta(fichaDeCultivo(chacra, p.ficha));
+    }
+
+    if (p.generaciones) {
+      return respuesta({ ok: true, generaciones: generacionesDelPlan(chacra) });
     }
 
     if (p.config) {
@@ -941,6 +967,31 @@ function rankingDelJuego(chacra) {
 // Para que en el celular se vea lo que viene cargando todo el equipo, no solo
 // lo de ese teléfono. Se leen nada más las últimas filas: no importa cuánto
 // crezca la planilla, siempre pesa lo mismo.
+/* El plan de generaciones entero. Son unas ochenta filas por temporada, asi
+   que viaja completo: no tiene sentido paginarlo, y el grafico las necesita
+   todas para dibujar la temporada. */
+function generacionesDelPlan(chacra) {
+  var def = HOJAS.generaciones;
+  var hoja = planillaDe(chacra).getSheetByName(def.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return [];
+  var tz = Session.getScriptTimeZone();
+  var texto = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+  return hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length)
+    .getValues()
+    .filter(function (f) { return f[0] && f[2]; })
+    .map(function (f) {
+      return {
+        id: String(f[0]), cultivo: String(f[2]), generacion: Number(f[3]) || 1,
+        metodo: String(f[4] || ""), fecha_almacigo: texto(f[5]),
+        fecha_campo: texto(f[6]), camas: Number(f[7]) || 0,
+        sector: String(f[8] || ""), bancales: String(f[9] || ""),
+        estado: String(f[10] || "Planificado"),
+      };
+    });
+}
+
 /* Todo lo que la chacra hizo con UN cultivo esta temporada: sus siembras, sus
    trasplantes y sus cosechas. Es lo que alimenta la ficha del cultivo.
 
