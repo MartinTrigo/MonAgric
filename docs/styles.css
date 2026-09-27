@@ -369,13 +369,32 @@ button.secundario {
 .dato b { font-size: .96rem; }
 .dato b small { font-weight: 400; color: var(--tenue); }
 
+/* "Saber más": la referencia del cultivo va al final y plegada. Quien abre la
+   ficha viene a ver cómo viene la temporada, no a leer sobre la especie. */
+.saber-mas { margin-top: 18px; }
+.saber-mas summary {
+  font-size: .92rem;
+  font-weight: 600;
+  color: var(--sage-dark);
+  cursor: pointer;
+  padding: 9px 0;
+  list-style: none;
+}
+.saber-mas summary::-webkit-details-marker { display: none; }
+.saber-mas summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform .15s;
+}
+.saber-mas[open] summary::before { content: "▾ "; }
+
 /* La ficha de referencia del cultivo: texto para leer, no datos para mirar,
    así que va con más aire y ancho de lectura cómodo. */
 .ficha-ref {
   background: var(--sage-suave);
   border-radius: 12px;
   padding: 14px 16px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 .ficha-titulo {
   display: flex;

@@ -1,204 +1,728 @@
 {
-  "_nota": "Fichas de referencia de los cultivos. Se cargan solo al abrir la ficha de un cultivo, no al arrancar la app, para no hacerla más pesada. Es información general: lo que pasa en cada chacra manda sobre lo que dice acá.",
-  "_fuentes": [
-    {
-      "titulo": "Calendario de cultivo a campo para especies hortícolas en el norte de la Patagonia",
-      "autores": "Iglesias, N. y otros — INTA, 2015",
-      "url": "https://repositorio.inta.gob.ar/xmlui/handle/20.500.12123/16337",
-      "sirve": "resistencia a heladas, profundidad de raíz y fechas para la región"
-    },
-    {
-      "titulo": "Fitosanitarios para cultivos hortícolas de la Norpatagonia (2023)",
-      "autores": "INTA",
-      "url": "https://repositoriosdigitales.mincyt.gob.ar/vufind/Record/INTADig_b60670596352c09d959ab598c5d96993",
-      "sirve": "plagas y enfermedades de la región"
-    }
-  ],
-  "fichas": {
-    "Acelga": {
-      "familia": "Amarantáceas",
-      "especie": "Beta vulgaris var. cicla",
-      "emoji": "🥬",
-      "resumen": "Es la misma especie que la remolacha, seleccionada por la hoja y el penca en vez de por la raíz. Resiste el frío mejor que casi cualquier hoja: aguanta heladas suaves y sigue produciendo cuando la lechuga ya no da. Por eso en la Comarca sostiene el bolsón en los meses flacos.\n\nSe cosecha hoja por hoja durante meses, sacando las de afuera y dejando el centro. Una plantación bien cuidada puede dar de 80 a 200 días de cosecha, que es lo que la vuelve tan rendidora por metro cuadrado.",
-      "manejo": [
-        "Corte de afuera hacia adentro: nunca sacar más de un tercio de las hojas de una planta.",
-        "Necesita agua pareja. Los altibajos de riego dan pencas fibrosas y hojas chicas.",
-        "Es exigente en nitrógeno por ser hoja. Responde bien al abonado de fondo.",
-        "Se puede sembrar directo, pero el almácigo da plantas más parejas y evita raleo."
-      ],
-      "problemas": [
-        "Mildiu (Peronospora): manchas amarillas arriba y polvillo gris abajo, con humedad y poca ventilación. Airear, no mojar la hoja de tarde.",
-        "Cercospora: manchitas redondas con borde rojizo. Sacar hojas enfermas y no compostarlas cerca.",
-        "Pulgones en el envés, sobre todo en primavera. Suelen controlarse solos si hay vaquitas."
-      ],
-      "presentacion": "Atado de hojas, de 400 a 600 g. También en manojos más chicos para el bolsón."
-    },
-    "Lechuga": {
-      "familia": "Asteráceas",
-      "especie": "Lactuca sativa",
-      "emoji": "🥬",
-      "resumen": "El cultivo de hoja más vendido y el que más escalona el trabajo: se siembra cada dos o tres semanas para tener corte continuo. Prefiere el fresco; con calor y días largos se espiga, la hoja se pone amarga y pierde valor.\n\nEn la Comarca el verano corto ayuda, pero conviene elegir la variedad según la época: las mantecosas de invierno no rinden igual sembradas en diciembre, y para eso están las de verano.",
-      "manejo": [
-        "Escalonar cada 15 a 21 días: es un cultivo de ventana corta, se pasa rápido.",
-        "No enterrar el cuello al trasplantar: si queda hundido se pudre.",
-        "Riego frecuente y liviano. La raíz es superficial y no busca agua en profundidad.",
-        "Con calor conviene media sombra o sembrar en los sectores más frescos."
-      ],
-      "problemas": [
-        "Espigado por calor o días largos: no tiene arreglo una vez que empezó, se previene con la variedad y la fecha.",
-        "Botrytis y esclerotinia en el cuello, con humedad y suelo frío. Plantar alto y no regar sobre la planta.",
-        "Babosas, sobre todo en plantas chicas recién trasplantadas.",
-        "Pulgones en el cogollo, difíciles de lavar después."
-      ],
-      "presentacion": "Por unidad o por kilo, según el punto de venta. La hoja suelta va en pack de 250 g."
-    },
-    "Brocoli": {
-      "familia": "Brasicáceas",
-      "especie": "Brassica oleracea var. italica",
-      "emoji": "🥦",
-      "resumen": "Se cosecha la inflorescencia antes de que abra. El punto es corto: pasado ese momento la cabeza se afloja, aparecen los botones amarillos y se cae el precio. Por eso se escalona en muchas generaciones y se revisa a diario cuando está por darse.\n\nDespués de cortar la cabeza central, la planta sigue dando rebrotes laterales más chicos durante semanas. Esos rebrotes suelen ir al bolsón y no a la verdulería.",
-      "manejo": [
-        "Escalonar de a poco: nueve generaciones de una cama rinden más que una de nueve camas.",
-        "Suelo bien abonado y fresco. Es un cultivo exigente y de ciclo largo.",
-        "No dejar que la planta sufra sed en la formación de la cabeza: da cabezas chicas y desparejas.",
-        "Dejar la planta después del corte: los rebrotes laterales son cosecha extra casi gratis."
-      ],
-      "problemas": [
-        "Polilla de las crucíferas y otras orugas: se controlan bien con Bacillus thuringiensis.",
-        "Pulgón ceniciento, que se mete entre los botones y es muy difícil de sacar al lavar.",
-        "Hernia de la col en suelos ácidos y húmedos: no repetir crucíferas en el mismo bancal.",
-        "Cabezas sueltas por calor o por atraso en la cosecha."
-      ],
-      "presentacion": "Por unidad, cabeza de 300 a 600 g. Los rebrotes, en atado."
-    },
-    "Kale": {
-      "familia": "Brasicáceas",
-      "especie": "Brassica oleracea var. sabellica",
-      "emoji": "🥬",
-      "resumen": "Es la col que no arma cabeza, y de todas las hortalizas de hoja es la que más tiempo queda en el bancal: entre 120 y 180 días de cosecha. Se saca hoja por hoja de abajo hacia arriba y la planta sigue creciendo hacia arriba.\n\nEl frío lo mejora: después de una helada la hoja se pone más dulce, porque la planta convierte almidón en azúcares. En la Comarca eso lo vuelve un cultivo de invierno muy confiable.",
-      "manejo": [
-        "Sacar siempre las hojas de abajo, dejando la corona: la planta rebrota desde el centro.",
-        "Una plantación bien manejada dura media temporada. Conviene ubicarla donde no moleste.",
-        "Aguanta heladas fuertes sin protección.",
-        "Distanciar bien: la planta crece mucho más de lo que parece al trasplantarla."
-      ],
-      "problemas": [
-        "Pulgón ceniciento en el cogollo, el problema más común y persistente.",
-        "Orugas de las crucíferas, que agujerean la hoja pero rara vez matan la planta.",
-        "Mosca blanca en invernadero o túnel."
-      ],
-      "presentacion": "Atado de hojas, de 250 a 400 g."
-    },
-    "Hakusai": {
-      "familia": "Brasicáceas",
-      "especie": "Brassica rapa subsp. pekinensis",
-      "emoji": "🥬",
-      "resumen": "El repollo chino: arma un cogollo alargado de hojas tiernas y penca ancha, mucho más rápido que un repollo común. Es el cultivo base del kimchi y un buen cierre de temporada porque tolera el frío y se guarda bien.\n\nEs sensible al espigado si se siembra muy temprano y agarra frío siendo planta chica: la planta interpreta que pasó un invierno y florece en vez de acogollar.",
-      "manejo": [
-        "No adelantarse con la siembra: el frío en planta chica dispara el espigado.",
-        "Necesita agua constante durante el acogollado, que es cuando gana todo su peso.",
-        "Suelo rico y suelto. Es de raíz superficial y crecimiento rápido.",
-        "Se guarda varias semanas en lugar fresco si se cosecha con las hojas de afuera puestas."
-      ],
-      "problemas": [
-        "Espigado por frío temprano o por siembra fuera de fecha.",
-        "Babosas entre las hojas del cogollo, que arruinan la presentación.",
-        "Pulgones y orugas, como todas las crucíferas.",
-        "Pudrición blanda en la base con exceso de humedad."
-      ],
-      "presentacion": "Por unidad, de 1 a 2 kg."
-    },
-    "Rucula": {
-      "familia": "Brasicáceas",
-      "especie": "Eruca vesicaria",
-      "emoji": "🌿",
-      "resumen": "De ciclo cortísimo: en cinco o seis semanas está lista, y por eso permite tapar huecos en el bancal entre dos cultivos largos. El sabor picante se acentúa con el calor y con la falta de agua; en fresco es más suave y la hoja más tierna.\n\nSe puede cortar y dejar rebrotar dos o tres veces, aunque cada corte da hoja más chica y más picante que el anterior.",
-      "manejo": [
-        "Siembra directa al voleo o en líneas juntas. No vale la pena el almácigo.",
-        "Cortar con tijera a dos o tres centímetros del suelo para que rebrote parejo.",
-        "Escalonar cada dos semanas: la ventana buena de cada siembra es muy corta.",
-        "Con calor se espiga rápido; en verano conviene sembrarla a media sombra."
-      ],
-      "problemas": [
-        "Pulguilla de las crucíferas: agujeritos redondos en la hoja, que la vuelven invendible. Es el problema principal y se maneja con cobertura de malla.",
-        "Espigado y picor excesivo por calor.",
-        "Babosas en siembras densas y húmedas."
-      ],
-      "presentacion": "Atado de 100 a 150 g, o a granel para mezcla de hojas."
-    },
-    "Rabanito": {
-      "familia": "Brasicáceas",
-      "especie": "Raphanus sativus",
-      "emoji": "🌶️",
-      "resumen": "El cultivo más rápido de la huerta: de la semilla a la cosecha pasan entre 25 y 40 días según la época. Sirve para aprovechar un bancal que queda libre poco tiempo y para dar señal temprana de cómo está el suelo.\n\nNo admite atraso: pasado el punto se ahueca, se pone picante y se raja. La ventana de cosecha es de días, no de semanas.",
-      "manejo": [
-        "Siembra directa siempre. No se trasplanta.",
-        "Ralear temprano si quedó denso: sin lugar no engrosa la raíz.",
-        "Riego parejo. La sed seguida de riego abundante raja las raíces.",
-        "Revisar todos los días cuando está cerca del punto."
-      ],
-      "problemas": [
-        "Pulguilla de las crucíferas en las hojas, sobre todo en plantas chicas.",
-        "Ahuecado y picor por cosecha tardía o por calor.",
-        "Raíces rajadas por riego irregular.",
-        "Todo hoja y nada de raíz: suele ser exceso de nitrógeno o siembra demasiado densa."
-      ],
-      "presentacion": "Atado de 6 a 10 unidades con sus hojas."
-    },
-    "Nabo Hakurei": {
-      "familia": "Brasicáceas",
-      "especie": "Brassica rapa subsp. rapa",
-      "emoji": "🥬",
-      "resumen": "Nabo japonés de raíz blanca, redonda y tierna, que se come crudo como una fruta y no necesita pelarse. Es bastante más rápido y más suave que el nabo común, y se cosecha chico: del tamaño de una pelota de golf a una de tenis.\n\nLa hoja también se vende y se come, así que rinde dos productos de la misma planta.",
-      "manejo": [
-        "Cosechar chico. Pasado el tamaño se pone fibroso y pierde lo que lo hace especial.",
-        "Siembra directa o almácigo corto; crece rápido en fresco.",
-        "Riego parejo para que la raíz no se raje.",
-        "Escalonar: la ventana buena es de unas tres semanas."
-      ],
-      "problemas": [
-        "Pulguilla de las crucíferas en la hoja, que es medio producto.",
-        "Raíces rajadas o fibrosas por atraso en la cosecha.",
-        "Gusanos de la raíz en suelos donde se repiten crucíferas."
-      ],
-      "presentacion": "Atado de 4 a 6 raíces con su hoja."
-    },
-    "Habas": {
-      "familia": "Fabáceas",
-      "especie": "Vicia faba",
-      "emoji": "🫘",
-      "resumen": "Legumbre de clima fresco, de las pocas que se siembran a fines del invierno y aguantan heladas. Además de la cosecha, fija nitrógeno en el suelo, así que deja el bancal mejor de lo que lo encontró: es buen antecesor de cultivos exigentes como las coles.\n\nSe cosecha en verde para consumo fresco, cuando el grano está formado pero todavía tierno.",
-      "manejo": [
-        "Siembra directa, a buena profundidad. La semilla es grande y no le teme al frío.",
-        "Despuntar la planta cuando empieza a cuajar: adelanta la cosecha y saca los brotes tiernos donde se concentra el pulgón.",
-        "No necesita abonado nitrogenado: lo fija ella.",
-        "Conviene tutorar o sostener en los sectores con viento."
-      ],
-      "problemas": [
-        "Pulgón negro en las puntas tiernas, el problema clásico. El despunte lo controla en buena medida.",
-        "Mancha chocolate (Botrytis fabae) con humedad y mucha planta junta: airear y no sembrar denso.",
-        "Roya en fin de ciclo, que suele no justificar intervención."
-      ],
-      "presentacion": "Por kilo, en chaucha."
-    },
-    "Puerro": {
-      "familia": "Amarilidáceas",
-      "especie": "Allium ampeloprasum var. porrum",
-      "emoji": "🧅",
-      "resumen": "De los cultivos más largos de la huerta: entre la siembra y la cosecha pueden pasar seis meses o más. A cambio, aguanta el invierno en el bancal sin deteriorarse, así que funciona como reserva viva: se cosecha cuando se necesita, no cuando está listo.\n\nEl blanco es la parte de valor, y se consigue enterrando: se planta en surco hondo o se va aporcando a medida que crece.",
-      "manejo": [
-        "Aporcar dos o tres veces durante el ciclo: cada aporque alarga el blanco.",
-        "Plantín fino, como un lápiz, antes de trasplantar. Recortar raíces y puntas ayuda al prendimiento.",
-        "Ocupa el bancal media temporada: ubicarlo donde no trabe la rotación.",
-        "Se puede dejar en tierra todo el invierno y cosechar de a poco."
-      ],
-      "problemas": [
-        "Trips, que dejan rayitas plateadas en la hoja, sobre todo en seco.",
-        "Polilla del puerro, que hace galerías en el interior.",
-        "Roya, con manchas anaranjadas en la hoja, en otoño húmedo.",
-        "Blanco corto por falta de aporque."
-      ],
-      "presentacion": "Atado de 3 a 5 plantas, o por unidad si son grandes."
-    }
+ "_nota": "Fichas de referencia de los cultivos. Se cargan solo al abrir la ficha de un cultivo, no al arrancar la app, para no hacerla más pesada. Es información general: lo que pasa en cada chacra manda sobre lo que dice acá.",
+ "_fuentes": [
+  {
+   "titulo": "Calendario de cultivo a campo para especies hortícolas en el norte de la Patagonia",
+   "autores": "Iglesias, N. y otros — INTA, 2015",
+   "url": "https://repositorio.inta.gob.ar/xmlui/handle/20.500.12123/16337",
+   "sirve": "resistencia a heladas, profundidad de raíz y fechas para la región"
+  },
+  {
+   "titulo": "Fitosanitarios para cultivos hortícolas de la Norpatagonia (2023)",
+   "autores": "INTA",
+   "url": "https://repositoriosdigitales.mincyt.gob.ar/vufind/Record/INTADig_b60670596352c09d959ab598c5d96993",
+   "sirve": "plagas y enfermedades de la región"
   }
+ ],
+ "fichas": {
+  "Acelga": {
+   "familia": "Amarantáceas",
+   "especie": "Beta vulgaris var. cicla",
+   "emoji": "🥬",
+   "resumen": "Es la misma especie que la remolacha, seleccionada por la hoja y el penca en vez de por la raíz. Resiste el frío mejor que casi cualquier hoja: aguanta heladas suaves y sigue produciendo cuando la lechuga ya no da. Por eso en la Comarca sostiene el bolsón en los meses flacos.\n\nSe cosecha hoja por hoja durante meses, sacando las de afuera y dejando el centro. Una plantación bien cuidada puede dar de 80 a 200 días de cosecha, que es lo que la vuelve tan rendidora por metro cuadrado.",
+   "manejo": [
+    "Corte de afuera hacia adentro: nunca sacar más de un tercio de las hojas de una planta.",
+    "Necesita agua pareja. Los altibajos de riego dan pencas fibrosas y hojas chicas.",
+    "Es exigente en nitrógeno por ser hoja. Responde bien al abonado de fondo.",
+    "Se puede sembrar directo, pero el almácigo da plantas más parejas y evita raleo."
+   ],
+   "problemas": [
+    "Mildiu (Peronospora): manchas amarillas arriba y polvillo gris abajo, con humedad y poca ventilación. Airear, no mojar la hoja de tarde.",
+    "Cercospora: manchitas redondas con borde rojizo. Sacar hojas enfermas y no compostarlas cerca.",
+    "Pulgones en el envés, sobre todo en primavera. Suelen controlarse solos si hay vaquitas."
+   ],
+   "presentacion": "Atado de hojas, de 400 a 600 g. También en manojos más chicos para el bolsón."
+  },
+  "Ajo": {
+   "familia": "Amarilidáceas",
+   "especie": "Allium sativum",
+   "emoji": "🧄",
+   "resumen": "Se planta en otoño y se cosecha a principio del verano: ocupa el bancal casi toda la temporada, pero en una época en que no compite con casi nada. No se siembra por semilla sino por diente, así que parte de la cosecha se guarda para plantar.\n\nNecesita frío invernal para dividirse en dientes. Sin ese frío arma un bulbo único, sin gajos.",
+   "manejo": [
+    "Plantar en otoño, diente por diente, con la punta hacia arriba.",
+    "Guardar los dientes más grandes de la propia cosecha para la próxima.",
+    "Cortar el riego cuando amarillea el follaje.",
+    "Curar y trenzar o atar para guardar."
+   ],
+   "problemas": [
+    "Bulbo sin dividir por falta de frío invernal.",
+    "Podredumbre blanca en suelos donde se repiten liliáceas: rotar largo.",
+    "Trips en la hoja.",
+    "Bulbos chicos por plantación tardía o competencia de yuyos."
+   ],
+   "presentacion": "Por cabeza, en ristra o por kilo."
+  },
+  "Ajo de verdeo": {
+   "familia": "Amarilidáceas",
+   "especie": "Allium fistulosum",
+   "emoji": "🧅",
+   "resumen": "Cebolla de verdeo: no forma bulbo y se cosecha entera, por la hoja y el tallo blanco. Es rústica, rebrota después del corte y puede quedar en el bancal como cultivo semipermanente, dando cortes durante meses.\n\nSe multiplica por semilla o por división de mata, que es más rápido y no pierde tiempo en almácigo.",
+   "manejo": [
+    "Se puede dividir la mata y replantar, en vez de sembrar.",
+    "Aporcar para alargar el blanco, igual que el puerro.",
+    "Cortar dejando la base: rebrota varias veces.",
+    "Aguanta heladas y sigue dando en invierno."
+   ],
+   "problemas": [
+    "Trips en la hoja, sobre todo en seco.",
+    "Roya con otoños húmedos.",
+    "Blanco corto por falta de aporque."
+   ],
+   "presentacion": "Atado de 5 a 8 plantas."
+  },
+  "Ají": {
+   "familia": "Solanáceas",
+   "especie": "Capsicum spp.",
+   "emoji": "🌶️",
+   "resumen": "Pariente picante del morrón, con el mismo manejo pero planta más chica y más rústica. El picor sube con el calor y con el estrés hídrico: la misma variedad da más suave en un año fresco y bien regado.\n\nLos frutos se pueden cosechar verdes o maduros; maduros pican más y sirven para secar.",
+   "manejo": [
+    "Bajo cubierta o en el sector más cálido y protegido.",
+    "Cosecha escalonada: cuanto más se saca, más produce.",
+    "Se seca bien colgado en ristra, lo que alarga la venta fuera de temporada.",
+    "Tolera mejor la sed que el morrón, pero pica más."
+   ],
+   "problemas": [
+    "Pulgones, trips y arañuela.",
+    "Golpe de sol en frutos expuestos.",
+    "Poco cuaje con noches frías."
+   ],
+   "presentacion": "Por unidad, en bolsita de 4 a 6, o en ristra seco."
+  },
+  "Albahaca": {
+   "familia": "Lamiáceas",
+   "especie": "Ocimum basilicum",
+   "emoji": "🌿",
+   "resumen": "Es de las pocas que no tolera nada de frío: una helada suave la mata, y por debajo de 10 °C deja de crecer y la hoja se mancha. En la Comarca eso la vuelve un cultivo de invernadero o de los sectores más protegidos.\n\nSe cosecha despuntando: cada corte por encima de un par de hojas hace que la planta se ramifique y dé más. Bien manejada rinde durante dos o tres meses.",
+   "manejo": [
+    "No sacarla afuera hasta que pase el riesgo de helada. Es lo que más la mata.",
+    "Despuntar seguido, cortando arriba de un par de hojas: ramifica y rinde más.",
+    "Sacar las flores apenas aparecen o la hoja se pone chica y dura.",
+    "Riego a la mañana y al pie, nunca sobre la hoja de tarde."
+   ],
+   "problemas": [
+    "Frío y helada: daño irreversible, se pone negra.",
+    "Botrytis y mancha en la hoja con humedad nocturna.",
+    "Fusarium en suelos donde ya hubo albahaca: rotar.",
+    "Floración temprana si no se despunta."
+   ],
+   "presentacion": "Atado de 80 a 150 g, o por planta en maceta."
+  },
+  "Apio": {
+   "familia": "Apiáceas",
+   "especie": "Apium graveolens",
+   "emoji": "🌿",
+   "resumen": "De los cultivos más largos y más sedientos de la huerta: entre almácigo y cosecha pasan cuatro o cinco meses, y no perdona la falta de agua en ningún momento. Con sed las pencas salen fibrosas, huecas y amargas.\n\nEl almácigo es lento y la semilla es muy chica; conviene sembrar en bandeja y ser paciente.",
+   "manejo": [
+    "Agua, agua y agua. Es el cultivo que más castiga el riego irregular.",
+    "Suelo muy rico en materia orgánica y que retenga humedad.",
+    "Almácigo largo: la semilla tarda y la planta arranca despacio.",
+    "Se puede blanquear atando las pencas o tapándolas las últimas semanas."
+   ],
+   "problemas": [
+    "Pencas fibrosas o huecas por sed o por crecimiento frenado.",
+    "Septoria: manchas marrones en la hoja, frecuente con humedad.",
+    "Corazón negro por falta de calcio, ligado al riego irregular.",
+    "Espigado si el plantín pasa frío."
+   ],
+   "presentacion": "Por planta, o atado de pencas."
+  },
+  "Berenjena": {
+   "familia": "Solanáceas",
+   "especie": "Solanum melongena",
+   "emoji": "🍆",
+   "resumen": "La más calurosa de las solanáceas: necesita más temperatura que el tomate y el morrón, y en la Comarca solo anda bien bajo cubierta. El almácigo es largo y la planta arranca despacio, pero después produce durante meses.\n\nSe cosecha con el fruto brillante y firme. Cuando pierde brillo ya tiene semilla dura y se pone amarga.",
+   "manejo": [
+    "Bajo cubierta sí o sí en esta zona. A campo no llega a producir.",
+    "Cosechar con el fruto brillante; el brillo perdido es señal de pasado.",
+    "Cosechar seguido: dejar frutos maduros frena la producción de los siguientes.",
+    "Tutorar: las ramas se quiebran con el peso."
+   ],
+   "problemas": [
+    "Arañuela roja, el problema principal en invernadero seco y caluroso.",
+    "Pulgones y mosca blanca.",
+    "Frutos amargos y con semilla dura por cosecha tardía.",
+    "Poco cuaje si las noches son frías."
+   ],
+   "presentacion": "Por kilo o por unidad."
+  },
+  "Brocoli": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica oleracea var. italica",
+   "emoji": "🥦",
+   "resumen": "Se cosecha la inflorescencia antes de que abra. El punto es corto: pasado ese momento la cabeza se afloja, aparecen los botones amarillos y se cae el precio. Por eso se escalona en muchas generaciones y se revisa a diario cuando está por darse.\n\nDespués de cortar la cabeza central, la planta sigue dando rebrotes laterales más chicos durante semanas. Esos rebrotes suelen ir al bolsón y no a la verdulería.",
+   "manejo": [
+    "Escalonar de a poco: nueve generaciones de una cama rinden más que una de nueve camas.",
+    "Suelo bien abonado y fresco. Es un cultivo exigente y de ciclo largo.",
+    "No dejar que la planta sufra sed en la formación de la cabeza: da cabezas chicas y desparejas.",
+    "Dejar la planta después del corte: los rebrotes laterales son cosecha extra casi gratis."
+   ],
+   "problemas": [
+    "Polilla de las crucíferas y otras orugas: se controlan bien con Bacillus thuringiensis.",
+    "Pulgón ceniciento, que se mete entre los botones y es muy difícil de sacar al lavar.",
+    "Hernia de la col en suelos ácidos y húmedos: no repetir crucíferas en el mismo bancal.",
+    "Cabezas sueltas por calor o por atraso en la cosecha."
+   ],
+   "presentacion": "Por unidad, cabeza de 300 a 600 g. Los rebrotes, en atado."
+  },
+  "Cebolla": {
+   "familia": "Amarilidáceas",
+   "especie": "Allium cepa",
+   "emoji": "🧅",
+   "resumen": "Es de las que más tiempo ocupan el bancal —cinco o seis meses— y de las que mejor pagan esa paciencia, porque se guarda medio año. El bulbo se forma según el largo del día, así que la variedad tiene que ser la correcta para la latitud: una de día corto no bulbifica acá.\n\nEl secreto de la guarda no está en el cultivo sino en el curado: hay que secarla bien antes de almacenarla.",
+   "manejo": [
+    "Elegir variedad de día largo o intermedio: es lo que define si forma bulbo.",
+    "Cortar el riego cuando cae el follaje: si sigue húmeda no cura bien.",
+    "Curar dos o tres semanas a la sombra y con aire antes de guardar.",
+    "Mantener el bancal sin yuyos: la cebolla compite muy mal."
+   ],
+   "problemas": [
+    "Bulbos que no engordan por variedad equivocada o competencia de yuyos.",
+    "Trips, que dejan la hoja plateada.",
+    "Mildiu en primavera húmeda.",
+    "Podredumbre en la guarda por curado incompleto o cuello grueso."
+   ],
+   "presentacion": "Por kilo."
+  },
+  "Cherry": {
+   "familia": "Solanáceas",
+   "especie": "Solanum lycopersicum var. cerasiforme",
+   "emoji": "🍅",
+   "resumen": "Tomate de fruto chico, más rústico y más precoz que el grande, y bastante más tolerante al rajado. Casi siempre es de planta indeterminada, así que crece sin parar y necesita tutor alto y desbrote constante.\n\nRinde mucho por planta pero la cosecha es lenta, fruto por fruto: es de los productos donde el tiempo de cosecha pesa más que el cultivo en sí.",
+   "manejo": [
+    "Tutor alto: puede pasar los dos metros en una temporada.",
+    "Desbrote semanal, como el tomate grande.",
+    "Cosechar seguido: maduros de más se caen y se rajan.",
+    "Riego parejo, aunque tolera mejor que el grande los altibajos."
+   ],
+   "problemas": [
+    "Tizón tardío y oídio, igual que el tomate grande.",
+    "Rajado por riego irregular, menos frecuente pero pasa.",
+    "Caída de fruta madura si se atrasa la cosecha."
+   ],
+   "presentacion": "Bandeja de 250 a 500 g, o por kilo."
+  },
+  "Choclos": {
+   "familia": "Poáceas",
+   "especie": "Zea mays",
+   "emoji": "🌽",
+   "resumen": "Se poliniza por viento, así que hay que sembrarlo en bloque cuadrado y no en una sola fila larga: en fila, la mitad de los granos no se forma y la espiga sale despareja. Es una de las reglas que más se olvida y más se nota.\n\nEl punto de cosecha es corto: con la barba marrón y el grano lechoso al apretarlo. Unos días más y el azúcar se convierte en almidón.",
+   "manejo": [
+    "Sembrar en bloque de al menos cuatro filas, nunca en una sola.",
+    "Es exigente en nitrógeno y en agua, sobre todo en floración.",
+    "Cosechar con el grano lechoso: apretar con la uña y ver si sale líquido blanco.",
+    "No mezclar variedades dulces con comunes cerca: se cruzan y se pierde el dulzor."
+   ],
+   "problemas": [
+    "Espigas despareja o con granos faltantes por mala polinización (siembra en fila).",
+    "Isoca de la espiga, que entra por la barba.",
+    "Sed en floración: es el momento que define el llenado.",
+    "Vuelco por viento en plantas altas y suelo flojo."
+   ],
+   "presentacion": "Por unidad, con chala."
+  },
+  "Cilantro": {
+   "familia": "Apiáceas",
+   "especie": "Coriandrum sativum",
+   "emoji": "🌿",
+   "resumen": "Hierba de ciclo muy corto que se espiga a la primera señal de calor o de estrés: es normal que una siembra dé solo dos o tres cortes antes de irse a flor. Por eso se escalona seguido y no se espera a que la planta crezca mucho.\n\nLa flor no se tira: atrae insectos benéficos, y la semilla es el coriandro.",
+   "manejo": [
+    "Siembra directa. No conviene trasplantarlo.",
+    "Escalonar cada dos o tres semanas: la ventana es cortísima.",
+    "En verano, a media sombra y con riego parejo, tarda más en espigarse.",
+    "Dejar florecer algunas plantas: atraen benéficos y dan semilla."
+   ],
+   "problemas": [
+    "Espigado rápido por calor, sed o trasplante.",
+    "Pulgones en los brotes tiernos.",
+    "Nacimiento desparejo si la semilla no se parte antes de sembrar."
+   ],
+   "presentacion": "Atado de 80 a 100 g."
+  },
+  "Coliflor": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica oleracea var. botrytis",
+   "emoji": "🥦",
+   "resumen": "Como el brócoli, pero más exigente y menos indulgente: la pella blanca se forma en una ventana estrecha y cualquier tropiezo —sed, calor, falta de nitrógeno— la deja chica, suelta o arrocetada. Es de los cultivos que más castiga la desatención.\n\nLa pella se pone amarilla con el sol. Para que salga blanca hay que taparla: se atan o se quiebran las hojas de afuera sobre ella cuando empieza a verse.",
+   "manejo": [
+    "Tapar la pella con las propias hojas apenas asoma, o sale amarilla y pierde valor.",
+    "No dejarla sin agua en la formación: es cuando se define todo.",
+    "Ciclo largo y exigente. Suelo bien abonado y sin competencia de yuyos.",
+    "Cosechar apretada. Una vez que se afloja no vuelve atrás."
+   ],
+   "problemas": [
+    "Pella arrocetada o suelta por calor, sed o siembra fuera de fecha.",
+    "Pulgón ceniciento entre las hojas, difícil de sacar al lavar.",
+    "Orugas de las crucíferas: Bacillus thuringiensis funciona bien.",
+    "Hernia de la col en suelos ácidos: no repetir crucíferas en el mismo bancal."
+   ],
+   "presentacion": "Por unidad, pella de 500 g a 1,5 kg."
+  },
+  "Espinaca": {
+   "familia": "Amarantáceas",
+   "especie": "Spinacia oleracea",
+   "emoji": "🥬",
+   "resumen": "Hoja de clima frío por excelencia: con días largos y calor se espiga enseguida, así que en la Comarca da bien en otoño, invierno y principio de primavera. Aguanta heladas y es de las primeras que se puede cosechar después del invierno.\n\nSe puede cosechar hoja por hoja o cortar la planta entera. El corte entero es más rápido y suele ser lo que conviene cuando hay volumen.",
+   "manejo": [
+    "Sembrarla en fresco. En verano se espiga antes de dar cosecha.",
+    "Siembra directa. No le gusta el trasplante.",
+    "Suelo con buen nitrógeno: es hoja pura.",
+    "Cosechar temprano en el día, que es cuando la hoja está firme."
+   ],
+   "problemas": [
+    "Espigado por calor y días largos.",
+    "Mildiu (Peronospora), el problema más serio: manchas amarillas y polvillo gris abajo. Airear y no regar la hoja de tarde.",
+    "Minador de la hoja, que deja galerías transparentes.",
+    "Pulgones en el envés."
+   ],
+   "presentacion": "Atado de 300 a 500 g."
+  },
+  "Habas": {
+   "familia": "Fabáceas",
+   "especie": "Vicia faba",
+   "emoji": "🫘",
+   "resumen": "Legumbre de clima fresco, de las pocas que se siembran a fines del invierno y aguantan heladas. Además de la cosecha, fija nitrógeno en el suelo, así que deja el bancal mejor de lo que lo encontró: es buen antecesor de cultivos exigentes como las coles.\n\nSe cosecha en verde para consumo fresco, cuando el grano está formado pero todavía tierno.",
+   "manejo": [
+    "Siembra directa, a buena profundidad. La semilla es grande y no le teme al frío.",
+    "Despuntar la planta cuando empieza a cuajar: adelanta la cosecha y saca los brotes tiernos donde se concentra el pulgón.",
+    "No necesita abonado nitrogenado: lo fija ella.",
+    "Conviene tutorar o sostener en los sectores con viento."
+   ],
+   "problemas": [
+    "Pulgón negro en las puntas tiernas, el problema clásico. El despunte lo controla en buena medida.",
+    "Mancha chocolate (Botrytis fabae) con humedad y mucha planta junta: airear y no sembrar denso.",
+    "Roya en fin de ciclo, que suele no justificar intervención."
+   ],
+   "presentacion": "Por kilo, en chaucha."
+  },
+  "Hakusai": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica rapa subsp. pekinensis",
+   "emoji": "🥬",
+   "resumen": "El repollo chino: arma un cogollo alargado de hojas tiernas y penca ancha, mucho más rápido que un repollo común. Es el cultivo base del kimchi y un buen cierre de temporada porque tolera el frío y se guarda bien.\n\nEs sensible al espigado si se siembra muy temprano y agarra frío siendo planta chica: la planta interpreta que pasó un invierno y florece en vez de acogollar.",
+   "manejo": [
+    "No adelantarse con la siembra: el frío en planta chica dispara el espigado.",
+    "Necesita agua constante durante el acogollado, que es cuando gana todo su peso.",
+    "Suelo rico y suelto. Es de raíz superficial y crecimiento rápido.",
+    "Se guarda varias semanas en lugar fresco si se cosecha con las hojas de afuera puestas."
+   ],
+   "problemas": [
+    "Espigado por frío temprano o por siembra fuera de fecha.",
+    "Babosas entre las hojas del cogollo, que arruinan la presentación.",
+    "Pulgones y orugas, como todas las crucíferas.",
+    "Pudrición blanda en la base con exceso de humedad."
+   ],
+   "presentacion": "Por unidad, de 1 a 2 kg."
+  },
+  "Kale": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica oleracea var. sabellica",
+   "emoji": "🥬",
+   "resumen": "Es la col que no arma cabeza, y de todas las hortalizas de hoja es la que más tiempo queda en el bancal: entre 120 y 180 días de cosecha. Se saca hoja por hoja de abajo hacia arriba y la planta sigue creciendo hacia arriba.\n\nEl frío lo mejora: después de una helada la hoja se pone más dulce, porque la planta convierte almidón en azúcares. En la Comarca eso lo vuelve un cultivo de invierno muy confiable.",
+   "manejo": [
+    "Sacar siempre las hojas de abajo, dejando la corona: la planta rebrota desde el centro.",
+    "Una plantación bien manejada dura media temporada. Conviene ubicarla donde no moleste.",
+    "Aguanta heladas fuertes sin protección.",
+    "Distanciar bien: la planta crece mucho más de lo que parece al trasplantarla."
+   ],
+   "problemas": [
+    "Pulgón ceniciento en el cogollo, el problema más común y persistente.",
+    "Orugas de las crucíferas, que agujerean la hoja pero rara vez matan la planta.",
+    "Mosca blanca en invernadero o túnel."
+   ],
+   "presentacion": "Atado de hojas, de 250 a 400 g."
+  },
+  "Khol Rabi": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica oleracea var. gongylodes",
+   "emoji": "🥬",
+   "resumen": "El colinabo: no se come la raíz ni la hoja sino el tallo, que se engrosa en una bola justo arriba del suelo. Crudo es dulce y crocante, parecido a un rabanito suave. Es rápido y poco conocido, así que suele necesitar una explicación en el punto de venta.\n\nSe cosecha chico. Pasado el tamaño de una pelota de tenis se pone leñoso y ya no se recupera.",
+   "manejo": [
+    "Cosechar entre 6 y 10 cm de diámetro. Más grande se hace fibroso.",
+    "Crecimiento parejo y sin frenadas: cualquier parate lo endurece.",
+    "Riego constante, raíz superficial.",
+    "Escalonar cada dos o tres semanas: la ventana buena es corta."
+   ],
+   "problemas": [
+    "Leñoso por cosecha tardía o por sed en el medio del ciclo.",
+    "Pulguilla de las crucíferas en las hojas jóvenes.",
+    "Orugas de las crucíferas."
+   ],
+   "presentacion": "Por unidad o atado de 2 a 3, con sus hojas."
+  },
+  "Lechuga": {
+   "familia": "Asteráceas",
+   "especie": "Lactuca sativa",
+   "emoji": "🥬",
+   "resumen": "El cultivo de hoja más vendido y el que más escalona el trabajo: se siembra cada dos o tres semanas para tener corte continuo. Prefiere el fresco; con calor y días largos se espiga, la hoja se pone amarga y pierde valor.\n\nEn la Comarca el verano corto ayuda, pero conviene elegir la variedad según la época: las mantecosas de invierno no rinden igual sembradas en diciembre, y para eso están las de verano.",
+   "manejo": [
+    "Escalonar cada 15 a 21 días: es un cultivo de ventana corta, se pasa rápido.",
+    "No enterrar el cuello al trasplantar: si queda hundido se pudre.",
+    "Riego frecuente y liviano. La raíz es superficial y no busca agua en profundidad.",
+    "Con calor conviene media sombra o sembrar en los sectores más frescos."
+   ],
+   "problemas": [
+    "Espigado por calor o días largos: no tiene arreglo una vez que empezó, se previene con la variedad y la fecha.",
+    "Botrytis y esclerotinia en el cuello, con humedad y suelo frío. Plantar alto y no regar sobre la planta.",
+    "Babosas, sobre todo en plantas chicas recién trasplantadas.",
+    "Pulgones en el cogollo, difíciles de lavar después."
+   ],
+   "presentacion": "Por unidad o por kilo, según el punto de venta. La hoja suelta va en pack de 250 g."
+  },
+  "Mix de hojas": {
+   "familia": "Varias",
+   "especie": "Mezcla de hojas para ensalada",
+   "emoji": "🥗",
+   "resumen": "No es un cultivo sino una mezcla que se siembra y se corta junta: suele llevar lechugas de hoja, mizuna, rúcula, mostazas y a veces acelga o remolacha baby. Se siembra densa, se corta chica y rebrota dos o tres veces.\n\nEs de los productos de mayor valor por metro cuadrado y de ciclo más corto, pero también el más perecedero: hay que lavarlo, secarlo y enfriarlo rápido.",
+   "manejo": [
+    "Siembra directa densa, en bandas anchas.",
+    "Cortar con tijera o cuchilla a unos 3 cm, parejo, para que rebrote.",
+    "Dos o tres cortes por siembra; el tercero suele ser de menor calidad.",
+    "Escalonar cada 10 a 15 días: la ventana es muy corta."
+   ],
+   "problemas": [
+    "Pulguilla en los componentes crucíferos de la mezcla.",
+    "Se calienta y se pudre rápido después del corte si no se enfría.",
+    "Yuyos: al sembrarse denso, desmalezar es casi imposible. Empezar con cama limpia.",
+    "Babosas, que además dejan suciedad entre las hojas."
+   ],
+   "presentacion": "Pack de 250 g, o por kilo a granel."
+  },
+  "Mizuna": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica rapa var. nipposinica",
+   "emoji": "🌿",
+   "resumen": "Hoja japonesa muy dentada, de sabor suave y apenas picante. Es de las más nobles para mezcla de hojas: crece rápido, rebrota bien después del corte y aguanta el frío mejor que la lechuga.\n\nSe puede manejar como hoja baby, cortando chica y varias veces, o dejar crecer la planta entera.",
+   "manejo": [
+    "Siembra directa densa si va para mezcla; más separada si se quiere planta entera.",
+    "Cortar a dos o tres centímetros del suelo para que rebrote.",
+    "Aguanta heladas suaves: sirve para estirar la oferta de hoja en otoño.",
+    "Escalonar: cada corte sucesivo da hoja más chica."
+   ],
+   "problemas": [
+    "Pulguilla de las crucíferas, el problema principal en hoja tierna.",
+    "Espigado con calor y días largos.",
+    "Babosas en siembras densas."
+   ],
+   "presentacion": "A granel para mezcla de hojas, o atado de 100 a 150 g."
+  },
+  "Morron": {
+   "familia": "Solanáceas",
+   "especie": "Capsicum annuum",
+   "emoji": "🫑",
+   "resumen": "Pimiento dulce. Como la berenjena, pide calor y en la Comarca va bajo cubierta. Se puede cosechar verde, que es más rápido y da más frutos por planta, o esperar a que vire a rojo o amarillo, que vale más pero ocupa la planta más tiempo.\n\nEl ciclo es largo y el almácigo lento: es de los primeros que se siembran en la temporada.",
+   "manejo": [
+    "Bajo cubierta en esta zona.",
+    "Decidir si se cosecha verde o de color: cambia el rendimiento y el precio.",
+    "Tutorar: la planta se vuelca con carga.",
+    "Riego parejo para evitar la podredumbre apical, igual que el tomate."
+   ],
+   "problemas": [
+    "Podredumbre apical por riego irregular.",
+    "Golpe de sol en los frutos expuestos, sobre todo si se deshoja de más.",
+    "Pulgones, trips y arañuela en invernadero.",
+    "Caída de flores si hay mucho calor o frío nocturno."
+   ],
+   "presentacion": "Por kilo o por unidad."
+  },
+  "Nabo Hakurei": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica rapa subsp. rapa",
+   "emoji": "🥬",
+   "resumen": "Nabo japonés de raíz blanca, redonda y tierna, que se come crudo como una fruta y no necesita pelarse. Es bastante más rápido y más suave que el nabo común, y se cosecha chico: del tamaño de una pelota de golf a una de tenis.\n\nLa hoja también se vende y se come, así que rinde dos productos de la misma planta.",
+   "manejo": [
+    "Cosechar chico. Pasado el tamaño se pone fibroso y pierde lo que lo hace especial.",
+    "Siembra directa o almácigo corto; crece rápido en fresco.",
+    "Riego parejo para que la raíz no se raje.",
+    "Escalonar: la ventana buena es de unas tres semanas."
+   ],
+   "problemas": [
+    "Pulguilla de las crucíferas en la hoja, que es medio producto.",
+    "Raíces rajadas o fibrosas por atraso en la cosecha.",
+    "Gusanos de la raíz en suelos donde se repiten crucíferas."
+   ],
+   "presentacion": "Atado de 4 a 6 raíces con su hoja."
+  },
+  "Pak choi": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica rapa subsp. chinensis",
+   "emoji": "🥬",
+   "resumen": "Col china de penca gruesa y blanca que no arma cabeza: crece como un manojo de hojas erguidas. Es muy rápido —seis a ocho semanas— y se usa entero, hoja y penca. Buen cultivo de relleno entre dos generaciones largas.\n\nComo su pariente el hakusai, se espiga si agarra frío siendo planta chica.",
+   "manejo": [
+    "No sembrarlo demasiado temprano: el frío en planta chica lo hace florecer.",
+    "Riego frecuente. Con sed la penca se pone amarga.",
+    "Se cosecha entero, cortando al ras del suelo.",
+    "Escalonar cada dos semanas."
+   ],
+   "problemas": [
+    "Espigado por frío temprano o calor fuerte.",
+    "Pulguilla de las crucíferas, que agujerea la hoja.",
+    "Babosas entre las pencas, que arruinan la presentación."
+   ],
+   "presentacion": "Por unidad o atado de 2 a 3 plantas."
+  },
+  "Pepinillo": {
+   "familia": "Cucurbitáceas",
+   "especie": "Cucumis sativus",
+   "emoji": "🥒",
+   "resumen": "Pepino de variedad chica, para encurtir. Mismo cultivo y mismo manejo que el pepino, pero se cosecha muy chico —de 5 a 10 cm— y con mucha más frecuencia. Es un producto de valor agregado: casi todo va a frasco.\n\nCuanto más se cosecha, más produce; dejar frutos grandes corta la producción de golpe.",
+   "manejo": [
+    "Cosechar todos los días o día por medio, chicos y parejos.",
+    "Conducir en vertical como el pepino.",
+    "Riego parejo para que no se deformen.",
+    "Coordinar la cosecha con la elaboración: se procesa el mismo día."
+   ],
+   "problemas": [
+    "Frutos pasados, que además frenan la producción.",
+    "Oídio y mildiu.",
+    "Arañuela roja bajo cubierta.",
+    "Deformes por sed o mala polinización."
+   ],
+   "presentacion": "Por kilo para elaborar, o en frasco terminado."
+  },
+  "Pepino": {
+   "familia": "Cucurbitáceas",
+   "especie": "Cucumis sativus",
+   "emoji": "🥒",
+   "resumen": "De los más sensibles al frío y a la sed. En la Comarca va bajo cubierta y conducido en vertical, que ahorra espacio y mantiene el fruto limpio y derecho. Produce rápido y durante bastante tiempo si se lo cosecha seguido.\n\nEl amargor es señal de estrés: sed, calor fuerte o cambios bruscos de temperatura.",
+   "manejo": [
+    "Conducir en vertical con hilo: más limpio, más parejo y más fácil de cosechar.",
+    "Riego abundante y parejo. La sed da frutos amargos y torcidos.",
+    "Cosechar cada dos o tres días.",
+    "Ventilar: la humedad estancada trae oídio y mildiu."
+   ],
+   "problemas": [
+    "Frutos amargos o deformes por sed o calor.",
+    "Oídio y mildiu en la hoja, muy frecuentes bajo cubierta.",
+    "Arañuela roja en ambiente seco y caluroso.",
+    "Mosca blanca."
+   ],
+   "presentacion": "Por kilo o por unidad."
+  },
+  "Perejil": {
+   "familia": "Apiáceas",
+   "especie": "Petroselinum crispum",
+   "emoji": "🌿",
+   "resumen": "Tarda mucho en nacer —dos a cuatro semanas— y después dura muchísimo: una plantación bien cuidada da cortes durante meses. Es de las hierbas que nunca faltan en el bolsón y de las que más veces se cosecha del mismo bancal.\n\nEs bienal: el segundo año florece y se termina. Conviene resembrar cada temporada.",
+   "manejo": [
+    "Paciencia con la germinación. Remojar la semilla la noche anterior ayuda.",
+    "Cortar de afuera hacia adentro, dejando el centro para que rebrote.",
+    "Aguanta heladas y sigue dando en invierno, más lento.",
+    "Riego parejo: con sed la hoja se pone dura y amarga."
+   ],
+   "problemas": [
+    "Nacimiento lento y desparejo, que confunde con una siembra fallida.",
+    "Pulgones en los brotes nuevos.",
+    "Mancha foliar (Septoria) con humedad y poca ventilación.",
+    "Espigado en el segundo año: es normal, hay que resembrar."
+   ],
+   "presentacion": "Atado de 100 g."
+  },
+  "Puerro": {
+   "familia": "Amarilidáceas",
+   "especie": "Allium ampeloprasum var. porrum",
+   "emoji": "🧅",
+   "resumen": "De los cultivos más largos de la huerta: entre la siembra y la cosecha pueden pasar seis meses o más. A cambio, aguanta el invierno en el bancal sin deteriorarse, así que funciona como reserva viva: se cosecha cuando se necesita, no cuando está listo.\n\nEl blanco es la parte de valor, y se consigue enterrando: se planta en surco hondo o se va aporcando a medida que crece.",
+   "manejo": [
+    "Aporcar dos o tres veces durante el ciclo: cada aporque alarga el blanco.",
+    "Plantín fino, como un lápiz, antes de trasplantar. Recortar raíces y puntas ayuda al prendimiento.",
+    "Ocupa el bancal media temporada: ubicarlo donde no trabe la rotación.",
+    "Se puede dejar en tierra todo el invierno y cosechar de a poco."
+   ],
+   "problemas": [
+    "Trips, que dejan rayitas plateadas en la hoja, sobre todo en seco.",
+    "Polilla del puerro, que hace galerías en el interior.",
+    "Roya, con manchas anaranjadas en la hoja, en otoño húmedo.",
+    "Blanco corto por falta de aporque."
+   ],
+   "presentacion": "Atado de 3 a 5 plantas, o por unidad si son grandes."
+  },
+  "Rabanito": {
+   "familia": "Brasicáceas",
+   "especie": "Raphanus sativus",
+   "emoji": "🌶️",
+   "resumen": "El cultivo más rápido de la huerta: de la semilla a la cosecha pasan entre 25 y 40 días según la época. Sirve para aprovechar un bancal que queda libre poco tiempo y para dar señal temprana de cómo está el suelo.\n\nNo admite atraso: pasado el punto se ahueca, se pone picante y se raja. La ventana de cosecha es de días, no de semanas.",
+   "manejo": [
+    "Siembra directa siempre. No se trasplanta.",
+    "Ralear temprano si quedó denso: sin lugar no engrosa la raíz.",
+    "Riego parejo. La sed seguida de riego abundante raja las raíces.",
+    "Revisar todos los días cuando está cerca del punto."
+   ],
+   "problemas": [
+    "Pulguilla de las crucíferas en las hojas, sobre todo en plantas chicas.",
+    "Ahuecado y picor por cosecha tardía o por calor.",
+    "Raíces rajadas por riego irregular.",
+    "Todo hoja y nada de raíz: suele ser exceso de nitrógeno o siembra demasiado densa."
+   ],
+   "presentacion": "Atado de 6 a 10 unidades con sus hojas."
+  },
+  "Remolacha": {
+   "familia": "Amarantáceas",
+   "especie": "Beta vulgaris var. conditiva",
+   "emoji": "🫒",
+   "resumen": "Da dos productos: la raíz y la hoja, que se vende como acelga chica. Es rústica, tolera el frío y se guarda mucho tiempo, así que es de las que sostienen el bolsón fuera de temporada.\n\nLa semilla es en realidad un glomérulo con varias semillas juntas, así que nacen varias plantas del mismo punto: el raleo no es opcional.",
+   "manejo": [
+    "Ralear sí o sí: de cada semilla salen dos o tres plantas y sin raleo no engrosa ninguna.",
+    "Riego parejo. La sed seguida de agua raja la raíz.",
+    "Cosechar entre 5 y 8 cm. Más grande se pone fibrosa y con anillos blancos.",
+    "Aprovechar las hojas del raleo: se venden como hoja tierna."
+   ],
+   "problemas": [
+    "Raíces rajadas o fibrosas por riego irregular o cosecha tardía.",
+    "Cercospora: manchitas redondas con borde rojizo en la hoja.",
+    "Minador de la hoja.",
+    "Corazón negro por falta de boro, en suelos muy alcalinos."
+   ],
+   "presentacion": "Atado de 3 a 5 raíces con hoja, o por kilo sin hoja."
+  },
+  "Repollo bco": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica oleracea var. capitata",
+   "emoji": "🥬",
+   "resumen": "El más rústico de las coles y el que mejor se guarda: una cabeza bien formada aguanta semanas en fresco sin perder calidad, así que sirve para sostener la oferta cuando ya no hay hoja fresca. Aguanta heladas fuertes en el bancal.\n\nEs de ciclo largo y ocupa mucho espacio por planta, pero el rendimiento por bancal es alto porque cada unidad pesa.",
+   "manejo": [
+    "Distanciar bien: apretado da cabezas chicas y desparejas.",
+    "Riego parejo al final del ciclo. Sed seguida de mucha agua raja la cabeza.",
+    "Cosechar antes de que se raje: apretar con la mano, si cede está pasada.",
+    "Se puede dejar en el bancal como reserva, pero vigilando las rajaduras."
+   ],
+   "problemas": [
+    "Cabezas rajadas por riego irregular o por cosecha tardía.",
+    "Pulgón ceniciento y orugas, como todas las crucíferas.",
+    "Hernia de la col: rotar y no repetir crucíferas seguidas.",
+    "Babosas entre las hojas de afuera."
+   ],
+   "presentacion": "Por unidad, de 1 a 3 kg."
+  },
+  "Repollo col": {
+   "familia": "Brasicáceas",
+   "especie": "Brassica oleracea var. capitata",
+   "emoji": "🥬",
+   "resumen": "Repollo colorado. Mismo cultivo y mismo manejo que el blanco, con hoja morada por antocianinas. Es algo más lento y un poco más chico, pero se guarda igual de bien y en el bolsón aporta color, que vende.\n\nEl color se intensifica con el frío, así que las cosechas de fin de temporada suelen ser las más vistosas.",
+   "manejo": [
+    "Igual que el repollo blanco, pero contando unos días más de ciclo.",
+    "Distanciar bien y regar parejo al final para que no se raje.",
+    "El frío mejora el color: no apurar la cosecha si el clima acompaña.",
+    "Cosechar apretado, comprobando con la mano."
+   ],
+   "problemas": [
+    "Cabezas rajadas por riego irregular.",
+    "Pulgón ceniciento, orugas y babosas.",
+    "Hernia de la col en suelos ácidos y húmedos."
+   ],
+   "presentacion": "Por unidad, de 1 a 2 kg."
+  },
+  "Rucula": {
+   "familia": "Brasicáceas",
+   "especie": "Eruca vesicaria",
+   "emoji": "🌿",
+   "resumen": "De ciclo cortísimo: en cinco o seis semanas está lista, y por eso permite tapar huecos en el bancal entre dos cultivos largos. El sabor picante se acentúa con el calor y con la falta de agua; en fresco es más suave y la hoja más tierna.\n\nSe puede cortar y dejar rebrotar dos o tres veces, aunque cada corte da hoja más chica y más picante que el anterior.",
+   "manejo": [
+    "Siembra directa al voleo o en líneas juntas. No vale la pena el almácigo.",
+    "Cortar con tijera a dos o tres centímetros del suelo para que rebrote parejo.",
+    "Escalonar cada dos semanas: la ventana buena de cada siembra es muy corta.",
+    "Con calor se espiga rápido; en verano conviene sembrarla a media sombra."
+   ],
+   "problemas": [
+    "Pulguilla de las crucíferas: agujeritos redondos en la hoja, que la vuelven invendible. Es el problema principal y se maneja con cobertura de malla.",
+    "Espigado y picor excesivo por calor.",
+    "Babosas en siembras densas y húmedas."
+   ],
+   "presentacion": "Atado de 100 a 150 g, o a granel para mezcla de hojas."
+  },
+  "Tomate": {
+   "familia": "Solanáceas",
+   "especie": "Solanum lycopersicum",
+   "emoji": "🍅",
+   "resumen": "El cultivo de mayor valor y el que más trabajo lleva: almácigo largo, tutorado, desbrote semanal y cosecha escalonada durante meses. En la Comarca es casi siempre de invernadero, porque a campo el verano corto no alcanza para madurar bien.\n\nHay dos tipos de planta y cambian todo el manejo: las indeterminadas crecen sin parar y hay que conducirlas a uno o dos brazos; las determinadas se detienen solas y casi no se desbrotan.",
+   "manejo": [
+    "Desbrotar todas las semanas en las indeterminadas: los brotes de las axilas roban todo.",
+    "Tutorar desde temprano. Una planta caída se pierde.",
+    "Riego parejo y al pie: los altibajos rajan el fruto y dan podredumbre apical.",
+    "Ventilar el invernadero: la humedad nocturna es la puerta de casi todas las enfermedades."
+   ],
+   "problemas": [
+    "Podredumbre apical (culillo negro): falta de calcio disponible, casi siempre por riego irregular.",
+    "Tizón tardío (Phytophthora) con humedad y temperatura templada: es el que puede arrasar el cultivo.",
+    "Oídio, polvillo blanco en la hoja.",
+    "Frutos rajados por riego desparejo después de un período seco."
+   ],
+   "presentacion": "Por kilo. El cherry, en bandeja o por kilo."
+  },
+  "Zanahoria": {
+   "familia": "Apiáceas",
+   "especie": "Daucus carota",
+   "emoji": "🥕",
+   "resumen": "De las más difíciles de arrancar y de las más agradecidas después: la semilla es chica, tarda en nacer y necesita humedad constante hasta la emergencia, que puede llevar dos o tres semanas. Pasado eso, es rústica y se guarda meses.\n\nEl suelo manda: en tierra compactada o con piedras salen bifurcadas y torcidas, y eso es invendible aunque el sabor sea el mismo.",
+   "manejo": [
+    "Mantener la cama húmeda hasta que nazca. Es el momento en que se pierde el cultivo.",
+    "Suelo suelto y profundo, sin piedras ni estiércol fresco: eso bifurca la raíz.",
+    "Ralear temprano para que cada planta tenga lugar.",
+    "Aporcar el hombro de la raíz o tapar con paja: expuesto al sol se pone verde."
+   ],
+   "problemas": [
+    "Raíces bifurcadas o torcidas por suelo compactado, piedras o abono fresco.",
+    "Hombro verde por exposición al sol.",
+    "Nacimiento disparejo por falta de humedad en la germinación.",
+    "Yuyos: nace lento y la tapan. La cama tiene que estar limpia antes."
+   ],
+   "presentacion": "Atado con hoja, o por kilo sin hoja."
+  },
+  "Zapallito": {
+   "familia": "Cucurbitáceas",
+   "especie": "Cucurbita maxima var. zapallito",
+   "emoji": "🥒",
+   "resumen": "Zapallito de tronco, redondo y verde, que se cosecha inmaduro y tierno. A diferencia del zapallo de guarda, la planta es compacta y la cosecha es continua: hay que pasar cada dos o tres días.\n\nSi se deja pasar, el fruto se agranda, se llena de semilla y la planta corta la producción de los siguientes.",
+   "manejo": [
+    "Cosechar cada dos o tres días, chicos. Es lo que sostiene la producción.",
+    "Necesita agua y sol. Es de ciclo rápido y alto consumo.",
+    "Planta compacta: ocupa bastante menos que el zapallo de guarda.",
+    "Dejar algún fruto grande solo si se quiere semilla."
+   ],
+   "problemas": [
+    "Caída de producción por frutos pasados sin cosechar.",
+    "Oídio en la hoja, frecuente en fin de ciclo.",
+    "Vaquita de los melones en plantas chicas.",
+    "Frutos abortados por falta de polinización con clima feo."
+   ],
+   "presentacion": "Por kilo o por unidad."
+  },
+  "Zapallo": {
+   "familia": "Cucurbitáceas",
+   "especie": "Cucurbita maxima",
+   "emoji": "🎃",
+   "resumen": "Cultivo de guarda: ocupa mucho espacio y mucho tiempo, pero después se conserva meses en un lugar fresco y seco, así que es de los que sostienen la oferta en invierno. La planta se extiende por el suelo y tapa yuyos por sí sola.\n\nSe cosecha maduro, con el pedúnculo seco y la cáscara dura, y conviene curarlo al sol unos días antes de guardarlo.",
+   "manejo": [
+    "Darle lugar: una planta puede tapar varios metros cuadrados.",
+    "Cosechar con el pedúnculo seco y la cáscara que no se raya con la uña.",
+    "Cortar dejando un buen pedazo de pedúnculo: sin él se pudre en la guarda.",
+    "Curar al sol unos días antes de guardar."
+   ],
+   "problemas": [
+    "Oídio en la hoja en fin de ciclo: muy común y rara vez grave.",
+    "Frutos que se pudren en la guarda por cosecha inmadura o pedúnculo cortado al ras.",
+    "Vaquita de los melones en plantas chicas.",
+    "Poco cuaje si faltan polinizadores."
+   ],
+   "presentacion": "Por unidad o por kilo."
+  },
+  "Zucchini": {
+   "familia": "Cucurbitáceas",
+   "especie": "Cucurbita pepo",
+   "emoji": "🥒",
+   "resumen": "Zapallito alargado, de planta erguida y muy productiva. Es de los cultivos de verano que más rinden por metro cuadrado, y también de los que más rápido se pasan: en dos días de calor un fruto perfecto se vuelve un garrote.\n\nLa flor también se vende y es un producto de alto valor, pero cada flor que se corta es un fruto menos.",
+   "manejo": [
+    "Pasar cada dos días. Es el cultivo que más castiga saltear una cosecha.",
+    "Cosechar entre 15 y 20 cm.",
+    "Planta erguida y espinosa: conviene guantes y manga larga.",
+    "Ventilar bien si está bajo cubierta."
+   ],
+   "problemas": [
+    "Frutos pasados por cosecha salteada, que además frenan a los siguientes.",
+    "Oídio, casi inevitable en fin de ciclo.",
+    "Podredumbre de la punta del fruto con humedad y mala polinización.",
+    "Vaquita de los melones."
+   ],
+   "presentacion": "Por kilo. La flor, en bandeja."
+  }
+ }
 }

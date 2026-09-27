@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 38 · 26/9/2026";
+const VERSION_APP = "versión 39 · 26/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1854,7 +1854,12 @@ function fichaCultivo(cultivo) {
   // --- la ficha de referencia, si ya se bajó ---
   const ref = FICHAS?.fichas?.[cultivo];
   const fuentes = FICHAS?._fuentes || [];
+  // Va abajo y plegado: quien abre la ficha suele venir a ver cómo viene el
+  // cultivo esta temporada, no a leer sobre la especie. Lo de leer queda a un
+  // toque de distancia para cuando sí se lo busca.
   const bloqueRef = ref ? `
+    <details class="saber-mas">
+    <summary>Saber más sobre ${esc(cultivo)}</summary>
     <div class="ficha-ref">
       <div class="ficha-titulo">
         <span class="ficha-emoji">${ref.emoji || "🌱"}</span>
@@ -1873,14 +1878,13 @@ function fichaCultivo(cultivo) {
       ${fuentes.length ? "Referencias regionales: " + fuentes.map((f) =>
         `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.autores)}</a>`
       ).join(" · ") : ""}</p>
-    </div>` : (FICHAS ? "" : `<p class="nota">Buscando la ficha del cultivo…</p>`);
+    </div>
+    </details>` : "";
 
   return `
   <div class="tarjeta">
     <h2>${esc(cultivo)}</h2>
     <button type="button" class="secundario" id="volver-plan">← Volver al plan</button>
-
-    ${bloqueRef}
 
     <h3 class="sub">Lo que sabe el catálogo</h3>
     <p class="nota">Común a las seis chacras. Se corrige en Plan → Agregar o completar un cultivo.</p>
@@ -1923,6 +1927,8 @@ function fichaCultivo(cultivo) {
         <div class="cuando">${esc(c.operador || "")}</div></div>
       <span class="etiqueta ok">${num(c.kg, 1)} kg</span>
     </div>`).join("")}` : ""}
+
+    ${bloqueRef}
   </div>`;
 }
 
