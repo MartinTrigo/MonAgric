@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 42 · 27/9/2026";
+const VERSION_APP = "versión 43 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1007,16 +1007,8 @@ const plantillas = {
       sembrados hace más de un mes pueden faltar. Revisá la señal; si sigue
       igual, el Apps Script puede estar corriendo una versión anterior.</p>`;
 
-    if (!pend.length) {
-      return `<div class="tarjeta">
-        <h2>&#127807; Trasplantes</h2>
-        ${origen || `<p class="nota">No hay almácigos esperando trasplante. Aparecen
-        acá solos en cuanto se carga una siembra de almácigo en la sección
-        Siembras.</p>`}
-      </div>
-      ${historialDe("trasplantes")}`;
-    }
-
+    // Sin almácigos en la lista el formulario se muestra igual: se puede
+    // trasplantar algo que no se cargó como siembra, o plantines comprados.
     const listos = pend.filter((s) => (estadoAlmacigo(s).dias ?? 99) <= 0);
     const pronto = pend.filter((s) => {
       const d = estadoAlmacigo(s).dias;
@@ -1039,18 +1031,37 @@ const plantillas = {
     </div>` : ""}
 
     <div class="tarjeta">
-      <h2>&#127807; Registrar trasplante <small>${pend.length} esperando</small></h2>
+      <h2>&#127807; Registrar trasplante${
+        pend.length ? ` <small>${pend.length} almácigos esperando</small>` : ""}</h2>
       ${origen}
       <form id="form-trasplantes">
-        <label>¿Qué almácigo estás trasplantando?</label>
-        <select name="siembra_id" required>
-          <option value="" disabled selected>Elegí el almácigo…</option>
-          ${pend.map((s) => `<option value="${esc(s.id)}">${esc(s.etiqueta)}</option>`).join("")}
-        </select>
-        <p class="nota" id="nota-almacigo"></p>
+        <label>¿Qué cultivo?</label>
+        ${buscadorCultivo("", "cultivo")}
+
+        <div class="fila">
+          <div>
+            <label>Variedad <small>(opcional)</small></label>
+            <input type="text" name="variedad" maxlength="40" autocomplete="off">
+          </div>
+          <div>
+            <label>Generación</label>
+            <input type="number" name="generacion" value="1" min="1" max="20" inputmode="numeric">
+          </div>
+        </div>
 
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
+
+        <!-- El almácigo es opcional: elegirlo completa el resto solo y permite
+             medir cuántos días estuvo de verdad en la bandeja contra los
+             teóricos, que es el dato con el que después se corrige el
+             catálogo. Sin él el trasplante se registra igual. -->
+        <label>¿Viene de un almácigo cargado? <small>(opcional)</small></label>
+        <select name="siembra_id">
+          <option value="">No, o no está en la lista</option>
+          ${pend.map((s) => `<option value="${esc(s.id)}">${esc(s.etiqueta)}</option>`).join("")}
+        </select>
+        <p class="nota" id="nota-almacigo"></p>
 
         <label>¿A qué bancales fue?</label>
         <div id="renglones-bancal">${renglonBancal(0)}</div>
@@ -1074,6 +1085,13 @@ const plantillas = {
         <select name="disposicion">
           ${DISPOSICIONES.map((d) => `<option>${esc(d)}</option>`).join("")}
         </select>
+
+        <!-- Los plantines salen del marco y de los bancales, pero a veces se
+             contaron de verdad y ese número vale más que la cuenta. -->
+        <label>Plantines por bancal <small>(si los contaste)</small></label>
+        <input type="text" name="plantines" inputmode="numeric"
+               placeholder="lo calcula solo con el marco">
+
         <div class="calculo" id="calculo-trasplante"></div>
 
         <label>Operador</label>
@@ -3641,15 +3659,44 @@ function prepararTrasplantes() {
   // Se recuerda lo que sugirió el plan para saber si lo cambiaron a mano.
   let sugerido = { lineas: 0, distancia_cm: 0 };
 
+  enlazarBuscadores(f);
+
   const elegido = () => pend.find((s) => s.id === f.siembra_id.value);
 
-  const alElegir = () => {
-    const s = elegido();
-    if (!s) { nota.textContent = ""; return; }
-    const plan = enPlan(s.cultivo) || {};
-    sugerido = { lineas: plan.lineas || 0, distancia_cm: plan.distancia_cm || 0 };
+  // El marco sugerido sale del cultivo, no del almácigo: ahora se puede
+  // trasplantar algo que no tiene siembra cargada.
+  const sugerirMarco = (cultivo) => {
+    const plan = enPlan(cultivo) || {};
+    const p = perfil(cultivo) || {};
+    sugerido = {
+      lineas: plan.lineas || p.lineas_bancal || 0,
+      distancia_cm: plan.distancia_cm || p.distancia_cm || 0,
+    };
     f.lineas.value = sugerido.lineas || "";
     f.distancia_cm.value = sugerido.distancia_cm || "";
+  };
+
+  // El buscador avisa con un "change" sobre el FORMULARIO, no sobre su campo
+  // oculto, así que se escucha acá y se mira si cambió el cultivo.
+  let ultimoCultivo = "";
+  f.addEventListener("change", () => {
+    if (f.cultivo.value === ultimoCultivo) return;
+    ultimoCultivo = f.cultivo.value;
+    if (!f.siembra_id.value) sugerirMarco(f.cultivo.value);
+    recalcular();
+  });
+
+  // Si se elige un almácigo, completa lo demás y habilita la cuenta de días
+  // reales en bandeja. Si se saca, lo cargado queda como estaba.
+  const alElegir = () => {
+    const s = elegido();
+    if (!s) { nota.textContent = ""; recalcular(); return; }
+    f.cultivo.value = s.cultivo;
+    const caja = f.querySelector("[data-buscador] .buscador-texto");
+    if (caja) caja.value = s.cultivo;
+    f.variedad.value = s.variedad || "";
+    f.generacion.value = s.generacion || 1;
+    sugerirMarco(s.cultivo);
     const sembrada = s.fecha ? `sembrado el ${fechaCorta(s.fecha)}` : "";
     const espera = s.estimado ? ` · estimado para ${fechaCorta(s.estimado)}` : "";
     nota.innerHTML = `${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""}
@@ -3679,8 +3726,12 @@ function prepararTrasplantes() {
     const lineas = aNumero(f.lineas.value) || 0;
     const dist = aNumero(f.distancia_cm.value) || 0;
     const bancales = destinos().length;
-    const porBancal = plantasPorBancal(lineas, dist, f.disposicion.value);
-    return { lineas, dist, bancales, porBancal, total: Math.round(porBancal * bancales) };
+    // Lo contado gana sobre lo calculado: si alguien los contó de verdad, ese
+    // número vale más que multiplicar líneas por distancia.
+    const contados = aNumero(f.plantines.value) || 0;
+    const porBancal = contados || plantasPorBancal(lineas, dist, f.disposicion.value);
+    return { lineas, dist, bancales, porBancal, contados,
+             total: Math.round(porBancal * bancales) };
   };
 
   const recalcular = () => {
@@ -3690,8 +3741,9 @@ function prepararTrasplantes() {
     const disponibles = s ? s.plantines : 0;
     const cambiado = c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm;
     calculo.innerHTML = `<b>${num(c.porBancal)} plantines</b> por bancal`
+      + (c.contados ? " <small>(contados)</small>" : "")
       + (c.bancales ? ` · ${c.bancales} bancal(es) elegidos = <b>${num(c.total)} plantines</b>` : "")
-      + (cambiado && sugerido.lineas
+      + (cambiado && sugerido.lineas && !c.contados
           ? `<br><small>Distinto del plan (${sugerido.lineas} líneas a ${sugerido.distancia_cm} cm): se guarda como lo hiciste.</small>`
           : "")
       // Aviso, no bloqueo: puede sobrar plantines o haberse perdido algunos, y
@@ -3702,7 +3754,8 @@ function prepararTrasplantes() {
   };
 
   f.siembra_id.addEventListener("change", alElegir);
-  ["lineas", "distancia_cm"].forEach((n) => f[n].addEventListener("input", recalcular));
+  ["lineas", "distancia_cm", "plantines"].forEach((n) =>
+    f[n].addEventListener("input", recalcular));
   f.disposicion.addEventListener("change", recalcular);
 
   // El sector de cada renglon manda sobre su lista de bancales, y agregar o
@@ -3730,16 +3783,20 @@ function prepararTrasplantes() {
 
   f.onsubmit = (e) => {
     e.preventDefault();
-    const s = elegido();
-    if (!s) return aviso("Elegí qué almácigo estás trasplantando.", true);
+    const cultivo = f.cultivo.value;
+    if (!cultivo) return aviso("Elegí qué cultivo estás trasplantando.", true);
     const c = cuentas();
-    // Lo que de verdad tardó en la bandeja, contra lo que decía la tabla. Es el
-    // dato que en unas temporadas permite corregir los días teóricos con lo que
-    // pasa en esta chacra y no en un manual.
+
+    // El almácigo es opcional. Si se eligió, se mide cuánto tardó de verdad en
+    // la bandeja contra lo que dice la tabla: ese es el dato con el que, en
+    // unas temporadas, se corrigen los días del catálogo con lo que pasa en
+    // esta chacra y no en un manual. Sin almácigo el trasplante se registra
+    // igual, solo que sin esa medición.
+    const s = elegido();
     // Los teóricos se cuentan con la estación en que se SEMBRÓ, no con la de
     // hoy: es contra eso que se compara lo que de verdad tardó en la bandeja.
-    const teoricos = diasAlmacigo(s.cultivo, s.fecha);
-    const reales = diasEntre(s.fecha, f.fecha.value);
+    const teoricos = s ? diasAlmacigo(s.cultivo, s.fecha) : 0;
+    const reales = s ? diasEntre(s.fecha, f.fecha.value) : null;
     const lugares = destinos();
     if (!lugares.length) return aviso("Elegí al menos un bancal.", true);
     escribir(LS.nombre, f.operador.value);
@@ -3749,14 +3806,14 @@ function prepararTrasplantes() {
     // un bancal contra otro plantados el mismo día con la misma variedad.
     const comun = {
       fecha: f.fecha.value,
-      siembra_id: s.id,
-      fecha_siembra: s.fecha || "",
+      siembra_id: s ? s.id : "",
+      fecha_siembra: s ? (s.fecha || "") : "",
       dias_almacigo_real: reales === null ? "" : reales,
       dias_almacigo_teorico: teoricos || "",
       diferencia_dias: (reales === null || !teoricos) ? "" : reales - teoricos,
-      cultivo: s.cultivo,
-      variedad: s.variedad,
-      generacion: s.generacion,
+      cultivo,
+      variedad: f.variedad.value.trim(),
+      generacion: parseInt(f.generacion.value, 10) || 1,
       lineas: c.lineas || "",
       distancia_cm: c.dist || "",
       disposicion: f.disposicion.value,
