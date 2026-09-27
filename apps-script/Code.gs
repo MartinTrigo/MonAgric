@@ -1038,16 +1038,19 @@ function generacionesDelPlan(chacra) {
      sigue creyendo en ella, una generacion ya sembrada queda pidiendo que la
      siembren para siempre. Se cruza por cultivo y generacion, que es la unica
      llave que comparten las dos hojas. */
-  /* Se cruza por cultivo y FECHA, no por numero de generacion. Dos razones:
+  /* Cruzar el plan con lo sembrado: manda el NUMERO DE GENERACION y la fecha
+     queda de respaldo.
 
-     - Varias generaciones del plan comparten una misma siembra. El puerro son
-       ocho plantaciones escalonadas que salen de un solo almacigo sembrado el
-       mismo dia; cruzando por numero, siete quedarian reclamando para siempre.
-     - Los numeros no tienen por que coincidir: el plan viene de afuera y quien
-       carga la siembra en el telefono elige la generacion a ojo.
+     Se probaron las dos reglas por separado y ninguna sola alcanza. Cruzando
+     solo por fecha, una siembra de habas cargada con 29 dias de atraso quedo
+     pegada a las generaciones 3 y 4 -las mas cercanas en el calendario- y la
+     1, que era la que decia el registro, siguio figurando como pendiente. La
+     persona habia escrito "generacion 1" y el cruce ignoraba ese dato, que es
+     el unico explicito que hay.
 
-     La ventana es amplia hacia adelante porque sembrar unos dias tarde es lo
-     normal, y angosta hacia atras porque adelantarse mucho no lo es. */
+     Asi que: si quien carga la siembra anoto la generacion, se le cree. La
+     fecha solo decide cuando nadie anoto ninguna generacion de ese cultivo,
+     que es el caso de los registros viejos. */
   var ANTES = 10, DESPUES = 25;
   var siembras = [];
   var hs = libro.getSheetByName(HOJAS.siembras.nombre);
@@ -1055,14 +1058,27 @@ function generacionesDelPlan(chacra) {
     hs.getRange(2, 1, hs.getLastRow() - 1, HOJAS.siembras.encabezados.length)
       .getValues().forEach(function (f) {
         if (!f[0] || !f[3] || !f[2]) return;
-        siembras.push({ id: String(f[0]), cultivo: claveNombre(f[3]), fecha: texto(f[2]) });
+        siembras.push({ id: String(f[0]), cultivo: claveNombre(f[3]),
+                        fecha: texto(f[2]), generacion: Number(f[6]) || 0 });
       });
   }
-  var buscarSiembra = function (cultivo, cuando) {
-    if (!cuando) return null;
+  // De que cultivos se anoto al menos una generacion: ahi la fecha no decide.
+  var conGeneracion = {};
+  siembras.forEach(function (s) {
+    if (s.generacion) conGeneracion[s.cultivo] = true;
+  });
+
+  var buscarSiembra = function (cultivo, gen, cuando) {
     var k = claveNombre(cultivo);
+    var i;
+    // 1) por numero de generacion, que es lo que alguien escribio a proposito
+    for (i = 0; i < siembras.length; i++) {
+      if (siembras[i].cultivo === k && siembras[i].generacion === gen) return siembras[i];
+    }
+    // 2) si de este cultivo nadie anoto generacion, se cae en la fecha
+    if (conGeneracion[k] || !cuando) return null;
     var objetivo = new Date(cuando + "T12:00:00").getTime();
-    for (var i = 0; i < siembras.length; i++) {
+    for (i = 0; i < siembras.length; i++) {
       if (siembras[i].cultivo !== k || !siembras[i].fecha) continue;
       var d = (new Date(siembras[i].fecha + "T12:00:00").getTime() - objetivo) / 86400000;
       if (d >= -ANTES && d <= DESPUES) return siembras[i];
@@ -1077,7 +1093,7 @@ function generacionesDelPlan(chacra) {
       var gen = Number(f[3]) || 1;
       // El dia que toca sembrar: la bandeja si va por almacigo, el bancal si
       // es siembra directa.
-      var real = buscarSiembra(String(f[2]), texto(f[5]) || texto(f[6]));
+      var real = buscarSiembra(String(f[2]), gen, texto(f[5]) || texto(f[6]));
       return {
         id: String(f[0]), cultivo: String(f[2]), generacion: gen,
         metodo: String(f[4] || ""), fecha_almacigo: texto(f[5]),

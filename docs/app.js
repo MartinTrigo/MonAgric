@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 47 · 27/9/2026";
+const VERSION_APP = "versión 48 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1706,38 +1706,14 @@ const plantillas = {
         </form>
       </details>
 
-      <form id="form-plan" class="alta">
-        <div id="titulo-plan"></div>
-        <label>Cultivo</label>
-        ${buscador("cultivo", cultivosDisponibles(), { placeholder: "Buscá el cultivo…" })}
-
-        <label>¿Cuántos bancales le vas a dar?</label>
-        <input type="text" name="bancales" inputmode="decimal" placeholder="Ej: 5" required>
-
-        <details id="avanzado-plan">
-          <summary>Ajustar rendimiento y densidad</summary>
-          <p class="nota">Vienen del catálogo común. Cambialos si en tu chacra
-          este cultivo se maneja distinto.</p>
-          <div class="fila">
-            <div>
-              <label>Rinde (kg/m²)</label>
-              <input type="text" name="rinde" inputmode="decimal">
-            </div>
-            <div>
-              <label>Líneas por bancal</label>
-              <input type="number" name="lineas" min="1" max="20">
-            </div>
-            <div>
-              <label>Distancia (cm)</label>
-              <input type="text" name="distancia" inputmode="decimal">
-            </div>
-          </div>
-        </details>
-
-        <div class="calculo" id="calculo-plan"></div>
-        <button class="secundario" id="btn-plan">Agregar al plan</button>
-        <button type="button" class="secundario" id="btn-cancelar-plan" hidden>Cancelar</button>
-      </form>
+      <!-- El plan por cultivo se arma en Plan → Planificar, junto con sus
+           generaciones y sus fechas. Estaba también acá, y eran las dos
+           mitades de una misma decisión cargadas por separado: el total podía
+           decir seis bancales de acelga mientras las generaciones decían tres,
+           sin que nada avisara. Ahora el total sale de las generaciones. -->
+      <p class="nota">Los cultivos de la temporada —con su marco, su rinde y
+      sus generaciones— se cargan en <b>Plan → Planificar</b>. Acá se define
+      cómo es la chacra; allá, qué se va a hacer esta temporada.</p>
     </div>`;
   },
 
@@ -2408,14 +2384,31 @@ function pantallaPlanificar() {
         <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
     </div>
 
-    <p class="nota">Una serie por cultivo: la primera fecha y cada cuántos días
-    se repite. El trasplante y la cosecha los calcula la app con los días del
-    catálogo, así que acá solo se decide cuándo sembrar.</p>
+    <p class="nota">Todo lo de un cultivo se decide acá: el marco de plantación,
+    cuántas generaciones y cada cuánto. La superficie, las plantas y los kilos
+    esperados salen de esos números, no se cargan aparte.</p>
 
     <form id="form-generaciones">
       <label>Cultivo</label>
       ${buscadorCultivo("", "cultivo")}
 
+      <h3 class="sub">Marco de plantación</h3>
+      <p class="nota">Viene del catálogo. Si acá se hace distinto, cambialo:
+      queda para esta chacra y de acá salen las plantas y los kilos.</p>
+      <div class="fila">
+        <div>
+          <label>Líneas por bancal</label>
+          <input type="text" name="lineas" inputmode="numeric">
+        </div>
+        <div>
+          <label>Distancia (cm)</label>
+          <input type="text" name="distancia" inputmode="numeric">
+        </div>
+      </div>
+      <label>Rinde esperado (kg/m²)</label>
+      <input type="text" name="rinde" inputmode="decimal">
+
+      <h3 class="sub">Generaciones</h3>
       <label>¿Cómo se siembra?</label>
       <select name="metodo">
         <option value="Trasplante">En almácigo, para trasplantar</option>
@@ -2442,11 +2435,11 @@ function pantallaPlanificar() {
         </div>
         <div>
           <label>Camas por generación</label>
-          <input type="text" name="camas" inputmode="decimal" placeholder="Ej: 1">
+          <input type="text" name="camas" inputmode="decimal" value="1">
         </div>
       </div>
 
-      <label>Sector <small>(opcional, se puede definir después)</small></label>
+      <label>Sector <small>(opcional, se ubica después en el mapa)</small></label>
       <select name="sector">
         <option value="">Sin asignar</option>
         ${sectores().map((s) => `<option>${esc(s.sector)}</option>`).join("")}
@@ -2643,7 +2636,8 @@ const filaPlan = (p, i) => {
     <div><div class="detalle">${esc(p.cultivo)}</div>
       <div class="cuando">${detalle}</div></div>
     <span class="etiqueta ok">${num(p.cosecha_esperada_kg)} kg</span>
-    <button type="button" class="editar" data-editar="${i}" aria-label="Editar">&#9998;</button>
+    <!-- Sin botón de editar: estos totales ya no se escriben a mano, salen de
+         sumar las generaciones. Se corrigen en Plan → Planificar. -->
     <button type="button" class="quitar" data-plan="${i}" aria-label="Quitar">&times;</button>
   </div>`;
 };
@@ -3432,126 +3426,9 @@ function prepararConfiguracion() {
   };
   }
 
-  // ---- plan de cultivos
-  const fPlan = $("#form-plan");
-  enlazarBuscadores(fPlan);
-  const calculoPlan = $("#calculo-plan");
-  const buscaCultivo = fPlan.querySelector(".buscador-texto");
-
-  // Al elegir un cultivo se traen los valores del catálogo, salvo que ya esté en
-  // el plan con los suyos propios.
-  const cargarValoresDe = (cultivo) => {
-    const p = perfil(cultivo);
-    const yaEsta = enPlan(cultivo);
-    // Si el cultivo ya estaba planificado sin rinde propio (planes viejos), se
-    // deduce de lo que se planificó: kg esperados sobre los metros.
-    const rindeDelPlan = yaEsta?.rinde_kg_m2 ||
-      (yaEsta?.superficie_m2 ? yaEsta.cosecha_esperada_kg / yaEsta.superficie_m2 : 0);
-    fPlan.rinde.value = redondear(rindeDelPlan || p.rinde_ref_kg_m2 || "");
-    fPlan.lineas.value = yaEsta?.lineas || p.lineas_bancal || "";
-    fPlan.distancia.value = yaEsta?.distancia_cm || p.distancia_cm || "";
-  };
-  const redondear = (v) => (v ? String(Math.round(v * 1000) / 1000) : "");
-
-  const verPlan = () => {
-    const cultivo = fPlan.cultivo.value;
-    const b = bancalM2();
-    const bancales = aNumero(fPlan.bancales.value) || 0;
-    const rinde = aNumero(fPlan.rinde.value) || 0;
-    const sup = bancales * b;
-    const plantas = plantasDe({ bancales, lineas: parseInt(fPlan.lineas.value, 10) || 0,
-                                distancia_cm: aNumero(fPlan.distancia.value) || 0 });
-    const ref = perfil(cultivo).rinde_ref_kg_m2 || 0;
-
-    if (!cultivo || !bancales) {
-      calculoPlan.innerHTML = "Elegí el cultivo y cuántos bancales para ver los números.";
-      return;
-    }
-    const partes = [`<b>${num(sup)} m²</b>`];
-    if (rinde) partes.push(`esperados: <b>${num(sup * rinde)} kg</b> a ${num(rinde, 2)} kg/m²`);
-    if (plantas) partes.push(`<b>${num(plantas)}</b> plantas`);
-    const p = perfil(cultivo);
-    if (p.dias_a_cosecha) partes.push(`${p.dias_a_cosecha} días a cosecha`);
-    calculoPlan.innerHTML = partes.join(" · ") +
-      (ref && Math.abs(ref - rinde) > 0.005
-        ? `<div class="nota" style="margin-top:4px">La referencia del catálogo para
-           ${esc(cultivo)} es ${num(ref, 2)} kg/m².</div>` : "");
-  };
-
-  // Al cambiar de cultivo se recargan rinde, líneas y distancia.
-  let ultimoCultivo = "";
-  fPlan.addEventListener("change", () => {
-    if (fPlan.cultivo.value && fPlan.cultivo.value !== ultimoCultivo) {
-      ultimoCultivo = fPlan.cultivo.value;
-      cargarValoresDe(ultimoCultivo);
-    }
-    verPlan();
-  });
-  fPlan.addEventListener("input", verPlan);
-  verPlan();
-
-  const salirDeEdicion = () => {
-    fPlan.reset();
-    ultimoCultivo = "";
-    buscaCultivo.value = "";
-    buscaCultivo.disabled = false;
-    $("#titulo-plan").innerHTML = "";
-    $("#btn-plan").textContent = "Agregar al plan";
-    $("#btn-cancelar-plan").hidden = true;
-    verPlan();
-  };
-  $("#btn-cancelar-plan").onclick = salirDeEdicion;
-
-  fPlan.onsubmit = (e) => {
-    e.preventDefault();
-    const cultivo = fPlan.cultivo.value;
-    if (!cultivo) return aviso("Elegí el cultivo.", true);
-    const b = bancalM2();
-    if (!b) return aviso("Primero cargá las medidas del bancal.", true);
-    const bancales = aNumero(fPlan.bancales.value);
-    if (!(bancales > 0)) return aviso("Los bancales tienen que ser más de cero.", true);
-
-    const rinde = aNumero(fPlan.rinde.value) || 0;
-    const lineas = parseInt(fPlan.lineas.value, 10) || 0;
-    const distancia = aNumero(fPlan.distancia.value) || 0;
-    const superficie = bancales * b;
-
-    const plan = [...(CFG?.plan || [])].filter((p) => p.cultivo !== cultivo);
-    plan.push({
-      cultivo,
-      superficie_m2: Math.round(superficie * 100) / 100,
-      cosecha_esperada_kg: Math.round(superficie * rinde),
-      rinde_kg_m2: rinde,
-      lineas,
-      distancia_cm: distancia,
-      plantas: plantasDe({ bancales, lineas, distancia_cm: distancia }),
-    });
-    plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
-    guardarConfig({ plan }, `${cultivo}: ${num(bancales, 1)} bancales ✓`);
-  };
-
-  // ---- editar un cultivo del plan
-  // Ojo: los sectores usan la misma clase pero otro atributo, así que se
-  // seleccionan por el atributo y no por la clase.
-  document.querySelectorAll("[data-editar]").forEach((b) => {
-    b.onclick = () => {
-      const p = (CFG.plan || [])[Number(b.dataset.editar)];
-      if (!p) return;
-      const m2 = bancalM2();
-      fPlan.cultivo.value = p.cultivo;
-      buscaCultivo.value = p.cultivo;
-      buscaCultivo.disabled = true;          // editando no se cambia de cultivo
-      ultimoCultivo = p.cultivo;
-      fPlan.bancales.value = m2 ? String(Math.round((p.superficie_m2 / m2) * 100) / 100) : "";
-      cargarValoresDe(p.cultivo);   // lo suyo, y lo que falte del catálogo
-      $("#avanzado-plan").open = true;
-      $("#titulo-plan").innerHTML = `<div class="editando">Editando <b>${esc(p.cultivo)}</b></div>`;
-      $("#btn-plan").textContent = "Guardar cambios";
-      $("#btn-cancelar-plan").hidden = false;
-      verPlan();
-      fPlan.scrollIntoView({ behavior: "smooth", block: "center" });
-    };
-  });
+  // El formulario del plan por cultivo se mudo a Plan → Planificar, donde se
+  // carga junto con sus generaciones. Editar el total por separado ya no tiene
+  // sentido: ahora sale de sumar las generaciones.
 
   // ---- quitar cosas
   document.querySelectorAll(".quitar").forEach((b) => {
@@ -4401,6 +4278,41 @@ function prepararGeneraciones() {
       (_, i) => (i === 0 ? desde : sumarDias(desde, i * cada)));
   };
 
+  // Al elegir el cultivo se trae su marco: primero lo que ya decidió esta
+  // chacra, y si no, lo que dice el catálogo.
+  let ultimoCultivo = "";
+  const alElegirCultivo = () => {
+    const c = f.cultivo.value;
+    if (!c || c === ultimoCultivo) return;
+    ultimoCultivo = c;
+    const ya = enPlan(c) || {};
+    const p = perfil(c) || {};
+    f.lineas.value = ya.lineas || p.lineas_bancal || "";
+    f.distancia.value = ya.distancia_cm || p.distancia_cm || "";
+    f.rinde.value = ya.rinde_kg_m2 || p.rinde_ref_kg_m2 || "";
+    const tipo = /almácigo|almacigo/i.test(p.tipo_siembra || "")
+      ? "Trasplante" : "Siembra directa";
+    f.metodo.value = tipo;
+    actualizar();
+  };
+
+  // Lo que la serie va a ocupar y a dar. Es la cuenta que antes había que
+  // hacer aparte en Configuración.
+  const cuentas = () => {
+    const bancales = (aNumero(f.camas.value) || 0)
+      * Math.max(1, parseInt(f.cuantas.value, 10) || 1);
+    const m2 = bancalM2();
+    const superficie = bancales * m2;
+    const rinde = aNumero(f.rinde.value) || 0;
+    return {
+      bancales, superficie,
+      kg: Math.round(superficie * rinde),
+      plantas: plantasDe({ bancales,
+        lineas: parseInt(f.lineas.value, 10) || 0,
+        distancia_cm: aNumero(f.distancia.value) || 0 }),
+    };
+  };
+
   const actualizar = () => {
     const cultivo = f.cultivo.value;
     const fs = fechas();
@@ -4422,17 +4334,22 @@ function prepararGeneraciones() {
     const campoUlt = directa ? ultima : sumarDias(ultima, diasAlmacigo(cultivo, ultima));
     const cosechaUlt = aCosecha ? sumarDias(campoUlt, aCosecha) : "";
 
+    const c = cuentas();
     calculo.innerHTML = `<b>${fs.length} generación(es)</b> de ${esc(cultivo)},`
       + ` G${desdeN}${fs.length > 1 ? ` a G${desdeN + fs.length - 1}` : ""}`
+      + (c.bancales ? ` · <b>${num(c.bancales, 1)} bancales</b> (${num(c.superficie)} m²)` : "")
+      + (c.kg ? ` · <b>${num(c.kg)} kg</b> esperados` : "")
       + `<br><small>de ${fechaCorta(primera)}${fs.length > 1 ? ` a ${fechaCorta(ultima)}` : ""}`
       + (cosechaUlt ? ` · la última se cosecharía cerca del ${fechaCorta(cosechaUlt)}` : "")
-      + (ya.length ? `<br>Ya hay ${ya.length} de este cultivo en el plan.` : "")
+      + (c.plantas ? ` · ${num(c.plantas)} plantas` : "")
+      + (ya.length ? `<br>Ya hay ${ya.length} de este cultivo en el plan: esto se suma.` : "")
+      + (bancalM2() ? "" : "<br>Faltan las medidas del bancal, en Configuración: sin eso no hay m² ni kilos.")
       + "</small>";
   };
 
-  ["desde", "cuantas", "cada", "metodo"].forEach((n) =>
-    f[n].addEventListener("input", actualizar));
-  f.addEventListener("change", actualizar);
+  ["desde", "cuantas", "cada", "metodo", "camas", "lineas", "distancia", "rinde"]
+    .forEach((n) => f[n].addEventListener("input", actualizar));
+  f.addEventListener("change", () => { alElegirCultivo(); actualizar(); });
   actualizar();
 
   f.onsubmit = (e) => {
@@ -4446,6 +4363,30 @@ function prepararGeneraciones() {
     const desdeN = ya.length ? Math.max(...ya.map((g) => g.generacion)) + 1 : 1;
     const directa = f.metodo.value === "Siembra directa";
     const camas = aNumero(f.camas.value) || "";
+
+    // El plan por cultivo se recalcula con TODAS sus generaciones, las que ya
+    // había y las nuevas. Antes ese total se cargaba aparte en Configuración y
+    // podía quedar diciendo una cosa mientras las generaciones decían otra.
+    const c = cuentas();
+    const bancalesPrevios = ya.reduce((a, g) => a + (Number(g.camas) || 0), 0);
+    const bancalesTotal = bancalesPrevios + c.bancales;
+    const m2 = bancalM2();
+    const superficie = bancalesTotal * m2;
+    const rinde = aNumero(f.rinde.value) || 0;
+    const lineas = parseInt(f.lineas.value, 10) || 0;
+    const distancia = aNumero(f.distancia.value) || 0;
+    if (m2 && bancalesTotal) {
+      const plan = [...(CFG?.plan || [])].filter((p) => p.cultivo !== cultivo);
+      plan.push({
+        cultivo,
+        superficie_m2: Math.round(superficie * 100) / 100,
+        cosecha_esperada_kg: Math.round(superficie * rinde),
+        rinde_kg_m2: rinde, lineas, distancia_cm: distancia,
+        plantas: plantasDe({ bancales: bancalesTotal, lineas, distancia_cm: distancia }),
+      });
+      plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
+      guardarConfig({ plan }, "");
+    }
 
     fs.forEach((fecha, i) => {
       const n = desdeN + i;
