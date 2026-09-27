@@ -125,7 +125,9 @@ var HOJAS = {
                   "Bancales", "Estado", "Origen", "Recibido"],
     fila: function (r) {
       var d = r.datos;
-      return [r.id, r.temporada || "", d.cultivo, d.generacion || 1,
+      // El id es estable y lo arma quien planifica: "gen-brocoli-4". Volver a
+      // guardar esa generacion la pisa en vez de dejar dos versiones.
+      return [d.generacion_id || r.id, r.temporada || "", d.cultivo, d.generacion || 1,
               d.metodo || "", d.fecha_almacigo || "", d.fecha_campo || "",
               d.camas || "", d.sector || "", d.bancales || "",
               d.estado || "Planificado", d.origen || "", new Date()];
@@ -426,19 +428,26 @@ function doPost(e) {
           else if (r.tipo === "puntaje") { guardarPuntaje(chacra, r); guardados++; }
           else if (r.tipo === "sugerencia") { guardarSugerencia(chacra, r); guardados++; }
           else if (r.tipo === "cultivo") { guardarCultivo(chacra, r, esAdmin(cuerpo.clave)); guardados++; }
+          // Las generaciones del plan no se agregan: se pisan por id. Un plan
+          // se corrige muchas veces antes de ejecutarse, y si cada correccion
+          // dejara una fila nueva, la hoja terminaria con cinco versiones de
+          // la misma generacion y nadie sabria cual vale.
+          else if (r.tipo === "generaciones") { guardarGeneracion(libro, r); guardados++; }
+          else if (r.tipo === "generacion_borrar") { borrarGeneracion(libro, r); guardados++; }
         } catch (err) {
           noGuardados.push({ id: r.id, tipo: r.tipo, error: String(err) });
         }
       });
 
-      // Los tipos que ya atendio el bucle de arriba no tienen hoja propia: no
-      // son un error.
+      // Los tipos que ya atendio el bucle de arriba no vuelven a pasar por la
+      // escritura por hoja: o no tienen hoja propia, o se escriben distinto.
       var SIN_HOJA = { tareas_hecha: 1, tareas_reabrir: 1, config: 1,
-                       puntaje: 1, sugerencia: 1, cultivo: 1 };
+                       puntaje: 1, sugerencia: 1, cultivo: 1,
+                       generaciones: 1, generacion_borrar: 1 };
       var porTipo = {};
       registros.forEach(function (r) {
-        if (HOJAS[r.tipo]) { (porTipo[r.tipo] = porTipo[r.tipo] || []).push(r); return; }
         if (SIN_HOJA[r.tipo]) return;
+        if (HOJAS[r.tipo]) { (porTipo[r.tipo] = porTipo[r.tipo] || []).push(r); return; }
         // Un tipo desconocido se descartaba en silencio: no entraba en
         // guardados ni en no_guardados, la respuesta salia ok, y la app lo
         // borraba de la cola dandolo por enviado. Se perdia sin que nadie se
@@ -967,6 +976,44 @@ function rankingDelJuego(chacra) {
 // Para que en el celular se vea lo que viene cargando todo el equipo, no solo
 // lo de ese teléfono. Se leen nada más las últimas filas: no importa cuánto
 // crezca la planilla, siempre pesa lo mismo.
+/* Guarda una generacion del plan pisando la que ya estuviera con ese id. El
+   plan se corrige muchas veces antes de ejecutarse: correr una fecha dos
+   semanas, cambiar los bancales, sacar una generacion. Si cada correccion
+   agregara una fila, quedarian cinco versiones de la misma y ninguna manera de
+   saber cual manda. */
+function guardarGeneracion(libro, r) {
+  var def = HOJAS.generaciones;
+  var hoja = obtenerHoja(libro, def);
+  var fila = def.fila(r);
+  var n = def.encabezados.length;
+  var id = String((r.datos && r.datos.generacion_id) || r.id);
+
+  if (hoja.getLastRow() > 1) {
+    var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === id) {
+        hoja.getRange(i + 2, 1, 1, n).setValues([fila]);
+        return;
+      }
+    }
+  }
+  hoja.getRange(hoja.getLastRow() + 1, 1, 1, n).setValues([fila]);
+}
+
+/* Saca una generacion del plan. Se borra la fila entera y no se marca como
+   anulada: el plan es una intencion, no un registro historico. Lo que de
+   verdad paso vive en Siembras y eso no se toca nunca. */
+function borrarGeneracion(libro, r) {
+  var def = HOJAS.generaciones;
+  var hoja = libro.getSheetByName(def.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return;
+  var id = String((r.datos && r.datos.generacion_id) || r.id);
+  var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+  for (var i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0]) === id) { hoja.deleteRow(i + 2); return; }
+  }
+}
+
 /* El plan de generaciones entero. Son unas ochenta filas por temporada, asi
    que viaja completo: no tiene sentido paginarlo, y el grafico las necesita
    todas para dibujar la temporada. */

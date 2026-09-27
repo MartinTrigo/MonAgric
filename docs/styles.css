@@ -384,6 +384,22 @@ button.secundario {
   border-radius: 8px;
 }
 
+/* Las generaciones de cada cultivo, plegadas: son ochenta y abiertas no se
+   puede buscar nada. */
+.gen-cultivo { border-bottom: 1px solid var(--sage-light); }
+.gen-cultivo:last-of-type { border-bottom: none; }
+.gen-cultivo summary {
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .94rem;
+  list-style: none;
+}
+.gen-cultivo summary::-webkit-details-marker { display: none; }
+.gen-cultivo summary::before { content: "▸ "; }
+.gen-cultivo[open] summary::before { content: "▾ "; }
+.gen-cultivo summary span { font-weight: 400; color: var(--tenue); font-size: .85rem; }
+
 /* ---- plan estratégico: el calendario de barras de la temporada ----
    Se desliza en horizontal, que es lo que permite que entre en un teléfono sin
    volverse ilegible: el nombre del cultivo queda fijo a la izquierda y lo que

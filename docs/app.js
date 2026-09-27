@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 44 · 27/9/2026";
+const VERSION_APP = "versión 45 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -97,7 +97,7 @@ let cultivoAbierto = "";
 let siembraSugerida = null;
 
 // El plan estratégico: el calendario de barras de toda la temporada.
-let verPlanEstrategico = false;
+let vistaPlan = "lista";       // "lista", "grafico" o "planificar"
 let ordenPlan = "cultivo";      // "cultivo" o "fecha"
 let filtroPlan = "todas";       // "todas", "planificadas" o "sembradas"
 let vistaTareas = "hoy";        // "hoy" o "areas"
@@ -1396,7 +1396,8 @@ const plantillas = {
     // Un cultivo abierto reemplaza la lista: en el teléfono no hay lugar para
     // las dos cosas, y en la notebook la ficha se lee mejor sola.
     if (cultivoAbierto) return fichaCultivo(cultivoAbierto);
-    if (verPlanEstrategico) return planEstrategico();
+    if (vistaPlan === "planificar") return pantallaPlanificar();
+    if (vistaPlan === "grafico") return planEstrategico();
 
     return `
     <div class="tarjeta">
@@ -1404,6 +1405,7 @@ const plantillas = {
       <div class="pestanas-tareas">
         <button type="button" class="pestana activa" data-plan-vista="lista">Lista</button>
         <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
+        <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
       </div>
       ${plan.length ? plan.map((p) => {
         const logrado = porCultivo[p.cultivo] || 0;
@@ -1925,7 +1927,7 @@ async function traerGeneraciones(forzar = false) {
     escribir(LS.generaciones, d.generaciones);
     if (!cambio) return;
     if (vistaActual === "inicio") render("inicio", true);
-    else if (vistaActual === "plan" && verPlanEstrategico) render("plan", true);
+    else if (vistaActual === "plan" && vistaPlan !== "lista") render("plan", true);
   } catch { /* sin señal: se usa lo último que se bajó */ }
 }
 
@@ -1997,6 +1999,7 @@ function planEstrategico() {
     <div class="pestanas-tareas">
       <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
       <button type="button" class="pestana activa" data-plan-vista="grafico">Plan estratégico</button>
+      <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
     </div>`;
 
   if (!gens.length) {
@@ -2118,6 +2121,108 @@ function planEstrategico() {
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun",
                       "jul", "ago", "sep", "oct", "nov", "dic"];
+
+// ---- Planificar generaciones desde la app ----
+// Escalonar un cultivo es la decisión central de la temporada: nueve
+// generaciones de brócoli cada dos semanas dan cosecha continua, y una sola
+// grande da un pico y después nada. Se carga así, como serie, porque es como
+// se piensa; cargar nueve fechas a mano invita a equivocarse.
+function pantallaPlanificar() {
+  const gens = (leer(LS.generaciones, []) || [])
+    .slice()
+    .sort((a, b) => a.cultivo.localeCompare(b.cultivo) || a.generacion - b.generacion);
+
+  const porCultivo = new Map();
+  gens.forEach((g) => {
+    if (!porCultivo.has(g.cultivo)) porCultivo.set(g.cultivo, []);
+    porCultivo.get(g.cultivo).push(g);
+  });
+
+  return `
+  <div class="tarjeta">
+    <h2>Planificar</h2>
+    <div class="pestanas-tareas">
+      <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
+      <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
+      <button type="button" class="pestana activa" data-plan-vista="planificar">Planificar</button>
+    </div>
+
+    <p class="nota">Una serie por cultivo: la primera fecha y cada cuántos días
+    se repite. El trasplante y la cosecha los calcula la app con los días del
+    catálogo, así que acá solo se decide cuándo sembrar.</p>
+
+    <form id="form-generaciones">
+      <label>Cultivo</label>
+      ${buscadorCultivo("", "cultivo")}
+
+      <label>¿Cómo se siembra?</label>
+      <select name="metodo">
+        <option value="Trasplante">En almácigo, para trasplantar</option>
+        <option value="Siembra directa">Siembra directa</option>
+      </select>
+
+      <div class="fila">
+        <div>
+          <label>Primera siembra</label>
+          <input type="date" name="desde" value="${hoy()}" required>
+        </div>
+        <div>
+          <label>Generaciones</label>
+          <input type="number" name="cuantas" value="1" min="1" max="30"
+                 inputmode="numeric" required>
+        </div>
+      </div>
+
+      <div class="fila">
+        <div>
+          <label>Cada cuántos días</label>
+          <input type="number" name="cada" value="14" min="1" max="120"
+                 inputmode="numeric">
+        </div>
+        <div>
+          <label>Camas por generación</label>
+          <input type="text" name="camas" inputmode="decimal" placeholder="Ej: 1">
+        </div>
+      </div>
+
+      <label>Sector <small>(opcional, se puede definir después)</small></label>
+      <select name="sector">
+        <option value="">Sin asignar</option>
+        ${sectores().map((s) => `<option>${esc(s.sector)}</option>`).join("")}
+      </select>
+
+      <div class="calculo" id="calculo-generaciones"></div>
+
+      <button class="principal">Agregar al plan</button>
+    </form>
+  </div>
+
+  <div class="tarjeta">
+    <h2>En el plan <small>${gens.length} generaciones</small></h2>
+    ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
+      <details class="gen-cultivo">
+        <summary>${esc(cultivo)} <span>${lista.length} generación(es)</span></summary>
+        ${lista.map((g) => {
+          const cuando = g.fecha_almacigo || g.fecha_campo;
+          return `<div class="registro">
+            <div>
+              <div class="detalle">G${g.generacion}${
+                g.sembrada ? ` <span class="etiqueta ok">sembrada</span>` : ""}</div>
+              <div class="cuando">${fechaCorta(cuando)}${
+                g.fecha_almacigo ? " · en bandeja" : " · directa"}${
+                g.camas ? ` · ${num(g.camas, 1)} cama(s)` : ""}${
+                g.sector ? ` · ${esc(g.sector)}` : ""}</div>
+            </div>
+            ${g.sembrada ? "" : `<button type="button" class="quitar"
+              data-borrar-gen="${esc(g.id)}" aria-label="Quitar del plan">&times;</button>`}
+          </div>`;
+        }).join("")}
+      </details>`).join("")
+      : `<p class="nota">Todavía no hay generaciones planificadas.</p>`}
+    <p class="nota">Las que ya se sembraron no se pueden sacar del plan: son
+    parte de lo que pasó, no de lo que se piensa hacer.</p>
+  </div>`;
+}
 
 // ---- Ficha de un cultivo ----
 // Todo lo que la app sabe de un cultivo, junto. Hoy, para responder "¿cuánto
@@ -2541,7 +2646,7 @@ function render(vista, conservarScroll = false) {
 
   ({ siembras: prepararSiembras, horas: prepararHoras, cosechas: prepararCosechas,
      tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes,
-     configuracion: prepararConfiguracion, plan: prepararInicio,
+     configuracion: prepararConfiguracion, plan: prepararPlan,
      trasplantes: prepararTrasplantes, cuentas: prepararCuentas
    }[vista] || (() => {}))();
 
@@ -2572,7 +2677,7 @@ function render(vista, conservarScroll = false) {
   // Plan estratégico: cambiar de vista, ordenar y filtrar.
   document.querySelectorAll("[data-plan-vista]").forEach((b) => {
     b.onclick = () => {
-      verPlanEstrategico = b.dataset.planVista === "grafico";
+      vistaPlan = b.dataset.planVista;
       cultivoAbierto = "";
       render("plan");
     };
@@ -3924,6 +4029,110 @@ function prepararHoras() {
     });
     render("horas");
   };
+}
+
+// La sección Plan tiene tres pantallas y cada una engancha lo suyo.
+function prepararPlan() {
+  prepararInicio();
+  prepararGeneraciones();
+}
+
+function prepararGeneraciones() {
+  const f = $("#form-generaciones");
+  if (!f) return;
+  enlazarBuscadores(f);
+  const calculo = $("#calculo-generaciones");
+  const existentes = leer(LS.generaciones, []) || [];
+
+  // Las fechas de la serie: la primera, y después cada tantos días.
+  const fechas = () => {
+    const desde = f.desde.value;
+    const cuantas = Math.max(1, parseInt(f.cuantas.value, 10) || 1);
+    const cada = Math.max(1, parseInt(f.cada.value, 10) || 14);
+    if (!desde) return [];
+    // La primera va tal cual: sumarDias devuelve vacío con 0 días, y hace bien
+    // —un perfil sin dato no debe inventar una fecha—, pero acá 0 es un
+    // desplazamiento legítimo.
+    return Array.from({ length: cuantas },
+      (_, i) => (i === 0 ? desde : sumarDias(desde, i * cada)));
+  };
+
+  const actualizar = () => {
+    const cultivo = f.cultivo.value;
+    const fs = fechas();
+    if (!cultivo || !fs.length) {
+      calculo.innerHTML = "Elegí el cultivo y cuándo arranca.";
+      return;
+    }
+    // La numeración sigue donde quedó: si ya hay tres generaciones de brócoli,
+    // la próxima serie empieza en la cuatro.
+    const ya = existentes.filter((g) => claveArea(g.cultivo) === claveArea(cultivo));
+    const desdeN = ya.length ? Math.max(...ya.map((g) => g.generacion)) + 1 : 1;
+    const directa = f.metodo.value === "Siembra directa";
+    const p = perfil(cultivo) || {};
+    const aCosecha = directa ? p.dias_a_cosecha : p.dias_trasplante_cosecha;
+
+    const primera = fs[0], ultima = fs[fs.length - 1];
+    // Cuándo estaría cosechándose la última, que es lo que dice si la serie
+    // entra en la temporada o se va de largo.
+    const campoUlt = directa ? ultima : sumarDias(ultima, diasAlmacigo(cultivo, ultima));
+    const cosechaUlt = aCosecha ? sumarDias(campoUlt, aCosecha) : "";
+
+    calculo.innerHTML = `<b>${fs.length} generación(es)</b> de ${esc(cultivo)},`
+      + ` G${desdeN}${fs.length > 1 ? ` a G${desdeN + fs.length - 1}` : ""}`
+      + `<br><small>de ${fechaCorta(primera)}${fs.length > 1 ? ` a ${fechaCorta(ultima)}` : ""}`
+      + (cosechaUlt ? ` · la última se cosecharía cerca del ${fechaCorta(cosechaUlt)}` : "")
+      + (ya.length ? `<br>Ya hay ${ya.length} de este cultivo en el plan.` : "")
+      + "</small>";
+  };
+
+  ["desde", "cuantas", "cada", "metodo"].forEach((n) =>
+    f[n].addEventListener("input", actualizar));
+  f.addEventListener("change", actualizar);
+  actualizar();
+
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const cultivo = f.cultivo.value;
+    if (!cultivo) return aviso("Elegí qué cultivo estás planificando.", true);
+    const fs = fechas();
+    if (!fs.length) return aviso("Falta la fecha de la primera siembra.", true);
+
+    const ya = existentes.filter((g) => claveArea(g.cultivo) === claveArea(cultivo));
+    const desdeN = ya.length ? Math.max(...ya.map((g) => g.generacion)) + 1 : 1;
+    const directa = f.metodo.value === "Siembra directa";
+    const camas = aNumero(f.camas.value) || "";
+
+    fs.forEach((fecha, i) => {
+      const n = desdeN + i;
+      guardarRegistro("generaciones", {
+        // El id lleva cultivo y número: volver a cargar la misma generación la
+        // pisa en vez de duplicarla.
+        generacion_id: `gen-${claveArea(cultivo)}-${n}`,
+        cultivo, generacion: n,
+        metodo: f.metodo.value,
+        // En siembra directa la planta arranca en el bancal: no hay bandeja.
+        fecha_almacigo: directa ? "" : fecha,
+        fecha_campo: directa ? fecha : "",
+        camas, sector: f.sector.value,
+        estado: "Planificado", origen: "AMA",
+      }, `${fs.length} generación(es) de ${cultivo} al plan ✓`);
+    });
+    traerGeneraciones(true);
+    render("plan");
+  };
+
+  // Sacar una del plan.
+  document.querySelectorAll("[data-borrar-gen]").forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.borrarGen;
+      if (!confirm("¿Sacar esta generación del plan?")) return;
+      guardarRegistro("generacion_borrar", { generacion_id: id }, "Sacada del plan ✓");
+      // Se saca de la copia local para que no siga a la vista hasta sincronizar.
+      escribir(LS.generaciones, (leer(LS.generaciones, []) || []).filter((g) => g.id !== id));
+      render("plan");
+    };
+  });
 }
 
 function prepararCosechas() {
