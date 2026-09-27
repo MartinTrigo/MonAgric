@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 43 · 27/9/2026";
+const VERSION_APP = "versión 44 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -90,6 +90,12 @@ let vistaActual = "inicio";
 let cuentaAbierta = "";
 // Qué cultivo del plan se está mirando en detalle. Vacío = el plan entero.
 let cultivoAbierto = "";
+// Lo que se eligió en "Para sembrar" y todavía no se cargó. Lleva el cultivo,
+// la generación y la fecha al formulario de Siembras, para que tocar el aviso
+// y registrar sea un solo movimiento. No marca nada como hecho: lo que marca
+// hecho es la siembra guardada, y nada más.
+let siembraSugerida = null;
+
 // El plan estratégico: el calendario de barras de toda la temporada.
 let verPlanEstrategico = false;
 let ordenPlan = "cultivo";      // "cultivo" o "fecha"
@@ -1870,8 +1876,9 @@ function tarjetaSiembrasPendientes() {
 
   return `<div class="tarjeta">
     <h2>&#127793; Para sembrar <small>${pend.length}</small></h2>
-    <p class="nota">Del plan de la temporada. Desaparecen solas al cargar la
-    siembra en su sección.</p>
+    <p class="nota">Del plan de la temporada. Tocá una para cargarla: se abre
+    Siembras con el cultivo y la generación puestos. Desaparece de acá cuando
+    la siembra queda guardada, no antes.</p>
     ${pend.slice(0, 8).map((g) => {
       const d = diasEntre(hoy(), g.cuando);
       const cuando = d === 0 ? "hoy"
@@ -1880,7 +1887,10 @@ function tarjetaSiembrasPendientes() {
       const gs = g.generaciones;
       const etiqueta = gs.length === 1 ? `G${gs[0]}`
         : `G${Math.min(...gs)} a G${Math.max(...gs)} <small>(${gs.length} juntas)</small>`;
-      return `<div class="registro">
+      return `<div class="registro abre-siembra" role="button" tabindex="0"
+                   data-sembrar="${esc(JSON.stringify({
+                     cultivo: g.cultivo, generacion: Math.min(...gs),
+                     directa: !g.fecha_almacigo }))}">
         <div>
           <div class="detalle">${esc(g.cultivo)} <span class="gen">${etiqueta}</span></div>
           <div class="cuando">${g.fecha_almacigo ? "en bandeja" : "siembra directa"}${
@@ -2575,6 +2585,19 @@ function render(vista, conservarScroll = false) {
   });
   // El plan también lo necesita Inicio, para avisar qué toca sembrar.
   if (vista === "plan" || vista === "inicio") traerGeneraciones();
+
+  // Tocar un aviso de "Para sembrar" abre el formulario con lo que ya se sabe.
+  document.querySelectorAll("[data-sembrar]").forEach((fila) => {
+    const ir = () => {
+      try { siembraSugerida = JSON.parse(fila.dataset.sembrar); } catch { return; }
+      render("siembras");
+      window.scrollTo(0, 0);
+    };
+    fila.onclick = ir;
+    fila.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); }
+    };
+  });
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {
@@ -2698,6 +2721,20 @@ function prepararSiembras() {
   const calculo = $("#calculo-siembra");
   enlazarSectorBancal(f);
   enlazarBuscadores(f);
+
+  // Si se llegó tocando un aviso de "Para sembrar", el formulario arranca con
+  // lo que el plan ya sabe. Queda todo editable: es una ayuda, no un dictado.
+  if (siembraSugerida) {
+    const s = siembraSugerida;
+    siembraSugerida = null;            // se usa una sola vez
+    f.cultivo.value = s.cultivo;
+    const caja = f.querySelector("[data-buscador] .buscador-texto");
+    if (caja) caja.value = s.cultivo;
+    f.generacion.value = s.generacion || 1;
+    const tipo = s.directa ? "Siembra directa" : "Siembra almácigo";
+    if ([...f.tipo.options].some((o) => o.value === tipo)) f.tipo.value = tipo;
+    aviso(`${s.cultivo} G${s.generacion}: revisá y guardá`);
+  }
 
   const actualizar = () => {
     const tipo = f.tipo.value;

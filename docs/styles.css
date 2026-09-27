@@ -376,6 +376,13 @@ button.secundario {
   color: var(--peligro);
 }
 .registro .gen { color: var(--tenue); font-weight: 400; }
+.registro.abre-siembra { cursor: pointer; }
+.registro.abre-siembra:hover .detalle { text-decoration: underline; }
+.registro.abre-siembra:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
 
 /* ---- plan estratégico: el calendario de barras de la temporada ----
    Se desliza en horizontal, que es lo que permite que entre en un teléfono sin
