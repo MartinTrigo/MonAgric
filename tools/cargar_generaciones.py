@@ -97,7 +97,9 @@ def main() -> None:
         registros.append({
             # Id estable: volver a correrlo actualiza en vez de duplicar.
             "id": f"gen-{clave(nombre)}-{gen}",
-            "tipo": "generacion",
+            # El tipo tiene que ser el mismo nombre que la clave de HOJAS en el
+            # servicio, que es "generaciones" en plural.
+            "tipo": "generaciones",
             "dispositivo": "escritorio",
             "datos": {
                 "cultivo": nombre,
