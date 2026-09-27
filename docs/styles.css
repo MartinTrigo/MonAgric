@@ -400,6 +400,104 @@ button.secundario {
 .gen-cultivo[open] summary::before { content: "▾ "; }
 .gen-cultivo summary span { font-weight: 400; color: var(--tenue); font-size: .85rem; }
 
+/* ---- mapa de cultivos: espacio y tiempo a la vez ----
+   Cada bancal es una columna y los meses bajan por las filas. Un cultivo
+   plantado ocupa un rectángulo: ancho = los bancales que toma, alto = desde
+   que va a tierra hasta que termina la cosecha. */
+.mapa-sectores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+  margin-top: 10px;
+}
+.sector-mapa h4 {
+  margin: 0 0 6px;
+  font-size: .9rem;
+  color: var(--sage-dark);
+}
+.sector-mapa h4 span { font-weight: 400; color: var(--tenue); font-size: .8rem; }
+
+.grilla {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  height: 300px;
+  border: 1px solid var(--sage-light);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.meses-y { position: relative; background: var(--crema); }
+.mes-y {
+  position: absolute;
+  left: 0; right: 0;
+  font-size: .58rem;
+  color: var(--tenue);
+  text-align: center;
+  border-top: 1px solid var(--sage-light);
+  padding-top: 1px;
+  text-transform: uppercase;
+}
+
+.camas {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+}
+.cama {
+  border-left: 1px solid #eef1ec;
+  min-width: 0;
+}
+.cama:first-child { border-left: none; }
+/* Con una generación elegida, el campo se divide en dónde entra y dónde no.
+   Es lo que convierte el mapa en una ayuda para decidir. */
+.cama.libre {
+  background: rgba(143,174,125,.22);
+  cursor: pointer;
+}
+.cama.libre:hover { background: rgba(143,174,125,.55); }
+.cama.ocupada { background: rgba(192,57,43,.05); }
+
+.puesta {
+  position: absolute;
+  border-radius: 3px;
+  background: #8fae7d;
+  border: 1px solid rgba(0,0,0,.12);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  padding: 1px 2px;
+}
+.puesta.sembrada { background: #3d6b35; }
+.puesta.elegida {
+  outline: 2px solid var(--amber);
+  outline-offset: -1px;
+  z-index: 3;
+}
+.puesta span {
+  font-size: .55rem;
+  line-height: 1.1;
+  color: #fff;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.hoy-y {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: #c0392b;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.registro.elegible { cursor: pointer; }
+.registro.elegible:hover .detalle { text-decoration: underline; }
+.registro.elegida {
+  background: var(--sage-suave);
+  border-radius: 8px;
+}
+
 /* ---- plan estratégico: el calendario de barras de la temporada ----
    Se desliza en horizontal, que es lo que permite que entre en un teléfono sin
    volverse ilegible: el nombre del cultivo queda fijo a la izquierda y lo que
@@ -546,7 +644,10 @@ button.secundario {
 /* En la notebook el gráfico entra entero: no tiene sentido partirlo en dos
    columnas como el resto de las tarjetas. */
 @media (min-width: 1000px) {
-  #vista > .tarjeta:has(.plan-grafico) { column-span: all; }
+  /* El gráfico y el mapa necesitan todo el ancho: partidos en dos columnas se
+     vuelven ilegibles. */
+  #vista > .tarjeta:has(.plan-grafico),
+  #vista > .tarjeta:has(.mapa-sectores) { column-span: all; }
 }
 
 /* "Saber más": la referencia del cultivo va al final y plegada. Quien abre la

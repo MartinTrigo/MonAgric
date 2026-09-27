@@ -6,6 +6,31 @@ que falta hacer.
 
 ---
 
+## Anotado para después — abonos verdes, corredores y categorías nuevas
+
+Pedido del 27/09, **para cuando esté el mapa de cultivos**. Hoy el catálogo
+tiene solo hortalizas; la planificación real de Bioma incluye dos cosas más
+que no entran en ese molde:
+
+- **Abonos verdes**: cereales de verano e invierno (trigo, avena, cebada,
+  centeno) y leguminosas (vicia, trébol blanco, trébol rojo). No se cosechan:
+  ocupan el bancal, fijan nitrógeno y se incorporan. Eso rompe el supuesto de
+  todo el sistema, que hoy asume que un cultivo termina en kilos cosechados.
+- **Corredores biológicos**: franjas de flores que no son cultivo de renta
+  pero sí ocupan espacio y tiempo, y son parte del diseño del campo.
+
+**Lo que hay que agregar** son categorías nuevas en la configuración:
+*florales, aromáticas y medicinales*, *nativas perennes*, *cereales*. Después,
+poder calendarizarlas con sus fechas de siembra, trasplante y cosecha —o de
+incorporación, en el caso del abono verde— y ubicarlas en los sectores con el
+mapa.
+
+**Lo que hay que pensar antes de programar**: un abono verde no tiene cosecha
+esperada en kilos ni rinde por m². Si entra al catálogo tal cual, va a
+ensuciar el plan de la temporada y el porcentaje de lo cosechado. Lo más
+probable es que necesite un campo de "tipo" que diga si el cultivo se cosecha
+o se incorpora, y que el resumen lo cuente aparte.
+
 ## Lo próximo, en orden
 
 ### 0. Tres agujeros del alta de personas — salieron del caso de Mili

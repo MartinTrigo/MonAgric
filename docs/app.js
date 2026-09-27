@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 46 · 27/9/2026";
+const VERSION_APP = "versión 47 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1396,6 +1396,7 @@ const plantillas = {
     // Un cultivo abierto reemplaza la lista: en el teléfono no hay lugar para
     // las dos cosas, y en la notebook la ficha se lee mejor sola.
     if (cultivoAbierto) return fichaCultivo(cultivoAbierto);
+    if (vistaPlan === "mapa") return mapaDeCultivos();
     if (vistaPlan === "planificar") return pantallaPlanificar();
     if (vistaPlan === "grafico") return planEstrategico();
 
@@ -1406,6 +1407,7 @@ const plantillas = {
         <button type="button" class="pestana activa" data-plan-vista="lista">Lista</button>
         <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
         <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
+        <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
       </div>
       ${plan.length ? plan.map((p) => {
         const logrado = porCultivo[p.cultivo] || 0;
@@ -2000,6 +2002,7 @@ function planEstrategico() {
       <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
       <button type="button" class="pestana activa" data-plan-vista="grafico">Plan estratégico</button>
       <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
+        <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
     </div>`;
 
   if (!gens.length) {
@@ -2210,6 +2213,175 @@ function correrGeneracion(id, dias) {
   render("plan", true);
 }
 
+// ---- Mapa de cultivos ----
+// Dónde va cada generación y por cuánto tiempo. Es la otra mitad de la
+// planificación: el plan estratégico dice CUÁNDO, el mapa dice DÓNDE, y hasta
+// que las dos coinciden no se sabe si el plan entra en el campo que hay.
+//
+// Un bancal se ocupa desde que la planta va a tierra hasta que termina la
+// cosecha. El tiempo en bandeja no cuenta: ese no ocupa bancal.
+let genSeleccionada = "";
+
+const bancalesDe = (g) => String(g.bancales || "")
+  .split(",").map((x) => parseInt(x, 10)).filter((n) => n > 0);
+
+function ocupacionDe(g) {
+  const t = tramosDe(g);
+  if (!t) return null;
+  return { desde: t.campo, hasta: t.fin };
+}
+
+// Los bancales que una generación tomaría si se la pone empezando en `inicio`.
+// Se usa tanto para dibujar la vista previa como para guardar.
+function bancalesQueOcuparia(g, inicio, cuantosHay) {
+  const n = Math.max(1, Math.round(Number(g.camas) || 1));
+  const desde = Math.min(inicio, Math.max(1, cuantosHay - n + 1));
+  return Array.from({ length: n }, (_, i) => desde + i).filter((b) => b <= cuantosHay);
+}
+
+// Qué generaciones chocarían con esta si se la pusiera en esos bancales: mismo
+// sector, bancal compartido y fechas superpuestas.
+function chocanCon(g, sector, bancales, todas) {
+  const o = ocupacionDe(g);
+  if (!o) return [];
+  const set = new Set(bancales);
+  return todas.filter((x) => {
+    if (x.id === g.id || claveArea(x.sector) !== claveArea(sector)) return false;
+    if (!bancalesDe(x).some((b) => set.has(b))) return false;
+    const ox = ocupacionDe(x);
+    return ox && ox.desde <= o.hasta && o.desde <= ox.hasta;
+  });
+}
+
+function mapaDeCultivos() {
+  const todas = (leer(LS.generaciones, []) || []);
+  const asignadas = todas.filter((g) => g.sector && bancalesDe(g).length);
+  const sueltas = todas.filter((g) => !(g.sector && bancalesDe(g).length));
+  const sel = todas.find((g) => g.id === genSeleccionada);
+
+  const d0 = inicioDeTemporada();
+  const d1 = new Date(d0); d1.setFullYear(d1.getFullYear() + 1);
+  const ini = Math.floor(d0.getTime() / 86400000);
+  const dias = Math.max(1, Math.floor(d1.getTime() / 86400000) - ini);
+  const alto = (iso) => ((diaDe(iso) - ini) / dias) * 100;
+
+  // Los meses del eje vertical
+  const filasMes = [];
+  const cur = new Date(d0);
+  while (cur < d1) {
+    const a = Math.floor(cur.getTime() / 86400000);
+    const sig = new Date(cur); sig.setMonth(sig.getMonth() + 1);
+    filasMes.push({
+      nombre: MESES_CORTOS[cur.getMonth()],
+      top: ((a - ini) / dias) * 100,
+      alto: ((Math.floor(sig.getTime() / 86400000) - a) / dias) * 100,
+    });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  const hoyPct = alto(hoy());
+
+  const grillaDe = (s) => {
+    const n = Number(s.bancales) || 0;
+    const aqui = asignadas.filter((g) => claveArea(g.sector) === claveArea(s.sector));
+    // Cuando hay una generación elegida, se marcan los bancales donde entraría
+    // sin pisar a nadie. Es lo que convierte el mapa en una ayuda y no en un
+    // dibujo: se ve el hueco antes de decidir.
+    const libres = new Set();
+    if (sel) {
+      for (let b = 1; b <= n; b++) {
+        const bs = bancalesQueOcuparia(sel, b, n);
+        if (bs.length && !chocanCon(sel, s.sector, bs, todas).length) libres.add(b);
+      }
+    }
+
+    return `<div class="sector-mapa">
+      <h4>${esc(s.sector)} <span>${n} bancales</span></h4>
+      <div class="grilla" style="--cols:${n}" data-sector="${esc(s.sector)}">
+        <div class="meses-y">
+          ${filasMes.map((m) => `<div class="mes-y" style="top:${m.top}%;height:${m.alto}%">${m.nombre}</div>`).join("")}
+        </div>
+        <div class="camas">
+          ${Array.from({ length: n }, (_, i) => `<div class="cama${
+            sel ? (libres.has(i + 1) ? " libre" : " ocupada") : ""}"
+            data-bancal="${i + 1}" title="Bancal ${i + 1}"></div>`).join("")}
+          ${aqui.map((g) => {
+            const o = ocupacionDe(g);
+            if (!o) return "";
+            const bs = bancalesDe(g);
+            const desdeB = Math.min(...bs), hastaB = Math.max(...bs);
+            const top = Math.max(0, alto(o.desde));
+            const fin = Math.min(100, alto(o.hasta));
+            if (fin <= top) return "";
+            const sembrada = ("sembrada" in g) ? g.sembrada : g.estado === "Sembrado";
+            return `<div class="puesta${sembrada ? " sembrada" : ""}${
+              g.id === genSeleccionada ? " elegida" : ""}"
+              data-puesta="${esc(g.id)}"
+              style="left:${((desdeB - 1) / n) * 100}%;width:${((hastaB - desdeB + 1) / n) * 100}%;
+                     top:${top}%;height:${fin - top}%"
+              title="${esc(g.cultivo)} G${g.generacion} · bancal ${bs.join(", ")} · ${
+                fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}">
+              <span>${esc(g.cultivo)} G${g.generacion}</span>
+            </div>`;
+          }).join("")}
+          ${hoyPct >= 0 && hoyPct <= 100
+            ? `<div class="hoy-y" style="top:${hoyPct}%"></div>` : ""}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const porCultivo = new Map();
+  sueltas.forEach((g) => {
+    if (!porCultivo.has(g.cultivo)) porCultivo.set(g.cultivo, []);
+    porCultivo.get(g.cultivo).push(g);
+  });
+
+  return `
+  <div class="tarjeta">
+    <h2>Mapa de cultivos <small>${asignadas.length} de ${todas.length} ubicadas</small></h2>
+    <div class="pestanas-tareas">
+      <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
+      <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
+      <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
+      <button type="button" class="pestana activa" data-plan-vista="mapa">Mapa</button>
+    </div>
+
+    <p class="nota">${sel
+      ? `Elegiste <b>${esc(sel.cultivo)} G${sel.generacion}</b>, que ocupa
+         ${Math.max(1, Math.round(Number(sel.camas) || 1))} bancal(es).
+         Los bancales en verde están libres en sus fechas: tocá uno para ubicarla.
+         <button type="button" class="secundario" id="cancelar-eleccion">Cancelar</button>`
+      : `Cada bancal es una columna y los meses van hacia abajo. Elegí una
+         generación de la lista y después el bancal donde va. Tocá una ya
+         puesta para moverla o sacarla.`}</p>
+
+    <div class="mapa-sectores">
+      ${sectores().map(grillaDe).join("")}
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Sin ubicar <small>${sueltas.length}</small></h2>
+    ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
+      <details class="gen-cultivo"${sel && sel.cultivo === cultivo ? " open" : ""}>
+        <summary>${esc(cultivo)} <span>${lista.length}</span></summary>
+        ${lista.map((g) => {
+          const o = ocupacionDe(g);
+          return `<div class="registro elegible${g.id === genSeleccionada ? " elegida" : ""}"
+                       data-elegir="${esc(g.id)}" role="button" tabindex="0">
+            <div>
+              <div class="detalle">G${g.generacion} <span class="gen">${
+                Math.max(1, Math.round(Number(g.camas) || 1))} cama(s)</span></div>
+              <div class="cuando">${o ? `ocupa del ${fechaCorta(o.desde)} al ${fechaCorta(o.hasta)}`
+                : "sin fechas suficientes"}</div>
+            </div>
+          </div>`;
+        }).join("")}
+      </details>`).join("")
+      : `<p class="nota">Están todas ubicadas.</p>`}
+  </div>`;
+}
+
 // ---- Planificar generaciones desde la app ----
 // Escalonar un cultivo es la decisión central de la temporada: nueve
 // generaciones de brócoli cada dos semanas dan cosecha continua, y una sola
@@ -2233,6 +2405,7 @@ function pantallaPlanificar() {
       <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
       <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
       <button type="button" class="pestana activa" data-plan-vista="planificar">Planificar</button>
+        <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
     </div>
 
     <p class="nota">Una serie por cultivo: la primera fecha y cada cuántos días
@@ -4124,6 +4297,88 @@ function prepararHoras() {
 function prepararPlan() {
   prepararInicio();
   prepararGeneraciones();
+  prepararMapa();
+}
+
+function prepararMapa() {
+  if (!$(".mapa-sectores")) return;
+  const todas = leer(LS.generaciones, []) || [];
+
+  const guardarUbicacion = (g, sector, bancales) => {
+    guardarRegistro("generaciones", {
+      generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
+      metodo: g.metodo, fecha_almacigo: g.fecha_almacigo,
+      fecha_campo: g.fecha_campo, camas: g.camas,
+      sector, bancales: bancales.join(", "),
+      estado: g.estado, origen: "AMA",
+    }, sector
+      ? `${g.cultivo} G${g.generacion} → ${sector} ${bancales.join(", ")} ✓`
+      : `${g.cultivo} G${g.generacion} sacada del mapa ✓`);
+    // Se mueve en la copia local para que el mapa responda al instante.
+    escribir(LS.generaciones, todas.map((x) => x.id === g.id
+      ? { ...x, sector, bancales: bancales.join(", ") } : x));
+    genSeleccionada = "";
+    render("plan", true);
+  };
+
+  // Elegir una generación de la lista de abajo.
+  document.querySelectorAll("[data-elegir]").forEach((el) => {
+    const elegir = () => {
+      genSeleccionada = genSeleccionada === el.dataset.elegir ? "" : el.dataset.elegir;
+      render("plan", true);
+    };
+    el.onclick = elegir;
+    el.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); elegir(); }
+    };
+  });
+
+  const cancelar = $("#cancelar-eleccion");
+  if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; render("plan", true); };
+
+  // Tocar un bancal: si hay una generación elegida, ahí va.
+  document.querySelectorAll(".cama").forEach((cama) => {
+    cama.onclick = () => {
+      const g = todas.find((x) => x.id === genSeleccionada);
+      if (!g) return;
+      const sector = cama.closest("[data-sector]").dataset.sector;
+      const n = Number((sectores().find((s) =>
+        claveArea(s.sector) === claveArea(sector)) || {}).bancales) || 0;
+      const bs = bancalesQueOcuparia(g, parseInt(cama.dataset.bancal, 10), n);
+      if (!bs.length) return aviso("Ese sector no tiene bancales suficientes.", true);
+
+      // Se avisa pero no se prohíbe: dos cultivos pueden compartir un bancal a
+      // propósito, y quien está en el campo sabe mejor que la cuenta.
+      const choques = chocanCon(g, sector, bs, todas);
+      if (choques.length) {
+        const cuales = choques.slice(0, 3)
+          .map((x) => `${x.cultivo} G${x.generacion}`).join(", ");
+        if (!confirm(`Ahí se superpone con ${cuales}` +
+          `${choques.length > 3 ? ` y ${choques.length - 3} más` : ""}.\n¿Ponerla igual?`)) return;
+      }
+      guardarUbicacion(g, sector, bs);
+    };
+  });
+
+  // Tocar una ya puesta: se elige, y desde ahí se la mueve o se la saca.
+  document.querySelectorAll("[data-puesta]").forEach((el) => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const g = todas.find((x) => x.id === el.dataset.puesta);
+      if (!g) return;
+      if (genSeleccionada === g.id) {
+        if (confirm(`¿Sacar ${g.cultivo} G${g.generacion} del mapa?\n` +
+                    "Queda en el plan, solo sin lugar asignado.")) {
+          guardarUbicacion(g, "", []);
+        }
+        return;
+      }
+      genSeleccionada = g.id;
+      render("plan", true);
+      aviso(`${g.cultivo} G${g.generacion}: tocá otro bancal para moverla, ` +
+            "o tocala de nuevo para sacarla del mapa");
+    };
+  });
 }
 
 function prepararGeneraciones() {

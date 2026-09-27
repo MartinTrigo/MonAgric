@@ -988,6 +988,12 @@ function guardarGeneracion(libro, r) {
   var n = def.encabezados.length;
   var id = String((r.datos && r.datos.generacion_id) || r.id);
 
+  /* La columna de bancales va como texto a la fuerza. Guarda listas como
+     "1, 2, 3" y la planilla, librada a su criterio, las interpreta como una
+     fecha: "1, 2, 3" se convertia en el 1 de febrero de 2003 y la generacion
+     quedaba sin lugar asignado aunque tuviera sector. */
+  hoja.getRange(1, 10, hoja.getMaxRows(), 1).setNumberFormat("@");
+
   if (hoja.getLastRow() > 1) {
     var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
     for (var i = 0; i < ids.length; i++) {
@@ -1076,7 +1082,10 @@ function generacionesDelPlan(chacra) {
         id: String(f[0]), cultivo: String(f[2]), generacion: gen,
         metodo: String(f[4] || ""), fecha_almacigo: texto(f[5]),
         fecha_campo: texto(f[6]), camas: Number(f[7]) || 0,
-        sector: String(f[8] || ""), bancales: String(f[9] || ""),
+        sector: String(f[8] || ""),
+        // Si una fila vieja quedo con la fecha que invento la planilla al leer
+        // "1, 2, 3", se devuelve vacia: mejor sin lugar que con uno falso.
+        bancales: (f[9] instanceof Date) ? "" : String(f[9] || ""),
         estado: String(f[10] || "Planificado"),
         // Lo que de verdad paso, calculado contra la hoja Siembras.
         sembrada: !!real,
