@@ -348,6 +348,37 @@ button.secundario {
 /* Un solo renglón no se puede quitar: sin él no queda nada que cargar. */
 .renglon-cosecha:only-child .quitar { visibility: hidden; }
 
+/* ---- ficha de un cultivo ----
+   Pares etiqueta/valor en dos columnas: en el teléfono entran dos por línea y
+   en la notebook cuatro, sin que ninguna quede sola al final. */
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 16px;
+  margin: 8px 0 14px;
+}
+.dato {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dato span {
+  font-size: .78rem;
+  color: var(--tenue);
+}
+.dato b { font-size: .96rem; }
+.dato b small { font-weight: 400; color: var(--tenue); }
+
+/* La fila del plan avisa que se puede abrir. */
+.plan-fila.abre-ficha { cursor: pointer; }
+.plan-fila.abre-ficha:hover .plan-cab b { text-decoration: underline; }
+.plan-fila.abre-ficha:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+#volver-plan { margin-bottom: 14px; }
+
 /* ---- modo pizarra: todos los cultivos del plan a la vista ----
    Dos columnas en pantallas anchas, una en el teléfono. El nombre ya está
    escrito, así que el único trabajo es el número. */

@@ -311,7 +311,7 @@ function atender(p) {
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
-      || p.catalogo || p.almacigos) {
+      || p.catalogo || p.almacigos || p.ficha) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -337,6 +337,10 @@ function atender(p) {
 
     if (p.almacigos) {
       return respuesta({ ok: true, almacigos: almacigosEsperando(chacra) });
+    }
+
+    if (p.ficha) {
+      return respuesta(fichaDeCultivo(chacra, p.ficha));
     }
 
     if (p.config) {
@@ -937,6 +941,64 @@ function rankingDelJuego(chacra) {
 // Para que en el celular se vea lo que viene cargando todo el equipo, no solo
 // lo de ese teléfono. Se leen nada más las últimas filas: no importa cuánto
 // crezca la planilla, siempre pesa lo mismo.
+/* Todo lo que la chacra hizo con UN cultivo esta temporada: sus siembras, sus
+   trasplantes y sus cosechas. Es lo que alimenta la ficha del cultivo.
+
+   Va aca y no en la app por lo de siempre: el telefono recibe las ultimas 15
+   filas de cada hoja, y la ficha tiene que mirar la temporada entera. Se pide
+   de a un cultivo, asi que lo que viaja es chico aunque la planilla crezca. */
+function fichaDeCultivo(chacra, cultivo) {
+  var libro = planillaDe(chacra);
+  var k = claveNombre(cultivo);
+  var tz = Session.getScriptTimeZone();
+  var texto = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+
+  var leer = function (def, columnaCultivo, armar) {
+    var hoja = libro.getSheetByName(def.nombre);
+    if (!hoja || hoja.getLastRow() < 2) return [];
+    return hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length)
+      .getValues()
+      .filter(function (f) { return f[0] && claveNombre(f[columnaCultivo]) === k; })
+      .map(armar);
+  };
+
+  var siembras = leer(HOJAS.siembras, 3, function (f) {
+    return {
+      id: String(f[0]), fecha: texto(f[2]), variedad: String(f[4] || ""),
+      tipo: String(f[5] || ""), generacion: Number(f[6]) || 1,
+      plantines: Number(f[9]) || 0, sector: String(f[10] || ""),
+      bancal: String(f[11] || ""), trasplante_estimado: texto(f[12]),
+      cosecha_estimada: texto(f[13]), operador: String(f[14] || ""),
+    };
+  });
+
+  var trasplantes = leer(HOJAS.trasplantes, 8, function (f) {
+    return {
+      id: String(f[0]), fecha: texto(f[2]), siembra_id: String(f[3] || ""),
+      dias_reales: Number(f[5]) || 0, dias_teoricos: Number(f[6]) || 0,
+      diferencia: Number(f[7]) || 0, variedad: String(f[9] || ""),
+      generacion: Number(f[10]) || 1, sector: String(f[11] || ""),
+      bancal: String(f[12] || ""), lineas: Number(f[13]) || 0,
+      distancia_cm: Number(f[14]) || 0, marco: String(f[16] || ""),
+      plantines: Number(f[17]) || 0,
+    };
+  });
+
+  var cosechas = leer(HOJAS.cosechas, 3, function (f) {
+    return { id: String(f[0]), fecha: texto(f[2]), kg: Number(f[4]) || 0,
+             operador: String(f[5] || "") };
+  });
+
+  var kg = 0;
+  cosechas.forEach(function (c) { kg += c.kg; });
+
+  return { ok: true, cultivo: cultivo, siembras: siembras,
+           trasplantes: trasplantes, cosechas: cosechas,
+           kg_cosechados: Math.round(kg * 100) / 100 };
+}
+
 /* Los almacigos que todavia esperan trasplante, mirando la hoja ENTERA.
    La app no puede calcularlo: solo recibe las ultimas 15 siembras, y un
    almacigo de agosto que se trasplanta en septiembre queda afuera de esa

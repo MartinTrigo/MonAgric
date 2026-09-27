@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 36 · 26/9/2026";
+const VERSION_APP = "versión 37 · 26/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -70,6 +70,7 @@ const LS = {
   ultimos: "monagric_ultimos",
   almacigos: "monagric_almacigos",
   modoCosecha: "monagric_modo_cosecha",
+  fichas: "monagric_fichas",
 };
 
 const leer = (k, def) => {
@@ -86,6 +87,8 @@ let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
 // Qué cuenta de sueldos se está mirando. Vacío = la lista.
 let cuentaAbierta = "";
+// Qué cultivo del plan se está mirando en detalle. Vacío = el plan entero.
+let cultivoAbierto = "";
 let vistaTareas = "hoy";        // "hoy" o "areas"
 
 // Dos maneras de cargar una cosecha, porque son dos situaciones distintas.
@@ -1358,6 +1361,11 @@ const plantillas = {
     const b = CFG.bancal || {}, m2 = bancalM2();
     const plan = CFG.plan || [];
     const porCultivo = resumen?.kg_por_cultivo || kgLocalesPorCultivo();
+
+    // Un cultivo abierto reemplaza la lista: en el teléfono no hay lugar para
+    // las dos cosas, y en la notebook la ficha se lee mejor sola.
+    if (cultivoAbierto) return fichaCultivo(cultivoAbierto);
+
     return `
     <div class="tarjeta">
       <h2>Plan de la temporada <small>${plan.length} cultivos</small></h2>
@@ -1365,7 +1373,8 @@ const plantillas = {
         const logrado = porCultivo[p.cultivo] || 0;
         const pct = p.cosecha_esperada_kg ? (logrado / p.cosecha_esperada_kg) * 100 : 0;
         const perf = perfil(p.cultivo);
-        return `<div class="plan-fila">
+        return `<div class="plan-fila abre-ficha" data-ficha="${esc(p.cultivo)}"
+                     role="button" tabindex="0">
           <div class="plan-cab">
             <b>${esc(p.cultivo)}</b>
             <span>${num(logrado)} / ${num(p.cosecha_esperada_kg)} kg</span>
@@ -1762,6 +1771,119 @@ const filaSector = (s, i) => `<div class="registro">
   <button type="button" class="quitar" data-sector="${i}" aria-label="Quitar">&times;</button>
 </div>`;
 
+// ---- Ficha de un cultivo ----
+// Todo lo que la app sabe de un cultivo, junto. Hoy, para responder "¿cuánto
+// tarda el brócoli?" o "¿cuánto llevamos cosechado?" hay que abrir la planilla.
+// Lo que se muestra sale de tres lados distintos y conviene no mezclarlos: el
+// catálogo (común a las seis chacras), el plan de esta chacra, y lo que de
+// verdad pasó en el campo.
+function fichaCultivo(cultivo) {
+  const p = perfil(cultivo) || {};
+  const enElPlan = enPlan(cultivo);
+  const f = (leer(LS.fichas, {}) || {})[cultivo];
+  const m2 = bancalM2();
+
+  const dato = (etiqueta, valor) => valor
+    ? `<div class="dato"><span>${etiqueta}</span><b>${valor}</b></div>` : "";
+
+  // --- lo que dice el catálogo ---
+  const almacigo = (p.dias_almacigo_oi && p.dias_almacigo_pv)
+    ? `${p.dias_almacigo_pv} a ${p.dias_almacigo_oi} días <small>(verano / invierno)</small>`
+    : (p.dias_almacigo ? `${p.dias_almacigo} días` : "");
+  const cosechaDura = p.dias_en_cosecha_max
+    ? (p.dias_en_cosecha_min && p.dias_en_cosecha_min !== p.dias_en_cosecha_max
+        ? `${p.dias_en_cosecha_min} a ${p.dias_en_cosecha_max} días`
+        : `${p.dias_en_cosecha_max} días`)
+    : (p.dias_en_cosecha ? `${p.dias_en_cosecha} días` : "");
+
+  // --- las generaciones sembradas, con su ventana de cosecha ---
+  const siembras = (f?.siembras || []).slice().sort((a, b) =>
+    String(a.fecha).localeCompare(String(b.fecha)));
+  const trasplantes = f?.trasplantes || [];
+  const porSiembra = {};
+  trasplantes.forEach((t) => { (porSiembra[t.siembra_id] = porSiembra[t.siembra_id] || []).push(t); });
+
+  const generaciones = siembras.map((s) => {
+    const suyos = porSiembra[s.id] || [];
+    const inicio = s.cosecha_estimada || "";
+    const dura = p.dias_en_cosecha_max || p.dias_en_cosecha || 0;
+    const fin = inicio && dura ? sumarDias(inicio, dura) : "";
+    const real = suyos.length
+      ? `trasplantado el ${fechaCorta(suyos[0].fecha)} · ${suyos[0].dias_reales} días en bandeja`
+        + (suyos[0].diferencia
+            ? ` <b>(${suyos[0].diferencia > 0 ? "+" : ""}${suyos[0].diferencia} vs. lo teórico)</b>`
+            : "")
+      : (s.trasplante_estimado ? `trasplante estimado ${fechaCorta(s.trasplante_estimado)}` : "");
+    const donde = suyos.length
+      ? suyos.map((t) => `${t.sector} ${t.bancal}`).join(", ")
+      : (s.sector ? `${s.sector} ${s.bancal}` : "");
+    return `<div class="registro">
+      <div>
+        <div class="detalle">G${s.generacion}${s.variedad ? " · " + esc(s.variedad) : ""}
+          ${donde ? `<small>${esc(donde)}</small>` : ""}</div>
+        <div class="cuando">sembrado el ${fechaCorta(s.fecha)}${
+          s.plantines ? " · " + num(s.plantines) + " plantines" : ""}<br>${real}</div>
+      </div>
+      ${inicio ? `<span class="etiqueta ok">cosecha ${fechaCorta(inicio)}${
+        fin ? " a " + fechaCorta(fin) : ""}</span>` : ""}
+    </div>`;
+  }).join("");
+
+  // --- variedades que de verdad se usaron acá ---
+  const variedades = [...new Set(siembras.map((s) => s.variedad).filter(Boolean))];
+
+  const cosechado = f?.kg_cosechados || 0;
+  const esperado = enElPlan?.cosecha_esperada_kg || 0;
+
+  return `
+  <div class="tarjeta">
+    <h2>${esc(cultivo)}</h2>
+    <button type="button" class="secundario" id="volver-plan">← Volver al plan</button>
+
+    <h3 class="sub">Lo que sabe el catálogo</h3>
+    <p class="nota">Común a las seis chacras. Se corrige en Plan → Agregar o completar un cultivo.</p>
+    <div class="datos">
+      ${dato("Cómo se siembra", esc(p.tipo_siembra || ""))}
+      ${dato("En almácigo", almacigo)}
+      ${dato("De trasplante a cosecha", p.dias_trasplante_cosecha ? p.dias_trasplante_cosecha + " días" : "")}
+      ${dato("De siembra a cosecha", p.dias_a_cosecha ? p.dias_a_cosecha + " días" : "")}
+      ${dato("Dura la cosecha", cosechaDura)}
+      ${dato("Marco de plantación", p.lineas_bancal
+        ? `${num(p.lineas_bancal)} líneas a ${num(p.distancia_cm)} cm` : "")}
+      ${dato("Rinde de referencia", p.rinde_ref_kg_m2 ? num(p.rinde_ref_kg_m2, 2) + " kg/m²" : "")}
+    </div>
+
+    ${enElPlan ? `
+    <h3 class="sub">En el plan de ${esc(chacraActual()?.nombre || "la chacra")}</h3>
+    <div class="datos">
+      ${dato("Superficie", num(enElPlan.superficie_m2) + " m²")}
+      ${dato("Bancales", m2 ? num(enElPlan.superficie_m2 / m2, 1) : "")}
+      ${dato("Plantas", enElPlan.plantas ? num(enElPlan.plantas) : "")}
+      ${dato("Cosecha esperada", esperado ? num(esperado) + " kg" : "")}
+      ${dato("Cosechado", `${num(cosechado, 1)} kg`)}
+    </div>
+    ${esperado ? barra((cosechado / esperado) * 100) : ""}` : `
+    <p class="nota">Este cultivo no está en el plan de la temporada.</p>`}
+
+    ${variedades.length ? `
+    <h3 class="sub">Variedades sembradas</h3>
+    <p class="nota">${variedades.map(esc).join(" · ")}</p>` : ""}
+
+    <h3 class="sub">Generaciones <small>${siembras.length}</small></h3>
+    ${siembras.length ? generaciones : `<p class="nota">${f
+      ? "Todavía no se sembró ninguna generación de este cultivo esta temporada."
+      : "Buscando los registros…"}</p>`}
+
+    ${(f?.cosechas || []).length ? `
+    <h3 class="sub">Cosechas <small>${f.cosechas.length}</small></h3>
+    ${f.cosechas.slice().reverse().slice(0, 12).map((c) => `<div class="registro">
+      <div><div class="detalle">${fechaCorta(c.fecha)}</div>
+        <div class="cuando">${esc(c.operador || "")}</div></div>
+      <span class="etiqueta ok">${num(c.kg, 1)} kg</span>
+    </div>`).join("")}` : ""}
+  </div>`;
+}
+
 const filaPlan = (p, i) => {
   const b = bancalM2();
   const detalle = [
@@ -1921,6 +2043,29 @@ function filaEquipo(tipo, f) {
 // Trae del servicio las últimas filas de una hoja y las guarda para verlas
 // aunque después no haya señal.
 const pedidoReciente = {};
+// Todo lo que la chacra hizo con un cultivo: lo calcula el servicio sobre las
+// hojas enteras, porque el teléfono solo recibe las últimas 15 filas de cada
+// una. Se pide de a un cultivo y se guarda, así abrir la ficha de nuevo no
+// vuelve a pedirlo.
+async function traerFicha(cultivo, forzar = false) {
+  if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+  const marca = "ficha:" + cultivo;
+  if (!forzar && Date.now() - (pedidoReciente[marca] || 0) < 20000) return;
+  pedidoReciente[marca] = Date.now();
+  try {
+    const d = await (await fetch(`${urlServicio()}?${
+      conCredenciales("ficha=" + encodeURIComponent(cultivo))}`)).json();
+    if (!d.ok) return;
+    const fichas = leer(LS.fichas, {});
+    const cambio = JSON.stringify(fichas[cultivo] || null) !== JSON.stringify(d);
+    fichas[cultivo] = d;
+    escribir(LS.fichas, fichas);
+    if (cambio && vistaActual === "plan" && cultivoAbierto === cultivo) {
+      render("plan", true);
+    }
+  } catch { /* sin señal: se muestra lo último que se bajó */ }
+}
+
 // Los almácigos que esperan trasplante los cuenta el servicio sobre la hoja
 // entera, no sobre las últimas 15 siembras que recibe el teléfono.
 async function traerAlmacigos(forzar = false) {
@@ -2027,6 +2172,22 @@ function render(vista, conservarScroll = false) {
   // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
   // aunque la sección que se está mirando sea Trasplantes.
   if (vista === "trasplantes") { traerUltimos("siembras"); traerAlmacigos(); }
+
+  // Plan: abrir un cultivo muestra su ficha, y con ella se pide su historial.
+  document.querySelectorAll("[data-ficha]").forEach((fila) => {
+    const abrir = () => {
+      cultivoAbierto = fila.dataset.ficha;
+      render("plan");
+      window.scrollTo(0, 0);
+    };
+    fila.onclick = abrir;
+    fila.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(); }
+    };
+  });
+  const volver = $("#volver-plan");
+  if (volver) volver.onclick = () => { cultivoAbierto = ""; render("plan"); };
+  if (vista === "plan" && cultivoAbierto) traerFicha(cultivoAbierto);
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {
