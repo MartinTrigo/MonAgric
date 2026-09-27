@@ -369,6 +369,53 @@ button.secundario {
 .dato b { font-size: .96rem; }
 .dato b small { font-weight: 400; color: var(--tenue); }
 
+/* La ficha de referencia del cultivo: texto para leer, no datos para mirar,
+   así que va con más aire y ancho de lectura cómodo. */
+.ficha-ref {
+  background: var(--sage-suave);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.ficha-titulo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ficha-emoji {
+  font-size: 2.1rem;
+  line-height: 1;
+}
+.ficha-titulo b { color: var(--sage-dark); }
+.ficha-titulo .especie {
+  font-style: italic;
+  font-size: .86rem;
+  color: var(--tenue);
+}
+.ficha-ref p {
+  margin: 0 0 9px;
+  font-size: .93rem;
+  line-height: 1.5;
+  max-width: 62ch;
+}
+.ficha-ref h4 {
+  margin: 13px 0 5px;
+  font-size: .86rem;
+  color: var(--sage-dark);
+}
+.ficha-ref ul {
+  margin: 0 0 4px;
+  padding-left: 19px;
+  max-width: 62ch;
+}
+.ficha-ref li {
+  font-size: .91rem;
+  line-height: 1.45;
+  margin-bottom: 5px;
+}
+.ficha-ref .nota { margin-top: 12px; }
+
 /* La fila del plan avisa que se puede abrir. */
 .plan-fila.abre-ficha { cursor: pointer; }
 .plan-fila.abre-ficha:hover .plan-cab b { text-decoration: underline; }

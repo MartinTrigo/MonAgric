@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 37 · 26/9/2026";
+const VERSION_APP = "versión 38 · 26/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1771,6 +1771,22 @@ const filaSector = (s, i) => `<div class="registro">
   <button type="button" class="quitar" data-sector="${i}" aria-label="Quitar">&times;</button>
 </div>`;
 
+// Las fichas de referencia viven en su propio archivo y se bajan la primera
+// vez que se abre una, no al arrancar: son texto y nadie las mira todos los
+// días. El service worker las guarda, así que después funcionan sin señal.
+let FICHAS = null;
+let bajandoFichas = false;
+async function traerFichasTexto() {
+  if (FICHAS || bajandoFichas) return;
+  bajandoFichas = true;
+  try {
+    const r = await fetch("fichas.json");
+    FICHAS = await r.json();
+    if (vistaActual === "plan" && cultivoAbierto) render("plan", true);
+  } catch { /* sin señal la primera vez: se muestra el resto de la ficha */ }
+  finally { bajandoFichas = false; }
+}
+
 // ---- Ficha de un cultivo ----
 // Todo lo que la app sabe de un cultivo, junto. Hoy, para responder "¿cuánto
 // tarda el brócoli?" o "¿cuánto llevamos cosechado?" hay que abrir la planilla.
@@ -1835,10 +1851,36 @@ function fichaCultivo(cultivo) {
   const cosechado = f?.kg_cosechados || 0;
   const esperado = enElPlan?.cosecha_esperada_kg || 0;
 
+  // --- la ficha de referencia, si ya se bajó ---
+  const ref = FICHAS?.fichas?.[cultivo];
+  const fuentes = FICHAS?._fuentes || [];
+  const bloqueRef = ref ? `
+    <div class="ficha-ref">
+      <div class="ficha-titulo">
+        <span class="ficha-emoji">${ref.emoji || "🌱"}</span>
+        <div>
+          <b>${esc(ref.familia)}</b>
+          <div class="especie">${esc(ref.especie)}</div>
+        </div>
+      </div>
+      ${ref.resumen.split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("")}
+      ${ref.manejo?.length ? `<h4>Manejo</h4><ul>${
+        ref.manejo.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
+      ${ref.problemas?.length ? `<h4>Plagas y enfermedades</h4><ul>${
+        ref.problemas.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
+      ${ref.presentacion ? `<h4>Cómo se presenta</h4><p>${esc(ref.presentacion)}</p>` : ""}
+      <p class="nota">Información general, no receta: lo que pasa en tu chacra manda.
+      ${fuentes.length ? "Referencias regionales: " + fuentes.map((f) =>
+        `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.autores)}</a>`
+      ).join(" · ") : ""}</p>
+    </div>` : (FICHAS ? "" : `<p class="nota">Buscando la ficha del cultivo…</p>`);
+
   return `
   <div class="tarjeta">
     <h2>${esc(cultivo)}</h2>
     <button type="button" class="secundario" id="volver-plan">← Volver al plan</button>
+
+    ${bloqueRef}
 
     <h3 class="sub">Lo que sabe el catálogo</h3>
     <p class="nota">Común a las seis chacras. Se corrige en Plan → Agregar o completar un cultivo.</p>
@@ -2187,7 +2229,7 @@ function render(vista, conservarScroll = false) {
   });
   const volver = $("#volver-plan");
   if (volver) volver.onclick = () => { cultivoAbierto = ""; render("plan"); };
-  if (vista === "plan" && cultivoAbierto) traerFicha(cultivoAbierto);
+  if (vista === "plan" && cultivoAbierto) { traerFicha(cultivoAbierto); traerFichasTexto(); }
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {
