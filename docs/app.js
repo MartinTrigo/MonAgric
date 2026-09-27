@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 45 · 27/9/2026";
+const VERSION_APP = "versión 46 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2055,7 +2055,11 @@ function planEstrategico() {
       return `<div class="${clase}" style="left:${i}%;width:${f - i}%" title="${esc(titulo)}"></div>`;
     };
     const sigue = t.fin > isoDe(d1);
-    return `<div class="plan-gen">
+    // Una generación ya sembrada no se puede correr: su fecha es un hecho, no
+    // una intención. Las planificadas sí, arrastrándolas.
+    const movible = !(("sembrada" in g) ? g.sembrada : g.estado === "Sembrado");
+    return `<div class="plan-gen${movible ? " movible" : ""}"
+                 ${movible ? `data-mover="${esc(g.id)}"` : ""}>
       <div class="plan-nombre" title="${esc(g.cultivo)} G${g.generacion}">
         ${esc(g.cultivo)} <span>G${g.generacion}</span>
       </div>
@@ -2121,6 +2125,90 @@ function planEstrategico() {
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun",
                       "jul", "ago", "sep", "oct", "nov", "dic"];
+
+// Correr una generación arrastrándola en el gráfico. Es la forma natural de
+// decir "esto va dos semanas más tarde": se ve contra qué queda, que es
+// justamente lo que no se ve escribiendo una fecha en un formulario.
+//
+// Va con eventos de puntero, que son los mismos para el mouse y para el dedo.
+// Durante el arrastre solo se mueve la barra; recién al soltar se guarda, para
+// que corregir la mano no mande veinte registros.
+function engancharArrastre() {
+  const grafico = $(".plan-grafico");
+  if (!grafico) return;
+  const pista = grafico.querySelector(".plan-gen .plan-pista");
+  if (!pista) return;
+
+  // Cuántos días mide un píxel, para traducir el movimiento a fechas.
+  const meses = grafico.querySelectorAll(".plan-meses .mes").length || 12;
+  const diasTotales = Math.round(meses * 30.44);
+  const porPixel = diasTotales / pista.getBoundingClientRect().width;
+
+  document.querySelectorAll("[data-mover]").forEach((fila) => {
+    const barra = fila.querySelector(".plan-pista");
+    let x0 = 0, corrido = 0, arrastrando = false;
+
+    barra.onpointerdown = (e) => {
+      // Con el botón derecho no, y en el teléfono sin robarle el scroll a la
+      // página: solo se toma el gesto si es claramente horizontal.
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      arrastrando = true;
+      x0 = e.clientX;
+      corrido = 0;
+      barra.setPointerCapture(e.pointerId);
+      fila.classList.add("arrastrando");
+    };
+
+    barra.onpointermove = (e) => {
+      if (!arrastrando) return;
+      corrido = Math.round((e.clientX - x0) * porPixel);
+      barra.style.transform = `translateX(${e.clientX - x0}px)`;
+      fila.querySelector(".plan-nombre").dataset.corrido = corrido
+        ? `${corrido > 0 ? "+" : ""}${corrido} d` : "";
+    };
+
+    const soltar = (e) => {
+      if (!arrastrando) return;
+      arrastrando = false;
+      fila.classList.remove("arrastrando");
+      barra.style.transform = "";
+      delete fila.querySelector(".plan-nombre").dataset.corrido;
+      try { barra.releasePointerCapture(e.pointerId); } catch (_) { /* ya soltado */ }
+      if (!corrido) return;
+      correrGeneracion(fila.dataset.mover, corrido);
+    };
+    barra.onpointerup = soltar;
+    barra.onpointercancel = soltar;
+  });
+}
+
+// Guarda la generación con sus fechas corridas. Se piden las dos porque una
+// siembra directa no tiene fecha de bandeja y un trasplante sí.
+function correrGeneracion(id, dias) {
+  const gens = leer(LS.generaciones, []) || [];
+  const g = gens.find((x) => x.id === id);
+  if (!g || !dias) return;
+
+  const corrida = (f) => (f ? sumarDias(f, dias) : "");
+  const nueva = {
+    ...g,
+    fecha_almacigo: corrida(g.fecha_almacigo),
+    fecha_campo: corrida(g.fecha_campo),
+  };
+  const antes = g.fecha_almacigo || g.fecha_campo;
+  const despues = nueva.fecha_almacigo || nueva.fecha_campo;
+
+  guardarRegistro("generaciones", {
+    generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
+    metodo: g.metodo, fecha_almacigo: nueva.fecha_almacigo,
+    fecha_campo: nueva.fecha_campo, camas: g.camas, sector: g.sector,
+    bancales: g.bancales, estado: g.estado, origen: "AMA",
+  }, `${g.cultivo} G${g.generacion}: ${fechaCorta(antes)} → ${fechaCorta(despues)} ✓`);
+
+  // Se mueve en la copia local para que el gráfico responda al instante.
+  escribir(LS.generaciones, gens.map((x) => (x.id === id ? nueva : x)));
+  render("plan", true);
+}
 
 // ---- Planificar generaciones desde la app ----
 // Escalonar un cultivo es la decisión central de la temporada: nueve
@@ -2688,6 +2776,7 @@ function render(vista, conservarScroll = false) {
   document.querySelectorAll("[name=filtro-plan]").forEach((r) => {
     r.onchange = () => { filtroPlan = r.value; render("plan", true); };
   });
+  engancharArrastre();
   // El plan también lo necesita Inicio, para avisar qué toca sembrar.
   if (vista === "plan" || vista === "inicio") traerGeneraciones();
 

@@ -472,6 +472,21 @@ button.secundario {
    ve qué es decisión tomada y qué es intención. */
 .plan-pista:not(.sembrada) .tramo { opacity: .55; }
 
+/* Una generación planificada se puede correr arrastrándola. Las sembradas no:
+   su fecha es un hecho. */
+.plan-gen.movible .plan-pista { cursor: grab; touch-action: pan-y; }
+.plan-gen.arrastrando .plan-pista {
+  cursor: grabbing;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.plan-gen.arrastrando .tramo { opacity: 1; }
+/* Mientras se arrastra, el nombre dice cuántos días se corrió. */
+.plan-nombre[data-corrido]::after {
+  content: " " attr(data-corrido);
+  color: var(--sage-dark);
+  font-weight: 700;
+}
+
 .tramo {
   position: absolute;
   top: 0;
