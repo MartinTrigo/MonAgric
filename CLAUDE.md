@@ -14,9 +14,11 @@ gente; comparten el catálogo de cultivos y las áreas de trabajo.
 
 - **App publicada:** <https://martintrigo.github.io/MonAgric/>
 - **Repositorio: PÚBLICO**, AGPL-3.0. Nunca subir URLs de Web App ni claves.
-- **El nombre visible es AMA** (sept 2026). La carpeta, el repositorio y las
-  claves internas siguen siendo `monagric`: renombrarlas le borraría a cada
-  teléfono su credencial y lo que tenga sin enviar. **No tocar.**
+- **El nombre es AMA · Aplicaciones para el Manejo Agroecológico** (28/9/2026),
+  con tres versiones: **AMA Producción** (esta), **AMA Economía** (bioma-mov) y
+  **AMA Salud** (a futuro). La carpeta, el repositorio y las claves internas
+  siguen siendo `monagric`: renombrarlas le borraría a cada teléfono su
+  credencial y lo que tenga sin enviar. **No tocar.**
 
 ## El ecosistema
 
@@ -139,6 +141,20 @@ AMA  →  planilla de horas  →  bioma-db  →  AMA
 - Contratos: `apps-script/CUENTAS.md` y `apps-script/ECONOMIA.md`, ambos del
   lado de bioma-mov, que es quien sirve los endpoints. **Esos son los
   canónicos.**
+
+### Proyección: el camino inverso
+
+AMA Economía muestra cuánto podría dar la temporada. Acá **AMA sabe y
+Economía pregunta**: `?proyeccion=1&chacra=tica&token=…` devuelve el plan de
+la configuración (cultivo, m², bancales, rinde, kg). El script de bioma-db lo
+pide con `UrlFetchApp` y la app de Economía le pone los precios.
+
+- La clave es `PROYECCION_TOKENS` (una por chacra, en las propiedades) y solo
+  abre esa respuesta. La genera `tools/token_proyeccion.py`.
+- **Los kilos se calculan acá y viajan hechos**: si Economía rehiciera la
+  cuenta, algún día diría otra cosa que la pantalla de Plan.
+- Los precios nunca vienen para este lado: quien trabaja en la chacra no ve
+  plata por AMA Producción.
 
 ## Estado actual
 

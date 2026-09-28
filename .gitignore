@@ -24,6 +24,7 @@ __pycache__/
 # La dirección del servicio y la clave de administración: NUNCA se publican.
 tools/servicio.txt
 tools/clave_admin.txt
+tools/token_proyeccion.txt
 
 # === Google Drive para escritorio ===
 # La carpeta está sincronizada con Drive: los .gsheet/.gdoc son accesos directos

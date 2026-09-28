@@ -70,6 +70,16 @@ def main() -> None:
         print(f"  [al dia]   los almacigos que esperan trasplante "
               f"({len(al['almacigos'])} esperando)")
 
+    # La proyeccion para AMA Economia: con codigo viejo, "proyeccion" ni se
+    # mira y la respuesta es la de un servicio sin nada que decir.
+    pr = pedir("proyeccion=1&chacra=tica")
+    if "plan" not in pr:
+        print("  [ANTERIOR] la proyeccion para AMA Economia")
+        viejas.append("la proyeccion para AMA Economia")
+    else:
+        print(f"  [al dia]   la proyeccion para AMA Economia "
+              f"({len(pr['plan'])} cultivos)")
+
     # La economia no se detecta por un nombre de campo sino por si la clave
     # llega o no: si el codigo desplegado es anterior, ni aparece.
     print()

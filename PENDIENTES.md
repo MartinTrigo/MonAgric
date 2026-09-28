@@ -1,10 +1,110 @@
-# Dónde quedamos — 15 de septiembre de 2026
+# Dónde quedamos — 28 de septiembre de 2026
 
 Estado de **AMA y bioma-mov**, que desde hoy se gestionan desde la misma
 conversación. El contexto de cada uno está en su `CLAUDE.md`; acá va solo lo
 que falta hacer.
 
 ---
+
+## Proyección en AMA Economía — hecha el 28/09, falta activarla
+
+La pestaña **Proyección** de AMA Economía cruza el plan de AMA Producción
+(cultivo, m², rinde, kg: lo que está en Plan / Configuración) con los precios
+de Productos. Probada en el navegador con el plan real de Tica (29 cultivos,
+17.172 kg, $46,2 M a precio chacra con el catálogo inicial). Hasta que se hagan
+estos pasos, la pestaña dice qué falta y no muestra números.
+
+1. `python tools/token_proyeccion.py` → genera la clave y la deja en
+   `tools/token_proyeccion.txt` (no se publica).
+2. **AMA Producción** (Apps Script de MonAgric Datos 2026-27): pegar
+   `Code.gs`, propiedad `PROYECCION_TOKENS` = `{"tica":"<clave>"}`, y
+   Administrar implementaciones → ✏ → **Nueva versión**.
+3. **bioma-db** (Apps Script): pegar `Code.gs`, propiedades
+   `AMA_URL` (la dirección /exec de AMA, la de `tools/servicio.txt`) y
+   `AMA_PROYECCION_TOKEN` (la clave). Correr **`probarProyeccion`** a mano una
+   vez (aprueba el permiso de llamar afuera), y **Nueva versión**.
+4. `python tools/version_servicio.py` tiene que decir "la proyeccion para AMA
+   Economia (29 cultivos)".
+
+Cinco cultivos quedan sin sumar y la pantalla dice por qué: Apio, Habas y
+Puerro no tienen precio cargado; Mizuna no está en Productos; Rúcula se vende
+por atado y la presentación no dice cuánto pesa (poner, por ejemplo,
+"atado 150g"). Se arregla en Productos, no en código.
+
+## Propuestas para la planificación, desde el análisis de Heirloom (28/09)
+
+Del documento `C:\MARTO\INFORMATICA\AMA\heirloom-analisis-para-melga.md`.
+Buena parte ya está en AMA (generaciones con fechas encadenadas, Gantt con tres
+tonos y línea de hoy, color por cultivo, mapa de bancales, ficha, "Para
+sembrar" que se apaga al registrar). Lo que queda, en el orden sugerido:
+
+1. **Una sola verdad del plan: las camas van en la generación.** Hoy 71 de las
+   79 generaciones de Tica tienen 0 camas (la importación de Heirloom no las
+   trajo), así que la superficie sale del plan por cultivo de Configuración y
+   las generaciones no la respaldan. En Heirloom todo cuelga de la plantación;
+   acá debería ser igual: superficie y kg del cultivo = suma de sus
+   generaciones. Es lo que hace confiable a la Proyección. Primero hay que
+   completar las camas (con el Excel de Heirloom si las trae, o a mano).
+2. **Validar rangos plausibles** de rinde (kg/m²), días y distancias al
+   planificar y al cargar un cultivo, con aviso visible. Heirloom dejó pasar
+   un apio de 120.120 kg; ahora que la Proyección multiplica por precio, un
+   error así inflaría la temporada entera.
+3. **Franja de heladas en el Plan estratégico**: última helada de primavera y
+   primera de otoño en Configuración (con valores de El Hoyo por defecto), la
+   franja arriba del gráfico y un aviso si un cultivo de verano (tomate,
+   zapallo, berenjena, morrón) sale a campo antes de la última helada. Barato
+   y de mucho valor en la Comarca. Después: días a cosecha ajustados por
+   grados-día con datos de INTA/SMN, que Heirloom tiene en "beta".
+4. **Proyectado vs real por cultivo**: kg cosechados contra esperados, y el
+   rinde real de la temporada. Lo calcula el servidor (lección de la ventana).
+   Cierra el círculo: el rinde real corrige el de referencia y la Proyección
+   de la próxima temporada sale con números propios.
+5. **Almácigo: bandejas y semillas.** Con plantas por generación (ya se
+   calculan) × margen (30 %) ÷ celdas de la bandeja (128) salen las bandejas;
+   con semillas por gramo, los gramos a comprar. La planilla de planificación
+   ya tiene esos datos en su hoja "Semillas". La ocupación semanal del
+   almácigo es el cuello de botella de primavera.
+6. **Tareas que nacen del plan y se cierran solas**: "Para sembrar" ya lo
+   hace; sumar "Para trasplantar" y un tablero semanal. Registrar la siembra
+   o el trasplante marca la tarea, como en Heirloom.
+7. **Carga de trabajo proyectada**: en vez de plantillas inventadas, usar las
+   horas reales por actividad que ya se registran (minutos por bancal
+   aprendidos de la temporada) → horas por semana y personas en el pico.
+8. **Rotación por familia**: las 38 fichas ya tienen familia botánica. Empezar
+   a guardar qué familia ocupó cada bancal, y en una temporada más avisar en el
+   mapa cuando se repite. (Heirloom tiene familias mal cargadas: ojo con eso.)
+9. **Costos y margen por cultivo** (lado Economía): horas × tarifa por área +
+   insumos, contra la Proyección. Después de la 4.
+
+Lo que **no** conviene copiar: el permiso "mostrar valores monetarios" ya está
+resuelto de otra forma (la plata vive en AMA Economía y AMA solo muestra lo
+filtrado); y ojo con la cuenta de Heirloom, que mezcla USD y ARS en los precios.
+
+## Anotado para después — el agente de WhatsApp de Proyecto Bioma
+
+Pedido del 28/09. Un agente con IA que escriba y conteste por WhatsApp:
+recordar las horas los días que alguien trabajó ("recordá anotar las horas de
+hoy"), pedir stock a los productores, avisos a clientes, respuestas automáticas
+en el número del proyecto.
+
+Lo que hay que saber antes de diseñarlo:
+- **Solo por la API oficial de WhatsApp Business (Meta, Cloud API).** Las
+  librerías no oficiales que manejan un WhatsApp común terminan con el número
+  bloqueado. La oficial pide cuenta de Meta Business, un número para el
+  proyecto y verificación.
+- **Mensajes que inicia el proyecto = plantillas aprobadas por Meta**, y se
+  pagan por mensaje (los de "utilidad", como un recordatorio, son baratos).
+  Dentro de las 24 h de que alguien escribe, se contesta libre y gratis.
+- **Recordatorios**: un disparador diario de Apps Script mira Horas y Tareas,
+  decide a quién avisar y manda la plantilla. No necesita IA.
+- **Respuestas automáticas**: necesitan un webhook público. El de Apps Script
+  responde con una redirección que la verificación de Meta suele rechazar:
+  probarlo primero, y si falla, va en un servicio chico aparte. La IA (Claude) contesta con herramientas de solo lectura sobre AMA.
+- **Los teléfonos son datos personales**: van en la planilla de accesos, nunca
+  en el repo, y cada persona tiene que aceptar recibir mensajes.
+
+Orden sensato: primero el recordatorio de horas (sin IA, una plantilla),
+después los avisos, y recién al final el que contesta solo.
 
 ## Anotado para después — abonos verdes, corredores y categorías nuevas
 

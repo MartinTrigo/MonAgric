@@ -331,6 +331,15 @@ function atender(p) {
     return respuesta({ ok: true, hoja: p.exportar, filas: exportarHoja(chacra, p.exportar) });
   }
 
+  // La proyeccion la pide el servidor de AMA Economia, no un telefono: no tiene
+  // credencial de dispositivo sino una clave propia que solo abre esto.
+  if (p.proyeccion) {
+    if (!esAdmin(p.clave) && !tokenDeProyeccionValido(chacra, p.token)) {
+      return respuesta(rechazo("Esta clave no abre la proyección de esta chacra."));
+    }
+    return respuesta(proyeccionDe(chacra));
+  }
+
   // Todo lo que entregue datos de una chacra exige credencial de esa chacra.
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
@@ -1415,6 +1424,71 @@ function economiaParaElTelefono(chacra, persona, forzar) {
   base.ingresos_por_concepto = d.ingresosPorConcepto || [];
   base.egresos_por_concepto = d.egresosPorConcepto || [];
   return base;
+}
+
+// ---------- Proyeccion de la temporada, para AMA Economia ----------
+//
+// El camino inverso al de las cuentas: aca AMA Produccion es quien sabe y
+// Economia quien pregunta. Produccion dice que se planto, cuanto y con que
+// rinde; Economia le pone los precios. Cada lado decide lo suyo y ninguno
+// copia al otro, asi no hay dos verdades.
+//
+// Lo pide el SERVIDOR de bioma-db con UrlFetchApp, nunca un navegador. La clave
+// va en una propiedad del script, una por chacra, y solo abre esta respuesta:
+//   PROYECCION_TOKENS  {"tica":"<clave larga al azar>"}
+// Una chacra sin clave no se puede consultar, que es lo que corresponde a las
+// cuatro que no tienen nada que ver con la economia de Bioma.
+function tokenDeProyeccionValido(chacra, token) {
+  if (!token) return false;
+  try {
+    var p = PropertiesService.getScriptProperties().getProperty("PROYECCION_TOKENS");
+    if (!p) return false;
+    var esperado = JSON.parse(p)[String(chacra).toLowerCase()] || "";
+    return !!esperado && esperado === String(token);
+  } catch (e) { return false; }
+}
+
+// Lo que la chacra decidio producir: el plan de la configuracion, cultivo por
+// cultivo. Viaja la superficie, el rinde y los kilos ya calculados: si Economia
+// rehiciera la cuenta, algun dia daria distinto que la pantalla de Plan.
+function proyeccionDe(chacra) {
+  var libro = planillaDe(chacra);
+  var cfg = leerConfigDe(libro, chacra);
+  var b = cfg.bancal || {};
+  var m2Bancal = (Number(b.largo_m) || 0) * (Number(b.ancho_m) || 0);
+
+  // Cuantas generaciones tiene cada cultivo en el plan: dice si el numero es
+  // una siembra grande o varias escalonadas.
+  var gens = {};
+  try {
+    generacionesDelPlan(chacra).forEach(function (g) {
+      var k = claveNombre(g.cultivo);
+      gens[k] = (gens[k] || 0) + 1;
+    });
+  } catch (e) { /* sin hoja de generaciones la proyeccion igual sirve */ }
+
+  var redondo = function (n, d) { var f = Math.pow(10, d); return Math.round(n * f) / f; };
+  var plan = (cfg.plan || []).map(function (p) {
+    var sup = Number(p.superficie_m2) || 0;
+    var rinde = Number(p.rinde_kg_m2) || 0;
+    return {
+      cultivo: p.cultivo,
+      superficie_m2: redondo(sup, 2),
+      bancales: m2Bancal ? redondo(sup / m2Bancal, 2) : 0,
+      rinde_kg_m2: rinde,
+      kg: Number(p.cosecha_esperada_kg) || Math.round(sup * rinde),
+      generaciones: gens[claveNombre(p.cultivo)] || 0,
+    };
+  });
+
+  return {
+    ok: true, api: 1,
+    chacra: chacra, nombre: cfg.nombre || chacra,
+    temporada: (cfg.temporada || {}).nombre || "",
+    bancal_m2: m2Bancal,
+    plan: plan,
+    actualizado: new Date().toISOString(),
+  };
 }
 
 // Se cachea unos minutos: los numeros cambian cuando se importan horas o se
