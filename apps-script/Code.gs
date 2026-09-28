@@ -539,7 +539,13 @@ function leerConfigDe(libro, chacra) {
     else if (seccion === "temporada") cfg.temporada[clave] = texto(f[2]);
     else if (seccion === "bancal") cfg.bancal[clave] = Number(f[2]) || 0;
     else if (seccion === "sector") {
-      cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0, tipo_riego: String(f[3] || "") });
+      /* Fila y columna dicen donde esta el sector en el campo, no en que
+         orden se cargo: Verano queda abajo a la izquierda porque ahi esta.
+         Los sectores viejos no las tienen y valen 0, que el mapa acomoda
+         solo en una fila. */
+      cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0,
+                          tipo_riego: String(f[3] || ""),
+                          fila: Number(f[4]) || 0, columna: Number(f[5]) || 0 });
     } else if (seccion === "integrante") cfg.integrantes.push(clave);
     // "proyecto" es como se llamaba antes: las filas viejas se siguen leyendo.
     else if (seccion === "area" || seccion === "proyecto") {
@@ -591,7 +597,8 @@ function guardarConfig(libro, cfg) {
     filas.push(vacios(["bancal", k, (cfg.bancal || {})[k] || 0]));
   });
   (cfg.sectores || []).forEach(function (s) {
-    filas.push(vacios(["sector", s.sector, s.bancales || 0, s.tipo_riego || ""]));
+    filas.push(vacios(["sector", s.sector, s.bancales || 0, s.tipo_riego || "",
+                       s.fila || 0, s.columna || 0]));
   });
   (cfg.integrantes || []).forEach(function (n) {
     filas.push(vacios(["integrante", n]));

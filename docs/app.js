@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 50 · 27/9/2026";
+const VERSION_APP = "versión 51 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1448,8 +1448,14 @@ const plantillas = {
       <p class="nota">Cada croquis muestra los bancales del sector y cuántos
       están ocupados por el plan. Desde el teléfono es la forma de ver cómo
       quedó el campo sin abrir el mapa.</p>
-      <div class="croquis-sectores">
-        ${sectores().map((s) => {
+      <div class="croquis-sectores" style="${(() => {
+        // La misma disposición que en el mapa: el croquis del teléfono tiene
+        // que parecerse al campo, no a una lista.
+        const ps = sectores().map((s, i) => ({
+          f: Number(s.fila) || 1, c: Number(s.columna) || (i + 1) }));
+        return `grid-template-columns:repeat(${Math.max(...ps.map((x) => x.c))}, 1fr)`;
+      })()}">
+        ${sectores().map((s, i) => {
           const n = Number(s.bancales) || 0;
           // Qué bancales del sector tienen algo asignado. Es lo mismo que
           // dibuja el mapa, resumido a una miniatura que entra en un teléfono.
@@ -1458,7 +1464,8 @@ const plantillas = {
             .filter((g) => claveArea(g.sector) === claveArea(s.sector))
             .forEach((g) => bancalesDe(g).forEach((x) => tomados.add(x)));
           const sup = n * m2;
-          return `<div class="croquis">
+          return `<div class="croquis" style="grid-row:${Number(s.fila) || 1};grid-column:${
+            Number(s.columna) || (i + 1)}">
             <div class="croquis-cab">
               <b>${esc(s.sector)}</b>
               <span>${tomados.size} de ${n} ocupados</span>
@@ -2405,8 +2412,14 @@ function mapaDeCultivos() {
       }
     }
 
-    return `<div class="sector-mapa">
-      <h4>${esc(s.sector)} <span>${n} bancales</span></h4>
+    const pos = conPos.find((x) => x.sector === s.sector) || { fila: 1, columna: 1 };
+    return `<div class="sector-mapa${sectorMoviendo === s.sector ? " levantado" : ""}"
+                 style="grid-row:${pos.fila};grid-column:${pos.columna}">
+      <h4>
+        <button type="button" class="agarre" data-mover-sector="${esc(s.sector)}"
+                title="Mover este sector a otro lugar del campo">⤧</button>
+        ${esc(s.sector)} <span>${n} bancales</span>
+      </h4>
       <!-- Los números de bancal van arriba, de izquierda a derecha: sin ellos
            hay que contar columnas con el dedo para saber cuál es el 17. -->
       <div class="numeros-bancal" style="--cols:${n}">
@@ -2454,6 +2467,20 @@ function mapaDeCultivos() {
     porCultivo.get(g.cultivo).push(g);
   });
 
+  // Los sectores se acomodan como están en el campo, no en el orden en que se
+  // cargaron. Cada uno tiene fila y columna; los que nunca se acomodaron caen
+  // en una fila, que es lo que había antes.
+  const conPos = sectores().map((s, i) => ({
+    ...s,
+    fila: Number(s.fila) || 1,
+    columna: Number(s.columna) || (i + 1),
+  }));
+  // Se deja siempre una fila y una columna de más, para poder soltar un sector
+  // afuera del bloque y armar la disposición real del campo.
+  const filasMapa = Math.max(...conPos.map((s) => s.fila)) + 1;
+  const colsMapa = Math.max(...conPos.map((s) => s.columna)) + 1;
+  const ocupadaPor = (f, c) => conPos.find((s) => s.fila === f && s.columna === c);
+
   return `
   <div class="tarjeta">
     <h2>Mapa de cultivos <small>${asignadas.length} de ${todas.length} ubicadas</small></h2>
@@ -2480,8 +2507,23 @@ function mapaDeCultivos() {
           <small>arrastrá el mapa para moverlo</small>
         </div>
         <div class="mapa-scroll" id="mapa-scroll">
-          <div class="mapa-sectores" id="mapa-lienzo">
+          <div class="mapa-sectores" id="mapa-lienzo"
+               style="grid-template-columns:repeat(${colsMapa}, minmax(300px, 1fr));
+                      grid-template-rows:repeat(${filasMapa}, auto)">
             ${sectores().map(grillaDe).join("")}
+            ${sectorMoviendo ? Array.from({ length: filasMapa }, (_, f) =>
+                Array.from({ length: colsMapa }, (_, c) => {
+                  const quien = ocupadaPor(f + 1, c + 1);
+                  // Una celda con otro sector también sirve: se intercambian.
+                  // Es lo natural cuando se reordena, y así nunca quedan dos
+                  // sectores en el mismo lugar.
+                  if (quien && quien.sector === sectorMoviendo) return "";
+                  return `<button type="button" class="celda-destino${quien ? " con-sector" : ""}"
+                            data-destino="${f + 1},${c + 1}"
+                            style="grid-row:${f + 1};grid-column:${c + 1}">
+                            ${quien ? `intercambiar con ${esc(quien.sector)}` : "soltar acá"}
+                          </button>`;
+                }).join("")).join("") : ""}
           </div>
         </div>
       </div>
@@ -3334,7 +3376,11 @@ function prepararSiembras() {
 // ---- Configuración de la chacra ----
 // Se guarda entera cada vez: la app manda la configuración completa y el
 // servicio reescribe la hoja Config. Así no hay estados a medias.
-function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
+// `volverA` es la vista donde se queda después de guardar. Por defecto es
+// Configuración, que es de donde se guarda casi siempre; el mapa y la
+// planificación también guardan configuración y no tienen por qué sacarte de
+// donde estabas.
+function guardarConfig(cambios, mensaje = "Configuración guardada ✓", volverA = "configuracion") {
   // Red de seguridad: guardar reescribe la hoja Config entera. Si todavía no
   // pudimos leer lo que la chacra tenía cargado, guardar borraría sus datos.
   if (!configConfirmada) {
@@ -3346,7 +3392,7 @@ function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
   }, CFG || {}, cambios);
   escribir(LS.config, CFG);
   guardarRegistro("config", CFG, mensaje);
-  render("configuracion");
+  if (volverA) render(volverA, volverA === vistaActual);
 }
 
 function prepararConfiguracion() {
@@ -4347,6 +4393,9 @@ function prepararPlan() {
 // redibujar: acomodar el zoom y que se resetee al ubicar una generación sería
 // insoportable.
 let zoomMapa = 1;
+// El sector que se está moviendo, si hay uno. Mientras tanto aparecen las
+// celdas donde se lo puede soltar.
+let sectorMoviendo = "";
 
 function prepararMapa() {
   if (!$(".mapa-sectores")) return;
@@ -4393,6 +4442,47 @@ function prepararMapa() {
   };
   scroll.onpointerup = soltarMapa;
   scroll.onpointercancel = soltarMapa;
+
+  // ---- mover sectores ----
+  // Se levanta con el agarre y se suelta en una celda. Soltar sobre otro
+  // sector los intercambia, así nunca quedan dos en el mismo lugar.
+  document.querySelectorAll("[data-mover-sector]").forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      sectorMoviendo = sectorMoviendo === b.dataset.moverSector ? "" : b.dataset.moverSector;
+      render("plan", true);
+      if (sectorMoviendo) aviso(`Elegí dónde va ${sectorMoviendo} en el campo`);
+    };
+  });
+
+  document.querySelectorAll("[data-destino]").forEach((celda) => {
+    celda.onclick = (e) => {
+      e.stopPropagation();
+      const [fila, columna] = celda.dataset.destino.split(",").map(Number);
+      const lista = sectores().map((s, i) => ({
+        ...s,
+        fila: Number(s.fila) || 1,
+        columna: Number(s.columna) || (i + 1),
+      }));
+      const moviendo = lista.find((s) => s.sector === sectorMoviendo);
+      if (!moviendo) { sectorMoviendo = ""; render("plan", true); return; }
+      const otro = lista.find((s) => s.fila === fila && s.columna === columna);
+      // El que estaba ahí pasa al lugar que dejó el que se movió.
+      if (otro) { otro.fila = moviendo.fila; otro.columna = moviendo.columna; }
+      moviendo.fila = fila;
+      moviendo.columna = columna;
+
+      // Se compacta: si quedó una fila o columna entera vacía a la izquierda o
+      // arriba, se corre todo para que el mapa no arranque con un hueco.
+      const minF = Math.min(...lista.map((s) => s.fila));
+      const minC = Math.min(...lista.map((s) => s.columna));
+      lista.forEach((s) => { s.fila -= minF - 1; s.columna -= minC - 1; });
+
+      const nombre = sectorMoviendo;
+      sectorMoviendo = "";
+      guardarConfig({ sectores: lista }, `${nombre} movido ✓`, "plan");
+    };
+  });
 
   const guardarUbicacion = (g, sector, bancales) => {
     guardarRegistro("generaciones", {
@@ -4598,7 +4688,7 @@ function prepararGeneraciones() {
         plantas: plantasDe({ bancales: bancalesTotal, lineas, distancia_cm: distancia }),
       });
       plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
-      guardarConfig({ plan }, "");
+      guardarConfig({ plan }, "", "");
     }
 
     fs.forEach((fecha, i) => {

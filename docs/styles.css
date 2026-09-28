@@ -596,6 +596,53 @@ button.secundario {
   margin: 0 0 6px;
   font-size: .9rem;
   color: var(--sage-dark);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* El agarre para mover un sector a otro lugar del campo. */
+.agarre {
+  border: 1px solid var(--sage-light);
+  background: #fff;
+  color: var(--sage-dark);
+  border-radius: 6px;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  font-size: .85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.agarre:hover { background: var(--sage-suave); }
+/* El sector levantado se ve distinto mientras se elige dónde soltarlo. */
+.sector-mapa.levantado {
+  outline: 2px dashed var(--amber);
+  outline-offset: 4px;
+  border-radius: 6px;
+  opacity: .75;
+}
+.sector-mapa.levantado .agarre { background: var(--amber); color: #fff; border-color: var(--amber); }
+
+/* Donde se puede soltar: aparecen solo mientras se mueve un sector. */
+.celda-destino {
+  min-height: 120px;
+  border: 2px dashed var(--sage);
+  border-radius: 8px;
+  background: rgba(143,174,125,.14);
+  color: var(--sage-dark);
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.celda-destino:hover { background: rgba(143,174,125,.32); }
+/* Soltar sobre otro sector los intercambia: la celda se pone encima de él. */
+.celda-destino.con-sector {
+  background: rgba(233,168,58,.18);
+  border-color: var(--amber);
+  z-index: 4;
+  align-self: stretch;
 }
 .sector-mapa h4 span { font-weight: 400; color: var(--tenue); font-size: .8rem; }
 
