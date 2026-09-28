@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 57 · 28/9/2026";
+const VERSION_APP = "versión 58 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -628,7 +628,10 @@ async function sincronizar(silencioso = true) {
     // Lo recién enviado ya está en la planilla: se vuelve a pedir para que
     // aparezca en la lista de la chacra y no solo como "por enviar".
     const tipos = new Set(enviadosAhora.map((r) => r.tipo));
-    tipos.forEach((t) => traerUltimos(t, true));
+    ["siembras", "cosechas", "horas", "trasplantes", "tareas"]
+      .filter((t) => tipos.has(t)).forEach((t) => traerUltimos(t, true));
+    // Las generaciones tienen su propio pedido: el plan entero.
+    if (tipos.has("generaciones") || tipos.has("generacion_borrar")) traerGeneraciones(true);
     // Un trasplante recién subido saca su almácigo de la lista de pendientes,
     // y una siembra nueva puede sumar uno: las dos cosas cambian esa lista.
     if (tipos.has("trasplantes") || tipos.has("siembras")) traerAlmacigos(true);
@@ -1941,7 +1944,9 @@ function siembrasAgrupadas(dias = DIAS_AVISO) {
     const k = `${claveArea(g.cultivo)}|${g.cuando}`;
     if (!juntas.has(k)) juntas.set(k, { ...g, generaciones: [], camasTotal: 0 });
     const j = juntas.get(k);
-    j.generaciones.push(g.generacion);
+    // Una generación partida en bancales separados es una sola siembra: su
+    // número va una vez, y los bancales se suman.
+    if (!j.generaciones.includes(g.generacion)) j.generaciones.push(g.generacion);
     j.camasTotal += Number(g.camas) || 0;
   });
   return [...juntas.values()]
@@ -2000,12 +2005,68 @@ async function traerGeneraciones(forzar = false) {
     const d = await (await fetch(
       `${urlServicio()}?${conCredenciales("generaciones=1")}`)).json();
     if (!d.ok || !Array.isArray(d.generaciones)) return;
-    const cambio = JSON.stringify(leer(LS.generaciones, null)) !== JSON.stringify(d.generaciones);
-    escribir(LS.generaciones, d.generaciones);
+    const lista = conPendientesDelPlan(d.generaciones);
+    const cambio = JSON.stringify(leer(LS.generaciones, null)) !== JSON.stringify(lista);
+    escribir(LS.generaciones, lista);
     if (!cambio) return;
     if (vistaActual === "inicio") redibujarConDatos("inicio");
     else if (vistaActual === "plan" && vistaPlan !== "lista") redibujarConDatos("plan");
   } catch { /* sin señal: se usa lo último que se bajó */ }
+}
+
+/* Lo que está en la cola del teléfono todavía no llegó a la planilla, así que
+   el servicio no lo devuelve. Se aplica encima de su respuesta: si no, un
+   cultivo recién agregado desaparecía de la lista y del gráfico hasta cerrar y
+   abrir la app (28/09), y una generación recién movida volvía a su lugar
+   viejo por unos segundos. */
+function conPendientesDelPlan(lista) {
+  let out = lista.slice();
+  pendientes.forEach((r) => {
+    const d = r.datos || {};
+    const id = d.generacion_id;
+    if (!id) return;
+    if (r.tipo === "generacion_borrar") { out = out.filter((x) => x.id !== id); return; }
+    if (r.tipo !== "generaciones") return;
+    const previa = out.find((x) => x.id === id);
+    // Una parte nueva de una generación partida es la misma siembra: si la
+    // original ya estaba sembrada, esta también.
+    const hermanaSembrada = out.some((x) => claveArea(x.cultivo) === claveArea(d.cultivo)
+      && Number(x.generacion) === (Number(d.generacion) || 1) && x.sembrada);
+    const nueva = {
+      ...(previa || { sembrada: hermanaSembrada }), id, cultivo: d.cultivo,
+      generacion: Number(d.generacion) || 1, metodo: d.metodo || "",
+      fecha_almacigo: d.fecha_almacigo || "", fecha_campo: d.fecha_campo || "",
+      camas: Number(d.camas) || 0, sector: d.sector || "", bancales: d.bancales || "",
+      estado: d.estado || "Planificado",
+    };
+    out = previa ? out.map((x) => (x.id === id ? nueva : x)) : out.concat(nueva);
+  });
+  return out;
+}
+
+// Guardar una generación: a la cola, y en la copia local al instante para que
+// la pantalla responda sin esperar a la planilla.
+function guardarGeneracion(g, mensaje) {
+  guardarRegistro("generaciones", {
+    generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
+    metodo: g.metodo, fecha_almacigo: g.fecha_almacigo || "",
+    fecha_campo: g.fecha_campo || "", camas: g.camas || "",
+    sector: g.sector || "",
+    // Solo números: si la planilla alguna vez convirtió "4, 5, 6" en una
+    // fecha, reenviarlo tal cual lo volvía a guardar dañado.
+    bancales: bancalesDe(g).join(", "), estado: g.estado || "Planificado", origen: "AMA",
+  }, mensaje);
+  escribir(LS.generaciones, conPendientesDelPlan(leer(LS.generaciones, []) || []));
+}
+
+// "G1", o "G1b" cuando una generación se partió para ubicarla en bancales
+// separados: son la misma siembra, así que comparten el número.
+function nombreGen(g, todas = leer(LS.generaciones, []) || []) {
+  const hermanas = todas.filter((x) => claveArea(x.cultivo) === claveArea(g.cultivo)
+    && Number(x.generacion) === Number(g.generacion));
+  if (hermanas.length < 2) return `G${g.generacion}`;
+  const orden = hermanas.map((x) => x.id).sort((a, b) => a.length - b.length || a.localeCompare(b));
+  return `G${g.generacion}${"abcdefghij"[orden.indexOf(g.id)] || ""}`;
 }
 
 // Los cuatro momentos de una generación. En siembra directa no hay tramo de
@@ -2065,7 +2126,11 @@ function generacionesParaElPlan() {
     .sort((a, b) => ordenPlan === "fecha"
       ? String(a.tramos.inicioCosecha || a.tramos.inicio)
           .localeCompare(String(b.tramos.inicioCosecha || b.tramos.inicio))
-      : a.cultivo.localeCompare(b.cultivo) || a.generacion - b.generacion);
+      // Por cultivo, y dentro de cada uno por la fecha en que arranca: al
+      // correr una generación en el gráfico, se reacomoda sola en su lugar.
+      : a.cultivo.localeCompare(b.cultivo)
+        || String(a.tramos.inicio).localeCompare(String(b.tramos.inicio))
+        || a.generacion - b.generacion);
 }
 
 function planEstrategico() {
@@ -2123,7 +2188,8 @@ function planEstrategico() {
   const anchoGrafico = Math.max(720, meses.length * 96);
   const anchoMinimoFecha = (34 / anchoGrafico) * 100;
 
-  const filas = gens.map((g) => {
+  const todasGens = leer(LS.generaciones, []) || [];
+  const filas = gens.map((g, i) => {
     const t = g.tramos;
     // Recortado a la temporada: lo que empieza antes de julio o sigue después
     // de junio se dibuja hasta el borde, no fuera de él.
@@ -2144,10 +2210,14 @@ function planEstrategico() {
     // Una generación ya sembrada no se puede correr: su fecha es un hecho, no
     // una intención. Las planificadas sí, arrastrándolas.
     const movible = !(("sembrada" in g) ? g.sembrada : g.estado === "Sembrado");
-    return `<div class="plan-gen${movible ? " movible" : ""}${g.id === genPanel ? " abierta" : ""}"
+    // Una línea algo más marcada donde empieza otro cultivo: separa los grupos.
+    const nuevoCultivo = ordenPlan === "cultivo" && i > 0 && gens[i - 1].cultivo !== g.cultivo;
+    const nombre = nombreGen(g, todasGens);
+    return `<div class="plan-gen${movible ? " movible" : ""}${g.id === genPanel ? " abierta" : ""}${
+                 nuevoCultivo ? " nuevo-cultivo" : ""}"
                  data-gen="${esc(g.id)}" ${movible ? `data-mover="${esc(g.id)}"` : ""}>
-      <div class="plan-nombre" title="${esc(g.cultivo)} G${g.generacion}">
-        ${esc(g.cultivo)} <span>G${g.generacion}</span>
+      <div class="plan-nombre" title="${esc(g.cultivo)} ${nombre}${g.camas ? ` · ${num(g.camas, 1)} bancal(es)` : ""}">
+        ${esc(g.cultivo)} <span>${nombre}</span>
       </div>
       <div class="plan-pista${
         (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado") ? " sembrada" : ""}">
@@ -2195,7 +2265,11 @@ function planEstrategico() {
           </div>
         </div>
         <div class="plan-cuerpo">
-          ${enPantalla ? `<div class="linea-hoy" style="left:calc(var(--sangria) + (100% - var(--sangria)) * ${hoyPct / 100})"></div>` : ""}
+          <!-- La cuadrícula: una línea por mes, de arriba abajo, para seguir con
+               la vista dónde empieza y termina cada barra. -->
+          ${meses.slice(1).map((m) => `<i class="plan-linea-mes" style="left:calc(var(--sangria) + var(--hueco)
+              + (100% - var(--sangria) - var(--hueco)) * ${m.izq / 100})"></i>`).join("")}
+          ${enPantalla ? `<div class="linea-hoy" style="left:calc(var(--sangria) + var(--hueco) + (100% - var(--sangria) - var(--hueco)) * ${hoyPct / 100})"></div>` : ""}
           ${filas}
         </div>
       </div>
@@ -2299,10 +2373,10 @@ function panelGeneracion(g) {
     ? `${esc(g.sector)} · bancal${bancalesDe(g).length > 1 ? "es" : ""} ${bancalesDe(g).join(", ")}`
     : "sin ubicar en el mapa";
 
-  return `<aside class="panel-gen" role="dialog" aria-label="${esc(g.cultivo)} G${g.generacion}">
+  return `<aside class="panel-gen" role="dialog" aria-label="${esc(g.cultivo)} ${nombreGen(g)}">
     <div class="panel-cab">
       <div>
-        <h3>${esc(g.cultivo)} <span>G${g.generacion}</span></h3>
+        <h3>${esc(g.cultivo)} <span>${nombreGen(g)}</span></h3>
         <span class="etiqueta ${sembrada ? "ok" : ""}">${sembrada ? "sembrada" : "planificada"}</span>
       </div>
       <button type="button" class="cerrar-panel" id="cerrar-panel" aria-label="Cerrar">&times;</button>
@@ -2328,6 +2402,7 @@ function panelGeneracion(g) {
     </div>
 
     <div class="panel-acciones">
+      <button type="button" class="secundario" data-editar-gen="${esc(g.id)}">Editar</button>
       <button type="button" class="secundario" data-panel-ficha>Ver ficha del cultivo</button>
       ${sembrada ? "" : `<button type="button" class="secundario peligro" data-panel-quitar>Sacar del plan</button>`}
     </div>
@@ -2384,7 +2459,7 @@ function prepararPanelGeneracion() {
   };
   const quitar = panel.querySelector("[data-panel-quitar]");
   if (quitar) quitar.onclick = () => {
-    if (!confirm(`¿Sacar ${g.cultivo} G${g.generacion} del plan?`)) return;
+    if (!confirm(`¿Sacar ${g.cultivo} ${nombreGen(g)} del plan?`)) return;
     guardarRegistro("generacion_borrar", { generacion_id: g.id }, "Sacada del plan ✓");
     const quedan = (leer(LS.generaciones, []) || []).filter((x) => x.id !== g.id);
     escribir(LS.generaciones, quedan);
@@ -2476,7 +2551,7 @@ function correrGeneracion(id, dias) {
     // Solo números: si la planilla alguna vez convirtió "4, 5, 6" en una
     // fecha, reenviarlo tal cual lo volvía a guardar dañado.
     bancales: bancalesDe(g).join(", "), estado: g.estado, origen: "AMA",
-  }, `${g.cultivo} G${g.generacion}: ${fechaCorta(antes)} → ${fechaCorta(despues)} ✓`);
+  }, `${g.cultivo} ${nombreGen(g)}: ${fechaCorta(antes)} → ${fechaCorta(despues)} ✓`);
 
   // Se mueve en la copia local para que el gráfico responda al instante.
   escribir(LS.generaciones, gens.map((x) => (x.id === id ? nueva : x)));
@@ -2696,9 +2771,9 @@ function mapaDeCultivos() {
       g.id === genSeleccionada ? " elegida" : ""}" data-puesta="${esc(g.id)}"
       style="left:${(desdeB - 1) * LZ.bancal}px;width:${ancho - 1}px;top:${top}px;
              height:${fin - top}px;background:${colorEtapa(g.cultivo, sembrada ? "cosecha" : "campo")}"
-      title="${esc(g.cultivo)} G${g.generacion} · bancal ${bs.join(", ")} · ${
+      title="${esc(g.cultivo)} ${nombreGen(g)} · bancal ${bs.join(", ")} · ${
         fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}${sembrada ? " · sembrada" : ""}">
-      <span>${esc(g.cultivo)} G${g.generacion}${acostado
+      <span>${esc(g.cultivo)} ${nombreGen(g)}${acostado
         ? `<small>${fechaCorta(o.desde)} – ${fechaCorta(o.hasta)}</small>` : ""}</span>
     </div>`;
   };
@@ -2745,7 +2820,7 @@ function mapaDeCultivos() {
     ${barraDePlan("mapa")}
 
     <div class="lz-estado">${sel
-      ? `<b>${esc(sel.cultivo)} G${sel.generacion}</b>
+      ? `<b>${esc(sel.cultivo)} ${nombreGen(sel)}</b>
          <span>${Math.max(1, Math.round(Number(sel.camas) || 1))} bancal(es)${
            o ? ` · ${fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}` : ""}${
            sel.sector ? ` · ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}` : " · sin ubicar"}</span>
@@ -2784,7 +2859,7 @@ function mapaDeCultivos() {
                        data-elegir="${esc(g.id)}" role="button" tabindex="0"
                        title="Arrastrala a un bancal, o tocala y después tocá el bancal">
             <div>
-              <div class="detalle">G${g.generacion} <span class="gen">${
+              <div class="detalle">${nombreGen(g, todas)} <span class="gen">${
                 Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)</span></div>
               <div class="cuando">${oc ? `ocupa del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
                 : "sin fechas suficientes"}</div>
@@ -2805,10 +2880,122 @@ function mapaDeCultivos() {
 // generaciones de brócoli cada dos semanas dan cosecha continua, y una sola
 // grande da un pico y después nada. Se carga así, como serie, porque es como
 // se piensa; cargar nueve fechas a mano invita a equivocarse.
+// ---- Editar lo planificado ----
+// Qué cultivo está desplegado en la lista, qué generación se está editando y
+// de qué cultivo se está cambiando el marco. Fuera del render para que un
+// redibujado no cierre lo que se estaba mirando.
+let cultivoEditando = "";
+let genEditando = "";
+let marcoEditando = "";
+
+// El día en que arranca una generación: la bandeja, o el bancal si es directa.
+const arranqueDe = (g) => g.fecha_almacigo || g.fecha_campo || "";
+const esSembrada = (g) => (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado");
+
+// En cuántas partes iguales se puede partir: las que dejan bancales enteros.
+function partesPosibles(g) {
+  const c = Number(g.camas) || 0;
+  if (c < 2 || !Number.isInteger(c)) return [];
+  return Array.from({ length: c - 1 }, (_, i) => i + 2).filter((k) => c % k === 0);
+}
+
+function formularioGeneracion(g) {
+  const sembrada = esSembrada(g);
+  const directa = g.metodo === "Siembra directa" || (!g.fecha_almacigo && g.fecha_campo);
+  const bloqueo = sembrada ? " disabled" : "";
+  return `<form class="editar-gen" data-form-gen="${esc(g.id)}">
+    <div class="fila">
+      <div>
+        <label>¿Cómo se siembra?</label>
+        <select name="metodo"${bloqueo}>
+          <option value="Trasplante"${directa ? "" : " selected"}>En almácigo</option>
+          <option value="Siembra directa"${directa ? " selected" : ""}>Siembra directa</option>
+        </select>
+      </div>
+      <div>
+        <label>Bancales</label>
+        <input type="text" name="camas" inputmode="decimal" value="${esc(String(g.camas || ""))}">
+      </div>
+    </div>
+    <div class="fila">
+      <div class="solo-almacigo"${directa ? " hidden" : ""}>
+        <label>Siembra en bandeja</label>
+        <input type="date" name="almacigo" value="${esc(g.fecha_almacigo || "")}"${bloqueo}>
+      </div>
+      <div>
+        <label class="rotulo-campo">${directa ? "Siembra en el bancal" : "A campo <small>(opcional)</small>"}</label>
+        <input type="date" name="campo" value="${esc(g.fecha_campo || "")}"${bloqueo}>
+      </div>
+    </div>
+    ${sembrada ? `<p class="nota">Ya se sembró: las fechas y el método son un hecho y no se cambian.</p>` : ""}
+    <div class="editar-gen-botones">
+      <button class="principal">Guardar</button>
+      <button type="button" class="secundario" data-cancelar-gen>Cancelar</button>
+    </div>
+    ${partesPosibles(g).length ? `<div class="partir">
+      <span>Partir para ubicarla en bancales separados:</span>
+      ${partesPosibles(g).map((k) => `<button type="button" class="secundario"
+        data-partir="${esc(g.id)}" data-partes="${k}">${k} de ${(Number(g.camas) || 0) / k}</button>`).join("")}
+    </div>` : ""}
+  </form>`;
+}
+
+function cultivoEditable(cultivo, lista, todas) {
+  const bancales = lista.reduce((a, g) => a + (Number(g.camas) || 0), 0);
+  const ya = enPlan(cultivo) || {};
+  const p = perfil(cultivo) || {};
+  const abierto = claveArea(cultivoEditando) === claveArea(cultivo);
+  return `<details class="gen-cultivo" data-cultivo-lista="${esc(cultivo)}"${abierto ? " open" : ""}>
+    <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
+      esc(cultivo)} <span>${lista.length} generación(es) · ${num(bancales, 1)} bancales${
+      ya.cosecha_esperada_kg ? ` · ${num(ya.cosecha_esperada_kg)} kg` : ""}</span></summary>
+    <div class="cultivo-acciones">
+      <button type="button" class="secundario" data-sumar-a="${esc(cultivo)}">+ Generaciones</button>
+      <button type="button" class="secundario" data-marco="${esc(cultivo)}">Marco y rinde</button>
+      <button type="button" class="secundario" data-ficha="${esc(cultivo)}">Ficha</button>
+    </div>
+    ${claveArea(marcoEditando) === claveArea(cultivo) ? `<form class="editar-gen" data-form-marco="${esc(cultivo)}">
+      <div class="fila">
+        <div><label>Líneas por bancal</label>
+          <input type="text" name="lineas" inputmode="numeric" value="${esc(String(ya.lineas || p.lineas_bancal || ""))}"></div>
+        <div><label>Distancia (cm)</label>
+          <input type="text" name="distancia" inputmode="numeric" value="${esc(String(ya.distancia_cm || p.distancia_cm || ""))}"></div>
+      </div>
+      <label>Rinde esperado (kg/m²)</label>
+      <input type="text" name="rinde" inputmode="decimal" value="${esc(String(ya.rinde_kg_m2 || p.rinde_ref_kg_m2 || ""))}">
+      <div class="editar-gen-botones">
+        <button class="principal">Guardar</button>
+        <button type="button" class="secundario" data-cancelar-marco>Cancelar</button>
+      </div>
+    </form>` : ""}
+    ${lista.map((g) => {
+      const sembrada = esSembrada(g);
+      const directa = !g.fecha_almacigo;
+      return `<div class="registro${g.id === genEditando ? " editando" : ""}" data-fila-gen="${esc(g.id)}">
+        <div>
+          <div class="detalle">${nombreGen(g, todas)}${
+            sembrada ? ` <span class="etiqueta ok">sembrada</span>` : ""}</div>
+          <div class="cuando">${fechaCorta(arranqueDe(g))}${directa ? " · directa" : " · en bandeja"}${
+            g.camas ? ` · ${num(g.camas, 1)} bancal(es)` : ""}${
+            g.sector ? ` · ${esc(g.sector)}${bancalesDe(g).length ? " " + bancalesDe(g).join(", ") : ""}` : ""}</div>
+        </div>
+        <button type="button" class="quitar editar" data-editar-gen="${esc(g.id)}"
+          aria-label="Editar" title="Editar">✎</button>
+        ${sembrada ? "" : `<button type="button" class="quitar"
+          data-borrar-gen="${esc(g.id)}" aria-label="Quitar del plan" title="Quitar del plan">&times;</button>`}
+      </div>
+      ${g.id === genEditando ? formularioGeneracion(g) : ""}`;
+    }).join("")}
+  </details>`;
+}
+
 function pantallaPlanificar() {
+  // Dentro de cada cultivo, por fecha: el orden en que se siembran, que es el
+  // que importa al mirar la lista. El número de generación queda en el nombre.
   const gens = (leer(LS.generaciones, []) || [])
     .slice()
-    .sort((a, b) => a.cultivo.localeCompare(b.cultivo) || a.generacion - b.generacion);
+    .sort((a, b) => a.cultivo.localeCompare(b.cultivo)
+      || arranqueDe(a).localeCompare(arranqueDe(b)) || a.generacion - b.generacion);
 
   const porCultivo = new Map();
   gens.forEach((g) => {
@@ -2896,31 +3083,13 @@ function pantallaPlanificar() {
     <div class="planificar-lista">
     <h3 class="sub">En el plan <small>${gens.length} generaciones</small></h3>
     <div class="lista-scroll">
-    ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
-      <details class="gen-cultivo">
-        <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
-          esc(cultivo)} <span>${lista.length} generación(es) · ${
-          num(lista.reduce((a, g) => a + (Number(g.camas) || 0), 0), 1)} bancales</span></summary>
-        ${lista.map((g) => {
-          const cuando = g.fecha_almacigo || g.fecha_campo;
-          return `<div class="registro">
-            <div>
-              <div class="detalle">G${g.generacion}${
-                g.sembrada ? ` <span class="etiqueta ok">sembrada</span>` : ""}</div>
-              <div class="cuando">${fechaCorta(cuando)}${
-                g.fecha_almacigo ? " · en bandeja" : " · directa"}${
-                g.camas ? ` · ${num(g.camas, 1)} cama(s)` : ""}${
-                g.sector ? ` · ${esc(g.sector)}` : ""}</div>
-            </div>
-            ${g.sembrada ? "" : `<button type="button" class="quitar"
-              data-borrar-gen="${esc(g.id)}" aria-label="Quitar del plan">&times;</button>`}
-          </div>`;
-        }).join("")}
-      </details>`).join("")
+    ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) =>
+        cultivoEditable(cultivo, lista, gens)).join("")
       : `<p class="nota">Todavía no hay generaciones planificadas.</p>`}
     </div>
-    <p class="nota">Las que ya se sembraron no se pueden sacar del plan: son
-    parte de lo que pasó, no de lo que se piensa hacer.</p>
+    <p class="nota">✎ edita una generación: método, fechas, bancales, o partirla
+    para ubicar sus bancales por separado. De las ya sembradas solo se cambian
+    los bancales: la siembra es un hecho.</p>
     </div>
     </div>
   </div>`;
@@ -3024,6 +3193,7 @@ function fichaCultivo(cultivo) {
   <div class="tarjeta">
     <h2>${esc(cultivo)}</h2>
     <button type="button" class="secundario" id="volver-plan">← Volver al plan</button>
+    <button type="button" class="secundario" data-editar-cultivo="${esc(cultivo)}">Editar generaciones y bancales</button>
 
     <h3 class="sub">Lo que sabe el catálogo</h3>
     <p class="nota">Común a las seis chacras. Se corrige en Plan → Agregar o completar un cultivo.</p>
@@ -3285,7 +3455,7 @@ async function traerUltimos(tipo, forzar = false) {
     const cambio = JSON.stringify(guardado[tipo] || []) !== JSON.stringify(d.filas);
     guardado[tipo] = d.filas;
     escribir(LS.ultimos, guardado);
-    if (cambio && vistaActual === tipo) render(tipo);
+    if (cambio && vistaActual === tipo) redibujarConDatos(tipo);
   } catch { /* sin conexión: se muestra lo último que se bajó */ }
 }
 
@@ -4700,6 +4870,185 @@ function prepararPlan() {
   prepararInicio();
   prepararGeneraciones();
   prepararMapa();
+  prepararEdicionCultivos();
+}
+
+// Ir a Cultivos con un cultivo desplegado (y una generación abierta para
+// editar). Es el único lugar donde se edita: el panel del gráfico y la ficha
+// llevan acá, en vez de tener cada uno su propio formulario.
+function irAEditar(cultivo, genId = "") {
+  vistaPlan = "planificar";
+  cultivoAbierto = "";
+  genPanel = "";
+  cultivoEditando = cultivo;
+  genEditando = genId;
+  marcoEditando = "";
+  render("plan");
+  const destino = document.querySelector(genId
+    ? `[data-fila-gen="${CSS.escape(genId)}"]`
+    : `[data-cultivo-lista="${CSS.escape(cultivo)}"]`);
+  if (destino) destino.scrollIntoView({ block: "center" });
+}
+
+function prepararEdicionCultivos() {
+  const todas = () => leer(LS.generaciones, []) || [];
+
+  // Desde el panel del gráfico, desde la ficha y desde la misma lista.
+  document.querySelectorAll("[data-editar-gen]").forEach((b) => {
+    b.onclick = (e) => {
+      e.preventDefault();
+      const g = todas().find((x) => x.id === b.dataset.editarGen);
+      if (!g) return;
+      if (vistaPlan === "planificar" && !cultivoAbierto) {
+        genEditando = genEditando === g.id ? "" : g.id;
+        cultivoEditando = g.cultivo;
+        render("plan", true);
+      } else {
+        irAEditar(g.cultivo, g.id);
+      }
+    };
+  });
+  document.querySelectorAll("[data-editar-cultivo]").forEach((b) => {
+    b.onclick = () => irAEditar(b.dataset.editarCultivo);
+  });
+
+  // Qué cultivo queda desplegado: se recuerda para el próximo redibujado.
+  document.querySelectorAll("[data-cultivo-lista]").forEach((d) => {
+    d.addEventListener("toggle", () => {
+      if (d.open) cultivoEditando = d.dataset.cultivoLista;
+      else if (claveArea(cultivoEditando) === claveArea(d.dataset.cultivoLista)) cultivoEditando = "";
+    });
+  });
+
+  // "+ Generaciones": el formulario de arriba, con el cultivo ya elegido.
+  document.querySelectorAll("[data-sumar-a]").forEach((b) => {
+    b.onclick = () => {
+      const f = $("#form-generaciones");
+      if (!f) return;
+      const cultivo = b.dataset.sumarA;
+      const caja = f.querySelector('[data-buscador="cultivo"]');
+      if (caja) {
+        caja.querySelector(".buscador-texto").value = cultivo;
+        caja.querySelector('input[type="hidden"]').value = cultivo;
+      }
+      f.dispatchEvent(new Event("change"));
+      f.scrollIntoView({ block: "start", behavior: "smooth" });
+      f.desde.focus({ preventScroll: true });
+    };
+  });
+
+  // Marco y rinde: son del cultivo, no de cada generación.
+  document.querySelectorAll("[data-marco]").forEach((b) => {
+    b.onclick = () => {
+      marcoEditando = claveArea(marcoEditando) === claveArea(b.dataset.marco) ? "" : b.dataset.marco;
+      cultivoEditando = b.dataset.marco;
+      render("plan", true);
+    };
+  });
+  document.querySelectorAll("[data-cancelar-marco]").forEach((b) => {
+    b.onclick = () => { marcoEditando = ""; render("plan", true); };
+  });
+  document.querySelectorAll("[data-form-marco]").forEach((f) => {
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      const cultivo = f.dataset.formMarco;
+      const rinde = aNumero(f.rinde.value) || 0;
+      const lineas = parseInt(f.lineas.value, 10) || 0;
+      const distancia = aNumero(f.distancia.value) || 0;
+      // Se escribe en el plan y se recalcula con sus generaciones: los kilos
+      // salen de la superficie por el rinde, no se cargan.
+      const k = claveArea(cultivo);
+      const plan = (CFG.plan || []).slice();
+      const i = plan.findIndex((p) => claveArea(p.cultivo) === k);
+      const nuevo = { ...(i >= 0 ? plan[i] : { cultivo }), rinde_kg_m2: rinde, lineas, distancia_cm: distancia };
+      if (i >= 0) plan[i] = nuevo; else plan.push(nuevo);
+      CFG = { ...CFG, plan };
+      replanearCultivo(cultivo, todas());
+      marcoEditando = "";
+      aviso(`${cultivo}: marco y rinde guardados ✓`);
+      render("plan", true);
+    };
+  });
+
+  // Editar una generación.
+  document.querySelectorAll("[data-cancelar-gen]").forEach((b) => {
+    b.onclick = () => { genEditando = ""; render("plan", true); };
+  });
+  document.querySelectorAll("[data-form-gen]").forEach((f) => {
+    const g = todas().find((x) => x.id === f.dataset.formGen);
+    if (!g) return;
+    // Con siembra directa no hay bandeja: el campo se esconde y la fecha que
+    // queda es la de siembra en el bancal.
+    f.metodo.onchange = () => {
+      const directa = f.metodo.value === "Siembra directa";
+      f.querySelector(".solo-almacigo").hidden = directa;
+      f.querySelector(".rotulo-campo").innerHTML = directa
+        ? "Siembra en el bancal" : "A campo <small>(opcional)</small>";
+    };
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      const camas = aNumero(f.camas.value);
+      if (!(camas > 0)) return aviso("Poné cuántos bancales ocupa.", true);
+      let metodo = g.metodo, almacigo = g.fecha_almacigo || "", campo = g.fecha_campo || "";
+      if (!esSembrada(g)) {
+        metodo = f.metodo.value;
+        const directa = metodo === "Siembra directa";
+        almacigo = directa ? "" : f.almacigo.value;
+        campo = f.campo.value;
+        if (directa && !campo) return aviso("Falta la fecha de siembra en el bancal.", true);
+        if (!directa && !almacigo) return aviso("Falta la fecha de siembra en bandeja.", true);
+      }
+      // Si estaba ubicada en el mapa y cambian los bancales, se acomoda desde
+      // el primero que tenía. Si no entra en el sector, queda sin ubicar.
+      let bancales = bancalesDe(g);
+      let sector = g.sector || "";
+      if (bancales.length && camas !== Number(g.camas)) {
+        const n = Number((sectores().find((s) => claveArea(s.sector) === claveArea(sector)) || {}).bancales) || 0;
+        bancales = n ? bancalesQueOcuparia({ camas }, Math.min(...bancales), n) : [];
+        if (!bancales.length) sector = "";
+      }
+      guardarGeneracion({ ...g, metodo, fecha_almacigo: almacigo, fecha_campo: campo,
+                          camas, sector, bancales: bancales.join(", ") },
+        `${g.cultivo} ${nombreGen(g)} actualizada ✓`);
+      replanearCultivo(g.cultivo, todas());
+      genEditando = "";
+      render("plan", true);
+    };
+  });
+
+  // Partir una generación en partes iguales, para ubicar cada una por su
+  // lado: el tomate de cuatro bancales en dos de dos, o en cuatro de uno. Son
+  // la misma siembra —mismo número de generación, mismas fechas—, así que al
+  // registrarla quedan sembradas todas juntas.
+  document.querySelectorAll("[data-partir]").forEach((b) => {
+    b.onclick = () => {
+      const lista = todas();
+      const g = lista.find((x) => x.id === b.dataset.partir);
+      if (!g) return;
+      const k = Number(b.dataset.partes);
+      const cada = (Number(g.camas) || 0) / k;
+      if (!confirm(`¿Partir ${g.cultivo} ${nombreGen(g, lista)} en ${k} partes de ${num(cada, 1)} bancal(es)?\n`
+                   + "Quedan con las mismas fechas, y cada una se ubica por su lado en el mapa.")) return;
+      const bs = bancalesDe(g);
+      const usados = new Set(lista.map((x) => x.id));
+      const idNuevo = () => {
+        for (const l of "bcdefghij") {
+          const id = `${g.id}-${l}`;
+          if (!usados.has(id)) { usados.add(id); return id; }
+        }
+        return `${g.id}-${uid()}`;
+      };
+      for (let i = 0; i < k; i++) {
+        // Si estaba ubicada, cada parte se queda con su tramo de bancales.
+        const tramo = bs.length >= (Number(g.camas) || 0) ? bs.slice(i * cada, (i + 1) * cada) : [];
+        guardarGeneracion({ ...g, id: i === 0 ? g.id : idNuevo(), camas: cada,
+                            bancales: tramo.join(", "), sector: bs.length && !tramo.length ? "" : g.sector },
+          `${g.cultivo} ${nombreGen(g, lista)} partida en ${k} ✓`);
+      }
+      genEditando = "";
+      render("plan", true);
+    };
+  });
 }
 
 // Un arrastre con el mouse o el dedo. Se escucha en la ventana y no en el
@@ -4804,8 +5153,8 @@ function prepararMapa() {
       sector, bancales: bancales.join(", "),
       estado: g.estado, origen: "AMA",
     }, sector
-      ? `${g.cultivo} G${g.generacion} → ${sector} ${bancales.join(", ")} ✓`
-      : `${g.cultivo} G${g.generacion} sacada del mapa ✓`);
+      ? `${g.cultivo} ${nombreGen(g)} → ${sector} ${bancales.join(", ")} ✓`
+      : `${g.cultivo} ${nombreGen(g)} sacada del mapa ✓`);
     // Se mueve en la copia local para que el mapa responda al instante.
     escribir(LS.generaciones, todas.map((x) => x.id === g.id
       ? { ...x, sector, bancales: bancales.join(", ") } : x));
@@ -4867,7 +5216,7 @@ function prepararMapa() {
         flotante = document.createElement("div");
         flotante.className = "lz-flotante";
         flotante.style.background = colorEtapa(g.cultivo, "campo");
-        flotante.textContent = `${g.cultivo} G${g.generacion} · ${
+        flotante.textContent = `${g.cultivo} ${nombreGen(g)} · ${
           Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)`;
         document.body.appendChild(flotante);
         document.body.classList.add("lz-arrastrando");
@@ -4998,7 +5347,7 @@ function prepararMapa() {
   const sacar = $("#sacar-del-mapa");
   if (sacar) sacar.onclick = () => {
     const g = todas.find((x) => x.id === genSeleccionada);
-    if (g && confirm(`¿Sacar ${g.cultivo} G${g.generacion} del mapa?\n` +
+    if (g && confirm(`¿Sacar ${g.cultivo} ${nombreGen(g)} del mapa?\n` +
                      "Queda en el plan, solo sin lugar asignado.")) {
       guardarUbicacion(g, "", []);
     }
@@ -5137,20 +5486,22 @@ function prepararGeneraciones() {
 
     fs.forEach((fecha, i) => {
       const n = desdeN + i;
-      guardarRegistro("generaciones", {
+      guardarGeneracion({
         // El id lleva cultivo y número: volver a cargar la misma generación la
         // pisa en vez de duplicarla.
-        generacion_id: `gen-${claveArea(cultivo)}-${n}`,
+        id: `gen-${claveArea(cultivo)}-${n}`,
         cultivo, generacion: n,
         metodo: f.metodo.value,
         // En siembra directa la planta arranca en el bancal: no hay bandeja.
         fecha_almacigo: directa ? "" : fecha,
         fecha_campo: directa ? fecha : "",
         camas, sector: f.sector.value,
-        estado: "Planificado", origen: "AMA",
+        estado: "Planificado",
       }, `${fs.length} generación(es) de ${cultivo} al plan ✓`);
     });
-    traerGeneraciones(true);
+    // Aparece ya en la lista y en el gráfico: sale de la copia local, que
+    // incluye lo que todavía está en camino a la planilla.
+    cultivoEditando = cultivo;
     render("plan");
   };
 

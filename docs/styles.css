@@ -760,27 +760,35 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
 }
 .plan-controles .chips { margin-bottom: 0; }
 
+/* El gráfico tiene su propio scroll, en los dos sentidos. Es lo que deja la
+   fila de meses fija arriba al bajar: "sticky" se pega al contenedor que
+   desplaza, y antes ese contenedor solo desplazaba de costado, así que los
+   meses se iban con la página. */
 .plan-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 250px);
+  min-height: 320px;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   margin: 0 -14px;
   padding: 0 14px;
 }
 .plan-grafico {
   min-width: var(--ancho, 720px);
   --sangria: 118px;
+  --hueco: 8px;
 }
 .plan-meses,
 .plan-gen {
   display: grid;
   grid-template-columns: var(--sangria) 1fr;
-  gap: 8px;
+  gap: var(--hueco);
   align-items: center;
 }
 .plan-meses {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 5;
   background: #fff;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--sage-light);
@@ -809,7 +817,25 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
 .plan-nombre span { color: var(--tenue); }
 
 .plan-cuerpo { position: relative; }
-.plan-gen { margin-bottom: 3px; }
+/* La cuadrícula: líneas grises y tenues, verticales por mes y horizontales por
+   fila. Guían el ojo de la barra al mes y de la barra a su cultivo sin
+   competir con los colores. */
+.plan-gen {
+  position: relative;
+  z-index: 1;
+  padding: 2px 0;
+  border-bottom: 1px solid #eef0eb;
+}
+.plan-gen.nuevo-cultivo { border-top: 1px solid #d9dfd4; }
+.plan-gen .plan-pista { background: transparent; }
+.plan-linea-mes {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid #e6eae2;
+  pointer-events: none;
+}
 .plan-pista {
   position: relative;
   height: 15px;
@@ -1494,3 +1520,24 @@ button.peligro { color: var(--peligro); border-color: #f0c9c3; }
 .plan-gen.abierta .plan-nombre { font-weight: 700; color: var(--sage-dark); }
 .plan-gen.abierta .plan-pista { outline: 2px solid var(--amber); outline-offset: 1px; }
 .plan-gen { cursor: pointer; }
+
+/* ---- editar lo planificado (Plan → Cultivos) ---- */
+.cultivo-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.cultivo-acciones .secundario { width: auto; margin: 0; padding: 5px 11px; font-size: .82rem; }
+.registro.editando { background: var(--sage-suave); border-radius: 8px; }
+.quitar.editar { font-size: .95rem; color: var(--sage-dark); }
+.editar-gen {
+  border: 1px solid var(--sage-light);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 2px 0 10px;
+  background: #fff;
+}
+.editar-gen-botones { display: flex; gap: 8px; margin-top: 8px; }
+.editar-gen-botones button { margin: 0; }
+.partir {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--sage-light);
+  font-size: .82rem; color: var(--tenue);
+}
+.partir .secundario { width: auto; margin: 0; padding: 4px 10px; font-size: .82rem; }
