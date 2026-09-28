@@ -404,12 +404,75 @@ button.secundario {
    Cada bancal es una columna y los meses bajan por las filas. Un cultivo
    plantado ocupa un rectángulo: ancho = los bancales que toma, alto = desde
    que va a tierra hasta que termina la cosecha. */
+/* El mapa a la izquierda y la lista a la derecha, cada uno con su scroll. Al
+   buscar una generación entre setenta y nueve, la lista se mueve sola y el
+   mapa se queda quieto. En el teléfono se apilan. */
+.mapa-con-lista {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+@media (min-width: 900px) {
+  .mapa-con-lista { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+
+.mapa-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mapa-zoom button {
+  width: 2.2rem;
+  padding: 4px 0;
+  font-size: 1.05rem;
+  line-height: 1;
+  margin: 0;
+}
+.mapa-zoom span { font-size: .85rem; font-weight: 600; min-width: 3.2rem; }
+.mapa-zoom small { color: var(--tenue); font-size: .76rem; }
+
+.mapa-scroll {
+  overflow: auto;
+  max-height: 62vh;
+  border: 1px solid var(--sage-light);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--crema);
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+.mapa-scroll.moviendo { cursor: grabbing; }
+
+.lista-panel { min-width: 0; }
+.lista-scroll {
+  max-height: 58vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
 .mapa-sectores {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 18px;
-  margin-top: 10px;
+  /* El zoom escala desde arriba a la izquierda para que al achicar no se vaya
+     el mapa fuera de la vista. */
+  transform-origin: 0 0;
 }
+
+/* Los números de bancal, alineados con las columnas de la grilla. */
+.numeros-bancal {
+  display: grid;
+  grid-template-columns: 26px repeat(var(--cols), 1fr);
+  font-size: .52rem;
+  color: var(--tenue);
+  text-align: center;
+  margin-bottom: 1px;
+}
+.numeros-bancal span { overflow: hidden; }
+.numeros-bancal .marcado { color: var(--sage-dark); font-weight: 700; }
 .sector-mapa h4 {
   margin: 0 0 6px;
   font-size: .9rem;
@@ -591,9 +654,27 @@ button.secundario {
   height: 100%;
   border-radius: 3px;
 }
+/* El color de fondo lo pone el JavaScript: cada cultivo tiene su tono y las
+   tres etapas son el mismo tono en tres claridades. Estos son el respaldo por
+   si algo no llega a calcularse. */
 .tramo.almacigo { background: #b98a4a; }
 .tramo.campo    { background: #8fae7d; }
 .tramo.cosecha  { background: #3d6b35; }
+
+/* La fecha de arranque, escrita dentro del tramo. Solo aparece cuando el
+   tramo es lo bastante ancho: el JavaScript decide y acá solo se la viste. */
+.tramo b {
+  font-size: .58rem;
+  font-weight: 600;
+  line-height: 15px;
+  padding-left: 3px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  display: block;
+  /* Sobre los tonos claros del almácigo el blanco no se lee. */
+  text-shadow: 0 0 2px rgba(0,0,0,.45);
+}
 
 /* La generación que sigue produciendo después de junio: la barra llega al
    borde y esta marca avisa que no se termina ahí, solo se termina el gráfico. */

@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 48 · 27/9/2026";
+const VERSION_APP = "versión 49 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -86,6 +86,8 @@ let resumen = leer(LS.resumen, null);   // totales de la chacra (desde su planil
 let CAT = null;                         // catálogo común (catalogo.json)
 let CFG = leer(LS.config, null);        // configuración de esta chacra
 let vistaActual = "inicio";
+// De dónde se venía antes de entrar a Configuración, para poder volver ahí.
+let vistaPrevia = "inicio";
 // Qué cuenta de sueldos se está mirando. Vacío = la lista.
 let cuentaAbierta = "";
 // Qué cultivo del plan se está mirando en detalle. Vacío = el plan entero.
@@ -211,6 +213,13 @@ function aFechaISO(valor) {
   if (isNaN(d)) return "";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// Día y mes, sin año: es lo que entra dentro de una barra del plan.
+const diaMes = (iso) => {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-");
+  return `${parseInt(d, 10)}/${parseInt(m, 10)}`;
+};
 
 function fechaCorta(iso) {
   if (!iso) return "";
@@ -1404,9 +1413,9 @@ const plantillas = {
     <div class="tarjeta">
       <h2>Plan de la temporada <small>${plan.length} cultivos</small></h2>
       <div class="pestanas-tareas">
-        <button type="button" class="pestana activa" data-plan-vista="lista">Lista</button>
+        <button type="button" class="pestana activa" data-plan-vista="lista">Resumen</button>
+        <button type="button" class="pestana" data-plan-vista="planificar">Cultivos</button>
         <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
-        <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
         <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
       </div>
       ${plan.length ? plan.map((p) => {
@@ -1485,6 +1494,9 @@ const plantillas = {
 
     return `
     <div class="tarjeta">
+      <!-- A Configuración se entra desde el engranaje de arriba, que no es una
+           sección de la barra: sin una salida clara quedaba como un callejón. -->
+      <button type="button" class="secundario" id="volver-de-config">← Volver</button>
       <h2>&#127962; La chacra y la temporada</h2>
       <form id="form-config-general">
         <label>Nombre de la chacra</label>
@@ -1975,9 +1987,9 @@ function planEstrategico() {
 
   const cabecera = `
     <div class="pestanas-tareas">
-      <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
-      <button type="button" class="pestana activa" data-plan-vista="grafico">Plan estratégico</button>
-      <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
+      <button type="button" class="pestana" data-plan-vista="lista">Resumen</button>
+        <button type="button" class="pestana" data-plan-vista="planificar">Cultivos</button>
+        <button type="button" class="pestana activa" data-plan-vista="grafico">Plan estratégico</button>
         <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
     </div>`;
 
@@ -2023,15 +2035,28 @@ function planEstrategico() {
 
   const hoyPct = pct(hoy());
   const enPantalla = hoyPct >= 0 && hoyPct <= 100;
+  // Cuánto tiene que medir un tramo, en porcentaje del eje, para que le entre
+  // una fecha como "16/8". Depende del ancho real del gráfico, no de un número
+  // fijo: en el teléfono el mismo tramo es mucho más angosto.
+  const anchoGrafico = Math.max(720, meses.length * 96);
+  const anchoMinimoFecha = (34 / anchoGrafico) * 100;
 
   const filas = gens.map((g) => {
     const t = g.tramos;
     // Recortado a la temporada: lo que empieza antes de julio o sigue después
     // de junio se dibuja hasta el borde, no fuera de él.
-    const seg = (a, b, clase, titulo) => {
+    // Cada tramo lleva su fecha de arranque escrita adentro, que es lo que
+    // permite leer el calendario sin pasar el mouse por encima. Si el tramo es
+    // muy angosto la fecha no entra y se omite: mejor sin texto que con un
+    // número cortado a la mitad.
+    const seg = (a, b, clase, titulo, etiqueta) => {
       const i = Math.max(0, pct(a)), f = Math.min(100, pct(b));
       if (f <= i) return "";
-      return `<div class="${clase}" style="left:${i}%;width:${f - i}%" title="${esc(titulo)}"></div>`;
+      const ancho = f - i;
+      const cabe = ancho >= anchoMinimoFecha;
+      return `<div class="${clase}" style="left:${i}%;width:${ancho}%;background:${
+        colorEtapa(g.cultivo, clase.split(" ")[1])}" title="${esc(titulo)}">${
+        cabe && etiqueta ? `<b>${esc(etiqueta)}</b>` : ""}</div>`;
     };
     const sigue = t.fin > isoDe(d1);
     // Una generación ya sembrada no se puede correr: su fecha es un hecho, no
@@ -2045,11 +2070,12 @@ function planEstrategico() {
       <div class="plan-pista${
         (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado") ? " sembrada" : ""}">
         ${t.directa ? "" : seg(t.inicio, t.campo, "tramo almacigo",
-          `almácigo: ${fechaCorta(t.inicio)} a ${fechaCorta(t.campo)}`)}
+          `almácigo: ${fechaCorta(t.inicio)} a ${fechaCorta(t.campo)}`, diaMes(t.inicio))}
         ${seg(t.campo, t.inicioCosecha || t.fin, "tramo campo",
-          `${t.directa ? "sembrado" : "trasplantado"} el ${fechaCorta(t.campo)}`)}
+          `${t.directa ? "sembrado" : "trasplantado"} el ${fechaCorta(t.campo)}`, diaMes(t.campo))}
         ${t.inicioCosecha ? seg(t.inicioCosecha, t.fin, "tramo cosecha",
-          `cosecha: ${fechaCorta(t.inicioCosecha)} a ${fechaCorta(t.fin)}`) : ""}
+          `cosecha: ${fechaCorta(t.inicioCosecha)} a ${fechaCorta(t.fin)}`,
+          diaMes(t.inicioCosecha)) : ""}
         ${sigue ? `<div class="sigue" title="sigue en cosecha hasta el ${
           fechaCorta(t.fin)}, ya fuera de esta temporada">›</div>` : ""}
       </div>
@@ -2067,7 +2093,7 @@ function planEstrategico() {
             ordenPlan === v ? " checked" : ""}><span>${t}</span></label>`).join("")}
       </div>
       <div class="chips">
-        ${[["todas", "Todas"], ["sembradas", "Sembradas"], ["planificadas", "Planificadas"]]
+        ${[["todas", "Todas"], ["planificadas", "Sin sembrar"], ["sembradas", "Sembradas"]]
           .map(([v, t]) => `<label class="chip"><input type="radio" name="filtro-plan" value="${v}"${
             filtroPlan === v ? " checked" : ""}><span>${t}</span></label>`).join("")}
       </div>
@@ -2078,7 +2104,7 @@ function planEstrategico() {
     días se corrigen con lo que pasa acá, el plan se corrige solo.</p>
 
     <div class="plan-scroll">
-      <div class="plan-grafico" style="--ancho:${Math.max(720, meses.length * 96)}px">
+      <div class="plan-grafico" style="--ancho:${anchoGrafico}px">
         <div class="plan-meses">
           <div class="plan-nombre"></div>
           <div class="plan-pista">
@@ -2104,6 +2130,26 @@ function planEstrategico() {
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun",
                       "jul", "ago", "sep", "oct", "nov", "dic"];
+
+// Un color propio para cada cultivo, sacado de su nombre. Con veintiún
+// cultivos en el mismo gráfico, el color es lo que deja seguir uno con la
+// vista sin leer cada renglón. El tono sale del nombre —siempre el mismo para
+// el mismo cultivo, en cualquier chacra y sin tener que elegirlo a mano— y las
+// tres etapas son el mismo tono en tres claridades, así se distinguen entre
+// ellas sin perder de qué cultivo son.
+function tonoDe(cultivo) {
+  let h = 0;
+  const s = claveArea(cultivo);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  // Se esquivan los rojos puros, que en esta app significan alerta y atraso.
+  return (h < 20 || h > 340) ? (h + 40) % 360 : h;
+}
+const colorEtapa = (cultivo, etapa) => {
+  const h = tonoDe(cultivo);
+  if (etapa === "almacigo") return `hsl(${h} 38% 72%)`;
+  if (etapa === "campo") return `hsl(${h} 42% 55%)`;
+  return `hsl(${h} 52% 34%)`;           // cosecha, la más saturada y oscura
+};
 
 // Correr una generación arrastrándola en el gráfico. Es la forma natural de
 // decir "esto va dos semanas más tarde": se ve contra qué queda, que es
@@ -2272,6 +2318,13 @@ function mapaDeCultivos() {
 
     return `<div class="sector-mapa">
       <h4>${esc(s.sector)} <span>${n} bancales</span></h4>
+      <!-- Los números de bancal van arriba, de izquierda a derecha: sin ellos
+           hay que contar columnas con el dedo para saber cuál es el 17. -->
+      <div class="numeros-bancal" style="--cols:${n}">
+        <span class="hueco"></span>
+        ${Array.from({ length: n }, (_, i) => `<span${
+          (i + 1) % 5 === 0 || i === 0 ? ' class="marcado"' : ""}>${i + 1}</span>`).join("")}
+      </div>
       <div class="grilla" style="--cols:${n}" data-sector="${esc(s.sector)}">
         <div class="meses-y">
           ${filasMes.map((m) => `<div class="mes-y" style="top:${m.top}%;height:${m.alto}%">${m.nombre}</div>`).join("")}
@@ -2316,10 +2369,10 @@ function mapaDeCultivos() {
   <div class="tarjeta">
     <h2>Mapa de cultivos <small>${asignadas.length} de ${todas.length} ubicadas</small></h2>
     <div class="pestanas-tareas">
-      <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
-      <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
-      <button type="button" class="pestana" data-plan-vista="planificar">Planificar</button>
-      <button type="button" class="pestana activa" data-plan-vista="mapa">Mapa</button>
+      <button type="button" class="pestana" data-plan-vista="lista">Resumen</button>
+        <button type="button" class="pestana" data-plan-vista="planificar">Cultivos</button>
+        <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
+        <button type="button" class="pestana activa" data-plan-vista="mapa">Mapa</button>
     </div>
 
     <p class="nota">${sel
@@ -2331,13 +2384,27 @@ function mapaDeCultivos() {
          generación de la lista y después el bancal donde va. Tocá una ya
          puesta para moverla o sacarla.`}</p>
 
-    <div class="mapa-sectores">
-      ${sectores().map(grillaDe).join("")}
-    </div>
-  </div>
+    <!-- El mapa y la lista, lado a lado y cada uno con su propio scroll: al
+         buscar una generación entre setenta y nueve, la lista se desplaza sola
+         y el mapa se queda donde estaba. -->
+    <div class="mapa-con-lista">
+      <div class="mapa-panel">
+        <div class="mapa-zoom">
+          <button type="button" class="secundario" data-zoom="-">−</button>
+          <span id="nivel-zoom">100%</span>
+          <button type="button" class="secundario" data-zoom="+">+</button>
+          <small>arrastrá el mapa para moverlo</small>
+        </div>
+        <div class="mapa-scroll" id="mapa-scroll">
+          <div class="mapa-sectores" id="mapa-lienzo">
+            ${sectores().map(grillaDe).join("")}
+          </div>
+        </div>
+      </div>
 
-  <div class="tarjeta">
-    <h2>Sin ubicar <small>${sueltas.length}</small></h2>
+      <div class="lista-panel">
+        <h3 class="sub">Sin ubicar <small>${sueltas.length}</small></h3>
+        <div class="lista-scroll">
     ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
       <details class="gen-cultivo"${sel && sel.cultivo === cultivo ? " open" : ""}>
         <summary>${esc(cultivo)} <span>${lista.length}</span></summary>
@@ -2355,6 +2422,9 @@ function mapaDeCultivos() {
         }).join("")}
       </details>`).join("")
       : `<p class="nota">Están todas ubicadas.</p>`}
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -2376,11 +2446,11 @@ function pantallaPlanificar() {
 
   return `
   <div class="tarjeta">
-    <h2>Planificar</h2>
+    <h2>Cultivos de la temporada</h2>
     <div class="pestanas-tareas">
-      <button type="button" class="pestana" data-plan-vista="lista">Lista</button>
-      <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
-      <button type="button" class="pestana activa" data-plan-vista="planificar">Planificar</button>
+      <button type="button" class="pestana" data-plan-vista="lista">Resumen</button>
+        <button type="button" class="pestana activa" data-plan-vista="planificar">Cultivos</button>
+        <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
         <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
     </div>
 
@@ -2889,6 +2959,9 @@ function filaRegistro(r) {
 // RENDER Y FORMULARIOS
 // ==========================================================
 function render(vista, conservarScroll = false) {
+  if (vista === "configuracion" && vistaActual !== "configuracion") {
+    vistaPrevia = vistaActual;
+  }
   if (vista !== "cuentas") cuentaAbierta = "";
   vistaActual = vista;
   const scroll = window.scrollY;
@@ -3189,6 +3262,11 @@ function guardarConfig(cambios, mensaje = "Configuración guardada ✓") {
 }
 
 function prepararConfiguracion() {
+  // Volver a donde se estaba. Configuración se abre desde el engranaje y no
+  // desde la barra de secciones, así que sin esto hay que adivinar la salida.
+  const volver = $("#volver-de-config");
+  if (volver) volver.onclick = () => render(vistaPrevia || "inicio");
+
   const reintentar = $("#btn-reintentar-config");
   if (reintentar) {
     reintentar.onclick = async () => {
@@ -4177,9 +4255,56 @@ function prepararPlan() {
   prepararMapa();
 }
 
+// Cuánto se ve el mapa. Queda fuera del render para que no se pierda al
+// redibujar: acomodar el zoom y que se resetee al ubicar una generación sería
+// insoportable.
+let zoomMapa = 1;
+
 function prepararMapa() {
   if (!$(".mapa-sectores")) return;
   const todas = leer(LS.generaciones, []) || [];
+
+  // ---- zoom y desplazamiento ----
+  const lienzo = $("#mapa-lienzo");
+  const scroll = $("#mapa-scroll");
+  const aplicarZoom = () => {
+    lienzo.style.width = `${100 / zoomMapa}%`;
+    lienzo.style.transform = `scale(${zoomMapa})`;
+    $("#nivel-zoom").textContent = `${Math.round(zoomMapa * 100)}%`;
+  };
+  aplicarZoom();
+  document.querySelectorAll("[data-zoom]").forEach((b) => {
+    b.onclick = () => {
+      zoomMapa = Math.min(3, Math.max(0.5,
+        zoomMapa + (b.dataset.zoom === "+" ? 0.25 : -0.25)));
+      aplicarZoom();
+    };
+  });
+
+  // Arrastrar para moverse, agarrando cualquier lugar vacío. No se toma el
+  // gesto sobre un bancal ni sobre una generación: ahí el clic es para ubicar.
+  let ax = 0, ay = 0, sx = 0, sy = 0, moviendo = false;
+  scroll.onpointerdown = (e) => {
+    if (e.target.closest(".cama, [data-puesta]")) return;
+    moviendo = true;
+    ax = e.clientX; ay = e.clientY;
+    sx = scroll.scrollLeft; sy = scroll.scrollTop;
+    scroll.classList.add("moviendo");
+    scroll.setPointerCapture(e.pointerId);
+  };
+  scroll.onpointermove = (e) => {
+    if (!moviendo) return;
+    scroll.scrollLeft = sx - (e.clientX - ax);
+    scroll.scrollTop = sy - (e.clientY - ay);
+  };
+  const soltarMapa = (e) => {
+    if (!moviendo) return;
+    moviendo = false;
+    scroll.classList.remove("moviendo");
+    try { scroll.releasePointerCapture(e.pointerId); } catch (_) { /* ya soltado */ }
+  };
+  scroll.onpointerup = soltarMapa;
+  scroll.onpointercancel = soltarMapa;
 
   const guardarUbicacion = (g, sector, bancales) => {
     guardarRegistro("generaciones", {
