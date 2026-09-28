@@ -38,13 +38,19 @@ Buena parte ya está en AMA (generaciones con fechas encadenadas, Gantt con tres
 tonos y línea de hoy, color por cultivo, mapa de bancales, ficha, "Para
 sembrar" que se apaga al registrar). Lo que queda, en el orden sugerido:
 
-1. **Una sola verdad del plan: las camas van en la generación.** Hoy 71 de las
-   79 generaciones de Tica tienen 0 camas (la importación de Heirloom no las
-   trajo), así que la superficie sale del plan por cultivo de Configuración y
-   las generaciones no la respaldan. En Heirloom todo cuelga de la plantación;
-   acá debería ser igual: superficie y kg del cultivo = suma de sus
-   generaciones. Es lo que hace confiable a la Proyección. Primero hay que
-   completar las camas (con el Excel de Heirloom si las trae, o a mano).
+1. **Una sola verdad del plan: las camas van en la generación.** En Heirloom
+   todo cuelga de la plantación; acá debería ser igual: superficie y kg del
+   cultivo = suma de sus generaciones. Es lo que hace confiable a la
+   Proyección.
+   *Camas completadas el 28/09*: 64 generaciones no las tenían porque Heirloom
+   exporta "Cantidad (cama)" como "-" cuando la plantación no está asignada en
+   su mapa; se sacaron de "Cantidad (m)" ÷ 30. Solo se llenaron celdas vacías.
+   Ahora las 79 tienen camas (116 en total). **Falta decidir** qué pasa con los
+   cultivos donde las generaciones y el plan de Configuración no coinciden:
+   Ajo, Cebolla, Choclos, Espinaca, Mizuna, Remolacha y Zanahoria no tienen
+   generaciones; Albahaca (2 vs 1), Coliflor (7 vs 8), Mix de hojas (8 vs 5),
+   Rabanito (5 vs 3) y Repollo bco (8 vs 15) difieren; Zapallito tiene 8 que
+   en Configuración están repartidas en Zapallito 4 + Zucchini 4.
 2. **Validar rangos plausibles** de rinde (kg/m²), días y distancias al
    planificar y al cargar un cultivo, con aviso visible. Heirloom dejó pasar
    un apio de 120.120 kg; ahora que la Proyección multiplica por precio, un
