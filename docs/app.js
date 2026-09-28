@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 54 · 28/9/2026";
+const VERSION_APP = "versión 55 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -504,6 +504,37 @@ const bancalM2 = () => {
   const b = CFG?.bancal || {};
   return (b.largo_m || 0) * (b.ancho_m || 0);
 };
+
+// El plan por cultivo de la configuración sale de sus generaciones (decidido el
+// 28/09): superficie = camas × m² del bancal, kilos = superficie × rinde. Se
+// rehace cada vez que las generaciones cambian, así Inicio y la Proyección de
+// AMA Economía no pueden quedar diciendo otra cosa que el plan estratégico.
+// El rinde, las líneas y la distancia son decisiones del cultivo: se conservan.
+// Sin generaciones, el cultivo sale del plan.
+function replanearCultivo(cultivo, generaciones) {
+  const m2 = bancalM2();
+  if (!m2 || !CFG) return;
+  const k = claveArea(cultivo);
+  const ya = (CFG.plan || []).find((p) => claveArea(p.cultivo) === k) || {};
+  const plan = (CFG.plan || []).filter((p) => claveArea(p.cultivo) !== k);
+  const bancales = generaciones.filter((g) => claveArea(g.cultivo) === k)
+    .reduce((a, g) => a + (Number(g.camas) || 0), 0);
+  if (bancales) {
+    const p = perfil(cultivo) || {};
+    const superficie = Math.round(bancales * m2 * 100) / 100;
+    const rinde = ya.rinde_kg_m2 || p.rinde_ref_kg_m2 || 0;
+    const lineas = ya.lineas || p.lineas_bancal || 0;
+    const distancia = ya.distancia_cm || p.distancia_cm || 0;
+    plan.push({
+      cultivo: ya.cultivo || cultivo, superficie_m2: superficie,
+      cosecha_esperada_kg: Math.round(superficie * rinde),
+      rinde_kg_m2: rinde, lineas, distancia_cm: distancia,
+      plantas: plantasDe({ bancales, lineas, distancia_cm: distancia }),
+    });
+  }
+  plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
+  guardarConfig({ plan }, "", "");
+}
 
 // En Chacra Tica los nombres salen también de la planilla de horas del proyecto,
 // que es donde está el historial; en las demás, solo de su configuración.
@@ -2354,7 +2385,9 @@ function prepararPanelGeneracion() {
   if (quitar) quitar.onclick = () => {
     if (!confirm(`¿Sacar ${g.cultivo} G${g.generacion} del plan?`)) return;
     guardarRegistro("generacion_borrar", { generacion_id: g.id }, "Sacada del plan ✓");
-    escribir(LS.generaciones, (leer(LS.generaciones, []) || []).filter((x) => x.id !== g.id));
+    const quedan = (leer(LS.generaciones, []) || []).filter((x) => x.id !== g.id);
+    escribir(LS.generaciones, quedan);
+    replanearCultivo(g.cultivo, quedan);
     genPanel = "";
     render("plan", true);
   };
@@ -4913,7 +4946,11 @@ function prepararGeneraciones() {
       if (!confirm("¿Sacar esta generación del plan?")) return;
       guardarRegistro("generacion_borrar", { generacion_id: id }, "Sacada del plan ✓");
       // Se saca de la copia local para que no siga a la vista hasta sincronizar.
-      escribir(LS.generaciones, (leer(LS.generaciones, []) || []).filter((g) => g.id !== id));
+      const todas = leer(LS.generaciones, []) || [];
+      const sacada = todas.find((g) => g.id === id);
+      const quedan = todas.filter((g) => g.id !== id);
+      escribir(LS.generaciones, quedan);
+      if (sacada) replanearCultivo(sacada.cultivo, quedan);
       render("plan");
     };
   });

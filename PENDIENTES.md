@@ -45,12 +45,17 @@ sembrar" que se apaga al registrar). Lo que queda, en el orden sugerido:
    *Camas completadas el 28/09*: 64 generaciones no las tenían porque Heirloom
    exporta "Cantidad (cama)" como "-" cuando la plantación no está asignada en
    su mapa; se sacaron de "Cantidad (m)" ÷ 30. Solo se llenaron celdas vacías.
-   Ahora las 79 tienen camas (116 en total). **Falta decidir** qué pasa con los
-   cultivos donde las generaciones y el plan de Configuración no coinciden:
-   Ajo, Cebolla, Choclos, Espinaca, Mizuna, Remolacha y Zanahoria no tienen
-   generaciones; Albahaca (2 vs 1), Coliflor (7 vs 8), Mix de hojas (8 vs 5),
-   Rabanito (5 vs 3) y Repollo bco (8 vs 15) difieren; Zapallito tiene 8 que
-   en Configuración están repartidas en Zapallito 4 + Zucchini 4.
+   Ahora las 79 tienen camas (116 en total).
+   *Decidido y hecho el 28/09*: **mandan las generaciones** ("las de Heirloom
+   son las más actualizadas; después las modifico desde AMA"). El plan de
+   Configuración de Tica se rehízo con `tools/plan_desde_generaciones.py`:
+   21 cultivos, 2.784 m², 11.184 kg (antes 29, 4.236 m², 17.172 kg). Salieron
+   Ajo, Cebolla, Choclos, Espinaca, Mizuna, Remolacha, Zanahoria y Zucchini,
+   que no tienen generaciones; el plan anterior quedó en la hoja oculta
+   "Config anterior". Desde la versión 55, sacar una generación en AMA
+   también rehace el plan del cultivo (`replanearCultivo`); agregar ya lo
+   hacía. **Falta**: editar las camas de una generación existente desde AMA
+   (hoy solo se puede correr, ubicar en el mapa o sacar).
 2. **Validar rangos plausibles** de rinde (kg/m²), días y distancias al
    planificar y al cargar un cultivo, con aviso visible. Heirloom dejó pasar
    un apio de 120.120 kg; ahora que la Proyección multiplica por precio, un
