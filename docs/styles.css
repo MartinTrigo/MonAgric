@@ -1394,3 +1394,86 @@ h3.sub {
   }
   body.a-lo-ancho .mapa-con-lista { grid-template-columns: minmax(0, 1fr) 280px; }
 }
+
+/* ---- el detalle de una generación, al tocar su barra ----
+   Un cajón a la derecha que se superpone al gráfico sin moverlo: se sigue
+   viendo la barra que se tocó y las vecinas. */
+.panel-gen {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 92vw);
+  background: #fff;
+  border-left: 1px solid var(--sage-light);
+  box-shadow: -8px 0 24px rgba(0,0,0,.12);
+  padding: 18px 18px 90px;
+  overflow-y: auto;
+  z-index: 20;
+}
+.panel-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.panel-cab h3 { margin: 0 0 5px; font-size: 1.2rem; color: var(--sage-dark); }
+.panel-cab h3 span { color: var(--tenue); font-weight: 500; }
+.cerrar-panel {
+  border: none;
+  background: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--tenue);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* Las etapas en línea de tiempo: una marca por etapa y su estado. */
+.panel-etapas { margin-bottom: 16px; }
+.etapa {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px;
+  padding-bottom: 14px;
+  position: relative;
+}
+.etapa:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 18px;
+  bottom: 0;
+  width: 2px;
+  background: var(--sage-light);
+}
+.etapa-marca {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--sage-light);
+  background: #fff;
+  margin-top: 1px;
+}
+.etapa.hecha .etapa-marca { background: var(--sage); border-color: var(--sage); }
+.etapa.hecha .etapa-marca::after {
+  content: "✓"; color: #fff; font-size: .7rem; display: block;
+  text-align: center; line-height: 14px; font-weight: 700;
+}
+.etapa.curso .etapa-marca { border-color: var(--amber); background: #fdf1dc; }
+.etapa.atrasada .etapa-marca { border-color: var(--peligro); background: #fbe9e7; }
+.etapa-texto b { display: block; font-size: .92rem; }
+.etapa-texto span { font-size: .82rem; color: var(--tenue); }
+.etapa.atrasada .etapa-texto span { color: var(--peligro); font-weight: 600; }
+.etapa-texto small { display: block; font-size: .8rem; color: var(--sage-dark); margin-top: 2px; }
+.etapa-texto button { margin-top: 7px; padding: 6px 12px; font-size: .83rem; }
+
+.panel-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.panel-acciones button { margin: 0; }
+button.peligro { color: var(--peligro); border-color: #f0c9c3; }
+
+/* La barra abierta se marca en el gráfico. */
+.plan-gen.abierta .plan-nombre { font-weight: 700; color: var(--sage-dark); }
+.plan-gen.abierta .plan-pista { outline: 2px solid var(--amber); outline-offset: 1px; }
+.plan-gen { cursor: pointer; }

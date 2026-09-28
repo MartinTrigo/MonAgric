@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 52 · 28/9/2026";
+const VERSION_APP = "versión 53 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2112,8 +2112,8 @@ function planEstrategico() {
     // Una generación ya sembrada no se puede correr: su fecha es un hecho, no
     // una intención. Las planificadas sí, arrastrándolas.
     const movible = !(("sembrada" in g) ? g.sembrada : g.estado === "Sembrado");
-    return `<div class="plan-gen${movible ? " movible" : ""}"
-                 ${movible ? `data-mover="${esc(g.id)}"` : ""}>
+    return `<div class="plan-gen${movible ? " movible" : ""}${g.id === genPanel ? " abierta" : ""}"
+                 data-gen="${esc(g.id)}" ${movible ? `data-mover="${esc(g.id)}"` : ""}>
       <div class="plan-nombre" title="${esc(g.cultivo)} G${g.generacion}">
         ${esc(g.cultivo)} <span>G${g.generacion}</span>
       </div>
@@ -2175,7 +2175,11 @@ function planEstrategico() {
       <span><i class="m-cosecha"></i> en cosecha</span>
       ${enPantalla ? `<span><i class="m-hoy"></i> hoy</span>` : ""}
     </div>
-  </div>`;
+  </div>
+  ${(() => {
+    const g = (leer(LS.generaciones, []) || []).find((x) => x.id === genPanel);
+    return g ? panelGeneracion(g) : "";
+  })()}`;
 }
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun",
@@ -2200,6 +2204,161 @@ const colorEtapa = (cultivo, etapa) => {
   if (etapa === "campo") return `hsl(${h} 42% 55%)`;
   return `hsl(${h} 52% 34%)`;           // cosecha, la más saturada y oscura
 };
+
+// ---- El detalle de una generación, al tocar su barra ----
+// Todo lo que se sabe de esa generación y en qué etapa está. Qué se hizo lo
+// dicen las hojas de registros —Siembras y Trasplantes—, no un tilde: el panel
+// muestra lo que hay, y para marcar algo como hecho lleva al formulario que lo
+// registra con los datos ya puestos.
+let genPanel = "";
+// Lo elegido en el panel para cargar como trasplante; lo usa el formulario.
+let trasplanteSugerido = null;
+
+function panelGeneracion(g) {
+  const t = tramosDe(g) || {};
+  const p = perfil(g.cultivo) || {};
+  const sembrada = ("sembrada" in g) ? g.sembrada : g.estado === "Sembrado";
+
+  // El trasplante sale de la ficha del cultivo, que trae todos sus registros.
+  const ficha = (leer(LS.fichas, {}) || {})[g.cultivo];
+  const tr = (ficha?.trasplantes || []).filter((x) =>
+    Number(x.generacion) === Number(g.generacion)
+    || (g.siembra_id && x.siembra_id === g.siembra_id));
+  const trasplantada = tr.length > 0;
+  const cosechado = ficha?.kg_cosechados || 0;
+  const hoyIso = hoy();
+
+  // Cada etapa: hecha, en curso, atrasada o por venir. Lo que ya pasó sin
+  // registro se marca atrasado: es lo único de la lista que pide hacer algo.
+  const estado = (hecha, desde, hasta) => hecha ? ["hecha", "hecho"]
+    : (desde && desde < hoyIso && (!hasta || hasta < hoyIso)) ? ["atrasada", "sin registrar"]
+    : (desde && desde <= hoyIso) ? ["curso", "en curso"]
+    : ["futura", "por venir"];
+
+  const etapas = [
+    !t.directa && {
+      nombre: "Siembra en bandeja", fecha: t.inicio,
+      e: estado(sembrada, t.inicio),
+      detalle: sembrada && g.sembrada_el ? `registrada el ${fechaCorta(g.sembrada_el)}` : "",
+      boton: sembrada ? "" : `<button type="button" class="secundario" data-panel-sembrar>Registrar siembra</button>`,
+    },
+    {
+      nombre: t.directa ? "Siembra directa" : "Trasplante al bancal", fecha: t.campo,
+      e: t.directa ? estado(sembrada, t.campo) : estado(trasplantada, t.campo),
+      detalle: t.directa
+        ? (sembrada && g.sembrada_el ? `registrada el ${fechaCorta(g.sembrada_el)}` : "")
+        : (trasplantada ? `registrado el ${fechaCorta(tr[0].fecha)}${
+            tr[0].dias_reales ? ` · ${tr[0].dias_reales} días en bandeja` : ""}` : ""),
+      boton: t.directa
+        ? (sembrada ? "" : `<button type="button" class="secundario" data-panel-sembrar>Registrar siembra</button>`)
+        : (trasplantada ? "" : `<button type="button" class="secundario" data-panel-trasplantar>Registrar trasplante</button>`),
+    },
+    t.inicioCosecha && {
+      nombre: "Cosecha", fecha: t.inicioCosecha, hasta: t.fin,
+      e: estado(false, t.inicioCosecha, t.fin),
+      // Las cosechas se cargan por cultivo, no por generación: lo que hay es
+      // el total del cultivo, y se dice así para no inventar un número.
+      detalle: cosechado ? `${num(cosechado, 1)} kg cosechados de ${esc(g.cultivo)} en total` : "",
+      boton: "",
+    },
+  ].filter(Boolean);
+
+  const lugar = g.sector && bancalesDe(g).length
+    ? `${esc(g.sector)} · bancal${bancalesDe(g).length > 1 ? "es" : ""} ${bancalesDe(g).join(", ")}`
+    : "sin ubicar en el mapa";
+
+  return `<aside class="panel-gen" role="dialog" aria-label="${esc(g.cultivo)} G${g.generacion}">
+    <div class="panel-cab">
+      <div>
+        <h3>${esc(g.cultivo)} <span>G${g.generacion}</span></h3>
+        <span class="etiqueta ${sembrada ? "ok" : ""}">${sembrada ? "sembrada" : "planificada"}</span>
+      </div>
+      <button type="button" class="cerrar-panel" id="cerrar-panel" aria-label="Cerrar">&times;</button>
+    </div>
+
+    <div class="panel-etapas">
+      ${etapas.map((x) => `<div class="etapa ${x.e[0]}">
+        <div class="etapa-marca"></div>
+        <div class="etapa-texto">
+          <b>${x.nombre}</b>
+          <span>${fechaCorta(x.fecha)}${x.hasta ? ` al ${fechaCorta(x.hasta)}` : ""} · ${x.e[1]}</span>
+          ${x.detalle ? `<small>${x.detalle}</small>` : ""}
+          ${x.boton}
+        </div>
+      </div>`).join("")}
+    </div>
+
+    <div class="datos">
+      <div class="dato"><span>Dónde</span><b>${lugar}</b></div>
+      <div class="dato"><span>Camas</span><b>${num(Number(g.camas) || 0, 1)}</b></div>
+      <div class="dato"><span>Método</span><b>${esc(g.metodo || (t.directa ? "Siembra directa" : "Trasplante"))}</b></div>
+      ${p.lineas_bancal ? `<div class="dato"><span>Marco</span><b>${num(p.lineas_bancal)} líneas a ${num(p.distancia_cm)} cm</b></div>` : ""}
+    </div>
+
+    <div class="panel-acciones">
+      <button type="button" class="secundario" data-panel-ficha>Ver ficha del cultivo</button>
+      ${sembrada ? "" : `<button type="button" class="secundario peligro" data-panel-quitar>Sacar del plan</button>`}
+    </div>
+    <p class="nota">Para correr las fechas, arrastrá la barra en el gráfico.</p>
+  </aside>`;
+}
+
+function prepararPanelGeneracion() {
+  // Tocar una barra abre su detalle; tocarla de nuevo lo cierra.
+  document.querySelectorAll("[data-gen]").forEach((fila) => {
+    fila.addEventListener("click", () => {
+      if (fila.dataset.recienMovida) { delete fila.dataset.recienMovida; return; }
+      genPanel = genPanel === fila.dataset.gen ? "" : fila.dataset.gen;
+      const g = (leer(LS.generaciones, []) || []).find((x) => x.id === genPanel);
+      render("plan", true);
+      // El estado del trasplante sale de la ficha del cultivo.
+      if (g) traerFicha(g.cultivo);
+    });
+  });
+
+  const panel = $(".panel-gen");
+  if (!panel) return;
+  const g = (leer(LS.generaciones, []) || []).find((x) => x.id === genPanel);
+  if (!g) return;
+
+  $("#cerrar-panel").onclick = () => { genPanel = ""; render("plan", true); };
+  // Escape también cierra, que es lo que se espera de un panel así.
+  document.onkeydown = (e) => {
+    if (e.key === "Escape" && genPanel) { genPanel = ""; render("plan", true); }
+  };
+
+  // Registrar algo lleva al formulario con los datos puestos. Lo que marca la
+  // etapa como hecha es ese registro, no un tilde en el plan.
+  panel.querySelectorAll("[data-panel-sembrar]").forEach((b) => {
+    b.onclick = () => {
+      siembraSugerida = { cultivo: g.cultivo, generacion: g.generacion,
+                          directa: !g.fecha_almacigo };
+      genPanel = "";
+      render("siembras");
+    };
+  });
+  panel.querySelectorAll("[data-panel-trasplantar]").forEach((b) => {
+    b.onclick = () => {
+      trasplanteSugerido = { cultivo: g.cultivo, generacion: g.generacion,
+                             siembra_id: g.siembra_id || "" };
+      genPanel = "";
+      render("trasplantes");
+    };
+  });
+  const ficha = panel.querySelector("[data-panel-ficha]");
+  if (ficha) ficha.onclick = () => {
+    cultivoAbierto = g.cultivo; genPanel = "";
+    render("plan");
+  };
+  const quitar = panel.querySelector("[data-panel-quitar]");
+  if (quitar) quitar.onclick = () => {
+    if (!confirm(`¿Sacar ${g.cultivo} G${g.generacion} del plan?`)) return;
+    guardarRegistro("generacion_borrar", { generacion_id: g.id }, "Sacada del plan ✓");
+    escribir(LS.generaciones, (leer(LS.generaciones, []) || []).filter((x) => x.id !== g.id));
+    genPanel = "";
+    render("plan", true);
+  };
+}
 
 // Correr una generación arrastrándola en el gráfico. Es la forma natural de
 // decir "esto va dos semanas más tarde": se ve contra qué queda, que es
@@ -2230,7 +2389,7 @@ function engancharArrastre() {
       arrastrando = true;
       x0 = e.clientX;
       corrido = 0;
-      barra.setPointerCapture(e.pointerId);
+      try { barra.setPointerCapture(e.pointerId); } catch (_) { /* sin captura igual anda */ }
       fila.classList.add("arrastrando");
     };
 
@@ -2250,6 +2409,9 @@ function engancharArrastre() {
       delete fila.querySelector(".plan-nombre").dataset.corrido;
       try { barra.releasePointerCapture(e.pointerId); } catch (_) { /* ya soltado */ }
       if (!corrido) return;
+      // Si se movio, el clic que el navegador dispara al soltar no abre el
+      // panel: se arrastraba, no se queria ver el detalle.
+      fila.dataset.recienMovida = "1";
       correrGeneracion(fila.dataset.mover, corrido);
     };
     barra.onpointerup = soltar;
@@ -2996,7 +3158,9 @@ async function traerFicha(cultivo, forzar = false) {
     const cambio = JSON.stringify(fichas[cultivo] || null) !== JSON.stringify(d);
     fichas[cultivo] = d;
     escribir(LS.fichas, fichas);
-    if (cambio && vistaActual === "plan" && cultivoAbierto === cultivo) {
+    const delPanel = (leer(LS.generaciones, []) || []).find((x) => x.id === genPanel);
+    if (cambio && vistaActual === "plan"
+        && (cultivoAbierto === cultivo || delPanel?.cultivo === cultivo)) {
       render("plan", true);
     }
   } catch { /* sin señal: se muestra lo último que se bajó */ }
@@ -3158,6 +3322,7 @@ function render(vista, conservarScroll = false) {
     r.onchange = () => { filtroPlan = r.value; render("plan", true); };
   });
   engancharArrastre();
+  prepararPanelGeneracion();
   // El plan también lo necesita Inicio, para avisar qué toca sembrar.
   if (vista === "plan" || vista === "inicio") traerGeneraciones();
 
@@ -4258,6 +4423,26 @@ function prepararTrasplantes() {
   };
 
   f.siembra_id.addEventListener("change", alElegir);
+
+  // Si se llegó desde el detalle de una generación en el plan, el formulario
+  // arranca con su cultivo y su generación. Si su almácigo está en la lista,
+  // se elige también, que es lo que permite medir los días reales en bandeja.
+  if (trasplanteSugerido) {
+    const s = trasplanteSugerido;
+    trasplanteSugerido = null;             // se usa una sola vez
+    const op = s.siembra_id && [...f.siembra_id.options].find((o) => o.value === s.siembra_id);
+    if (op) {
+      f.siembra_id.value = s.siembra_id;
+      alElegir();
+    } else {
+      f.cultivo.value = s.cultivo;
+      const caja = f.querySelector("[data-buscador] .buscador-texto");
+      if (caja) caja.value = s.cultivo;
+      sugerirMarco(s.cultivo);
+    }
+    f.generacion.value = s.generacion || 1;
+    aviso(`${s.cultivo} G${s.generacion}: completá los bancales y guardá`);
+  }
   ["lineas", "distancia_cm", "plantines"].forEach((n) =>
     f[n].addEventListener("input", recalcular));
   f.disposicion.addEventListener("change", recalcular);
@@ -4438,7 +4623,7 @@ function prepararMapa() {
     ax = e.clientX; ay = e.clientY;
     sx = scroll.scrollLeft; sy = scroll.scrollTop;
     scroll.classList.add("moviendo");
-    scroll.setPointerCapture(e.pointerId);
+    try { scroll.setPointerCapture(e.pointerId); } catch (_) { /* sin captura igual anda */ }
   };
   scroll.onpointermove = (e) => {
     if (!moviendo) return;
