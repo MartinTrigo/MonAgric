@@ -551,10 +551,10 @@ function leerConfigDe(libro, chacra) {
     else if (seccion === "temporada") cfg.temporada[clave] = texto(f[2]);
     else if (seccion === "bancal") cfg.bancal[clave] = Number(f[2]) || 0;
     else if (seccion === "sector") {
-      /* Fila y columna dicen donde esta el sector en el campo, no en que
-         orden se cargo: Verano queda abajo a la izquierda porque ahi esta.
-         Los sectores viejos no las tienen y valen 0, que el mapa acomoda
-         solo en una fila. */
+      /* Fila y columna dicen donde esta el sector en el lienzo del mapa, en
+         pasos de 25 px: columna = x / 25 + 1, fila = y / 25 + 1 (desde el
+         28/09; antes eran fila y columna de una grilla, que nadie llego a
+         usar). 0 = nunca se acomodo: el mapa lo pone solo. */
       cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0,
                           tipo_riego: String(f[3] || ""),
                           fila: Number(f[4]) || 0, columna: Number(f[5]) || 0 });

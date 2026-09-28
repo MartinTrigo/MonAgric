@@ -411,6 +411,7 @@ button.secundario {
   margin: 10px 0;
 }
 .croquis {
+  min-width: 0;
   border: 1px solid var(--sage-light);
   border-radius: 9px;
   padding: 9px 10px;
@@ -552,18 +553,6 @@ button.secundario {
 .mapa-zoom span { font-size: .85rem; font-weight: 600; min-width: 3.2rem; }
 .mapa-zoom small { color: var(--tenue); font-size: .76rem; }
 
-.mapa-scroll {
-  overflow: auto;
-  max-height: 62vh;
-  border: 1px solid var(--sage-light);
-  border-radius: 8px;
-  padding: 10px;
-  background: var(--crema);
-  cursor: grab;
-  overscroll-behavior: contain;
-}
-.mapa-scroll.moviendo { cursor: grabbing; }
-
 .lista-panel { min-width: 0; }
 .lista-scroll {
   max-height: 58vh;
@@ -572,152 +561,184 @@ button.secundario {
   padding-right: 4px;
 }
 
-.mapa-sectores {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 18px;
-  /* El zoom escala desde arriba a la izquierda para que al achicar no se vaya
-     el mapa fuera de la vista. */
+/* ---- el lienzo del mapa ----
+   Una ventana fija por la que se mira un lienzo grande. Los sectores son
+   objetos puestos en ese lienzo: se arrastran por el título, y el lienzo
+   entero se desplaza y se acerca con transform, que es lo único que cambia
+   al moverse (redibujar setenta y nueve generaciones en cada cuadro sería
+   lento). Las medidas en píxeles salen de LZ en app.js. */
+.lz-vista {
+  position: relative;
+  height: 62vh;
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--sage-light);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle, #dfe5da 1px, transparent 1.2px) 0 0 / 25px 25px,
+    var(--crema);
+  cursor: grab;
+  touch-action: none;          /* el dedo mueve el mapa, no la página */
+  user-select: none;
+}
+.lz-vista.moviendo { cursor: grabbing; }
+.lz-lienzo {
+  position: absolute;
+  left: 0; top: 0;
   transform-origin: 0 0;
 }
-
-/* Los números de bancal, alineados con las columnas de la grilla. */
-.numeros-bancal {
-  display: grid;
-  grid-template-columns: 26px repeat(var(--cols), 1fr);
-  font-size: .52rem;
-  color: var(--tenue);
-  text-align: center;
-  margin-bottom: 1px;
+.lz-bloque {
+  position: absolute;
+  background: #fff;
+  border: 1px solid var(--sage-light);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
 }
-.numeros-bancal span { overflow: hidden; }
-.numeros-bancal .marcado { color: var(--sage-dark); font-weight: 700; }
-.sector-mapa h4 {
-  margin: 0 0 6px;
-  font-size: .9rem;
-  color: var(--sage-dark);
+.lz-bloque.levantado {
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  border-color: var(--amber);
+  z-index: 20;
+  opacity: .92;
+}
+.lz-cab {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 30px;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-/* El agarre para mover un sector a otro lugar del campo. */
-.agarre {
-  border: 1px solid var(--sage-light);
-  background: #fff;
-  color: var(--sage-dark);
-  border-radius: 6px;
-  width: 24px;
-  height: 22px;
-  padding: 0;
-  font-size: .85rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.agarre:hover { background: var(--sage-suave); }
-/* El sector levantado se ve distinto mientras se elige dónde soltarlo. */
-.sector-mapa.levantado {
-  outline: 2px dashed var(--amber);
-  outline-offset: 4px;
-  border-radius: 6px;
-  opacity: .75;
-}
-.sector-mapa.levantado .agarre { background: var(--amber); color: #fff; border-color: var(--amber); }
-
-/* Donde se puede soltar: aparecen solo mientras se mueve un sector. */
-.celda-destino {
-  min-height: 120px;
-  border: 2px dashed var(--sage);
-  border-radius: 8px;
-  background: rgba(143,174,125,.14);
-  color: var(--sage-dark);
-  font-family: inherit;
-  font-size: .82rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.celda-destino:hover { background: rgba(143,174,125,.32); }
-/* Soltar sobre otro sector los intercambia: la celda se pone encima de él. */
-.celda-destino.con-sector {
-  background: rgba(233,168,58,.18);
-  border-color: var(--amber);
-  z-index: 4;
-  align-self: stretch;
-}
-.sector-mapa h4 span { font-weight: 400; color: var(--tenue); font-size: .8rem; }
-
-.grilla {
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  height: 300px;
-  border: 1px solid var(--sage-light);
-  border-radius: 6px;
+  gap: 7px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--sage-light);
+  border-radius: 8px 8px 0 0;
+  background: var(--sage-suave);
+  cursor: move;
+  white-space: nowrap;
   overflow: hidden;
-  background: #fff;
 }
-.meses-y { position: relative; background: var(--crema); }
-.mes-y {
+.lz-cab b { font-size: .92rem; color: var(--sage-dark); }
+.lz-dato { font-size: .74rem; color: var(--tenue); }
+.lz-asa { color: var(--tenue); font-size: .9rem; line-height: 1; }
+.lz-numeros {
+  position: absolute;
+  top: 33px;
+  display: flex;
+  font-size: 9px;
+  color: var(--tenue);
+}
+.lz-numeros span { width: 22px; text-align: center; }
+.lz-numeros .marcado { color: var(--sage-dark); font-weight: 700; }
+.lz-meses { position: absolute; width: 30px; }
+.lz-meses span {
+  position: absolute;
+  left: 0; right: 2px;
+  font-size: 9px;
+  color: var(--tenue);
+  text-transform: uppercase;
+  text-align: right;
+  padding-top: 2px;
+}
+.lz-grilla {
+  position: absolute;
+  border: 1px solid var(--sage-light);
+  background:
+    repeating-linear-gradient(to right, transparent 0 calc(var(--bancal) - 1px),
+      #edf0ea calc(var(--bancal) - 1px) var(--bancal)),
+    #fff;
+}
+.lz-linea-mes {
   position: absolute;
   left: 0; right: 0;
-  font-size: .58rem;
-  color: var(--tenue);
-  text-align: center;
-  border-top: 1px solid var(--sage-light);
-  padding-top: 1px;
-  text-transform: uppercase;
+  border-top: 1px solid #e2e7de;
 }
-
-.camas {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--cols), 1fr);
+.lz-hoy {
+  position: absolute;
+  left: -6px; right: 0;
+  height: 0;
+  border-top: 2px solid #c0392b;
+  z-index: 4;
+  pointer-events: none;
 }
-.cama {
-  border-left: 1px solid #eef1ec;
-  min-width: 0;
-}
-.cama:first-child { border-left: none; }
-/* Con una generación elegida, el campo se divide en dónde entra y dónde no.
-   Es lo que convierte el mapa en una ayuda para decidir. */
-.cama.libre {
-  background: rgba(143,174,125,.22);
-  cursor: pointer;
-}
-.cama.libre:hover { background: rgba(143,174,125,.55); }
-.cama.ocupada { background: rgba(192,57,43,.05); }
-
-.puesta {
+.lz-puesta {
   position: absolute;
   border-radius: 3px;
-  background: #8fae7d;
-  border: 1px solid rgba(0,0,0,.12);
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
+  z-index: 2;
   display: flex;
-  align-items: flex-start;
-  padding: 1px 2px;
+  padding: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
 }
-.puesta.sembrada { background: #3d6b35; }
-.puesta.elegida {
-  outline: 2px solid var(--amber);
-  outline-offset: -1px;
-  z-index: 3;
-}
-.puesta span {
-  font-size: .55rem;
-  line-height: 1.1;
+.lz-puesta:hover { box-shadow: inset 0 0 0 2px rgba(0,0,0,.35); }
+.lz-puesta.elegida { box-shadow: 0 0 0 2px var(--amber); z-index: 3; }
+.lz-puesta.levantada { opacity: .35; }
+.lz-puesta span {
+  font-size: 9px;
+  line-height: 1.15;
   color: #fff;
   white-space: nowrap;
   writing-mode: vertical-rl;
   text-orientation: mixed;
+  text-shadow: 0 0 2px rgba(0,0,0,.35);
 }
-.hoy-y {
+.lz-puesta.acostada span { writing-mode: horizontal-tb; font-weight: 600; }
+.lz-puesta.acostada small { display: block; font-weight: 400; opacity: .9; }
+/* Mientras se arrastra: los bancales libres en esas fechas, y dónde caería. */
+.lz-previa { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.lz-libre {
   position: absolute;
-  left: 0; right: 0;
-  height: 2px;
-  background: #c0392b;
-  z-index: 2;
+  background: rgba(143,174,125,.28);
   pointer-events: none;
+}
+.lz-destino {
+  position: absolute;
+  background: rgba(61,107,53,.55);
+  outline: 2px solid var(--sage-dark);
+  border-radius: 3px;
+}
+.lz-destino.choca { background: rgba(192,57,43,.45); outline-color: #c0392b; }
+.lz-flotante {
+  position: fixed;
+  z-index: 1000;
+  padding: 5px 10px;
+  border-radius: 14px;
+  color: #fff;
+  font-size: .8rem;
+  font-weight: 600;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,.22);
+  white-space: nowrap;
+}
+body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
+.lz-estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+  font-size: .88rem;
+}
+.lz-estado .secundario { margin: 0; padding: 5px 12px; width: auto; }
+.lz-ayuda { color: var(--tenue); font-size: .82rem; }
+.lz-arrastrable { display: flex; align-items: center; justify-content: space-between; cursor: grab; }
+.lz-color {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.mapa-zoom .ajustar { width: auto; padding: 4px 12px; font-size: .85rem; }
+
+/* Cultivos: el formulario y lo planificado, lado a lado en la notebook. */
+.planificar-dos { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.planificar-form, .planificar-lista { min-width: 0; }
+@media (min-width: 900px) {
+  .planificar-dos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+  .planificar-lista {
+    border-left: 1px solid var(--sage-light);
+    padding-left: 24px;
+  }
+  .planificar-lista .lista-scroll { max-height: calc(100vh - 290px); }
 }
 
 .registro.elegible { cursor: pointer; }
@@ -894,7 +915,7 @@ button.secundario {
   /* El gráfico y el mapa necesitan todo el ancho: partidos en dos columnas se
      vuelven ilegibles. */
   #vista > .tarjeta:has(.plan-grafico),
-  #vista > .tarjeta:has(.mapa-sectores),
+  #vista > .tarjeta:has(.lz-vista),
   /* La tarjeta con la barra de Plan es el marco de la seccion: partida en
      una de tres columnas, la barra y su contenido quedaban en 500 px. */
   #vista > .tarjeta:has(.plan-nav) { column-span: all; }
@@ -1386,13 +1407,8 @@ h3.sub {
   body.a-lo-ancho #vista { columns: 1; }
 
   /* El mapa y la lista llenan el alto disponible, no una fracción fija. */
-  body.a-lo-ancho .mapa-scroll { max-height: calc(100vh - 250px); }
-  body.a-lo-ancho .lista-scroll { max-height: calc(100vh - 290px); }
-  /* Cada grilla se reparte el alto según cuántas filas de sectores hay: con
-     el campo en dos filas, entero en la pantalla sin tener que bajar. */
-  body.a-lo-ancho .grilla {
-    height: max(240px, calc((100vh - 300px) / var(--filas-mapa, 1) - 62px));
-  }
+  body.a-lo-ancho .lz-vista { height: max(420px, calc(100vh - 260px)); }
+  body.a-lo-ancho .lista-scroll { max-height: calc(100vh - 300px); }
   body.a-lo-ancho .mapa-con-lista { grid-template-columns: minmax(0, 1fr) 280px; }
 }
 

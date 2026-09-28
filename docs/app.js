@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 55 · 28/9/2026";
+const VERSION_APP = "versión 56 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1479,14 +1479,16 @@ const plantillas = {
       <p class="nota">Cada croquis muestra los bancales del sector y cuántos
       están ocupados por el plan. Desde el teléfono es la forma de ver cómo
       quedó el campo sin abrir el mapa.</p>
-      <div class="croquis-sectores" style="${(() => {
-        // La misma disposición que en el mapa: el croquis del teléfono tiene
-        // que parecerse al campo, no a una lista.
-        const ps = sectores().map((s, i) => ({
-          f: Number(s.fila) || 1, c: Number(s.columna) || (i + 1) }));
-        return `grid-template-columns:repeat(${Math.max(...ps.map((x) => x.c))}, 1fr)`;
-      })()}">
-        ${sectores().map((s, i) => {
+      <!-- En el orden del campo —de arriba abajo y de izquierda a derecha, como
+           quedaron en el mapa— pero acomodándose al ancho que haya. Antes se
+           copiaba la grilla del mapa con columnas fijas, y en media pantalla
+           de notebook los croquis se salían de la tarjeta y pisaban la de al
+           lado. -->
+      <div class="croquis-sectores">
+        ${bloquesDelMapa().slice()
+          .sort((a, z) => (a.y - z.y) || (a.x - z.x))
+          .map((bq) => sectores().find((s) => s.sector === bq.sector))
+          .map((s) => {
           const n = Number(s.bancales) || 0;
           // Qué bancales del sector tienen algo asignado. Es lo mismo que
           // dibuja el mapa, resumido a una miniatura que entra en un teléfono.
@@ -1495,8 +1497,7 @@ const plantillas = {
             .filter((g) => claveArea(g.sector) === claveArea(s.sector))
             .forEach((g) => bancalesDe(g).forEach((x) => tomados.add(x)));
           const sup = n * m2;
-          return `<div class="croquis" style="grid-row:${Number(s.fila) || 1};grid-column:${
-            Number(s.columna) || (i + 1)}">
+          return `<div class="croquis">
             <div class="croquis-cab">
               <b>${esc(s.sector)}</b>
               <span>${tomados.size} de ${n} ocupados</span>
@@ -2568,92 +2569,165 @@ function chocanCon(g, sector, bancales, todas) {
   });
 }
 
+// Medidas del lienzo, en píxeles a zoom 100 %. Un bancal es una columna y un
+// mes una fila; el tiempo va hacia abajo, como en la planilla de Heirloom.
+const LZ = { bancal: 22, mes: 36, cab: 50, meses: 34, borde: 8, paso: 25, hueco: 50 };
+
+// Dónde está mirando el mapa: desplazamiento y zoom. Vive fuera del render para
+// que no se pierda al redibujar después de ubicar algo. null = todavía no se
+// acomodó: la primera vez se ajusta para que entre todo el campo.
+let vistaMapa = null;
+
+// La temporada en píxeles: de julio a junio, un día mide lo mismo siempre.
+function escalaTemporada() {
+  const d0 = inicioDeTemporada();
+  const d1 = new Date(d0); d1.setFullYear(d1.getFullYear() + 1);
+  const ini = Math.floor(d0.getTime() / 86400000);
+  const dias = Math.max(1, Math.floor(d1.getTime() / 86400000) - ini);
+  const alto = 12 * LZ.mes;
+  return { d0, d1, ini, dias, alto, y: (iso) => ((diaDe(iso) - ini) * alto) / dias };
+}
+
+/* Dónde va cada sector en el lienzo.
+   La posición se guarda en las columnas "fila" y "columna" del sector, en
+   pasos de 25 px: columna = x / 25 + 1 y fila = y / 25 + 1. El +1 mantiene el
+   0 como "nunca se acomodó", que es lo que tienen todos los sectores cargados
+   antes (se revisaron las seis chacras el 28/09: ninguno había usado la
+   disposición en filas y columnas que había antes). Así no hizo falta tocar el
+   servidor ni la planilla. Los que nunca se movieron van en fila, debajo de los
+   que sí. */
+function bloquesDelMapa() {
+  const alto = escalaTemporada().alto;
+  const lista = sectores().map((s) => {
+    const n = Number(s.bancales) || 0;
+    return {
+      sector: s.sector, n,
+      w: LZ.meses + n * LZ.bancal + 2 * LZ.borde,
+      h: LZ.cab + alto + LZ.borde,
+      x: Number(s.columna) > 0 ? (Number(s.columna) - 1) * LZ.paso : null,
+      y: Number(s.fila) > 0 ? (Number(s.fila) - 1) * LZ.paso : null,
+    };
+  });
+  const puestos = lista.filter((b) => b.x !== null && b.y !== null);
+  // En filas de hasta ~2000 px: todos en una sola fila, "Ajustar" los dejaba
+  // en un 25 % ilegible con media ventana vacía abajo.
+  const ANCHO_FILA = 2000;
+  let x = 0, altoFila = 0;
+  let y = puestos.length ? Math.max(...puestos.map((b) => b.y + b.h)) + LZ.hueco : 0;
+  lista.forEach((b) => {
+    if (b.x !== null && b.y !== null) return;
+    if (x > 0 && x + b.w > ANCHO_FILA) { x = 0; y += altoFila + LZ.hueco; altoFila = 0; }
+    b.x = x; b.y = y;
+    x += b.w + LZ.hueco;
+    altoFila = Math.max(altoFila, b.h);
+  });
+  return lista;
+}
+
+// Los bancales de un sector que están libres en las fechas de una generación.
+// Es la franja verde que aparece al arrastrarla: se ve el hueco antes de soltar.
+function bancalesLibres(g, sector, n, todas) {
+  const libres = [];
+  for (let b = 1; b <= n; b++) {
+    if (!chocanCon(g, sector, [b], todas).length) libres.push(b);
+  }
+  return libres;
+}
+
+// La franja de bancales libres, en tramos seguidos para no dibujar veinticinco
+// cajitas sueltas.
+function franjaLibre(g, sector, n, todas, e) {
+  const o = ocupacionDe(g);
+  if (!o) return "";
+  const top = Math.max(0, e.y(o.desde));
+  const alto = Math.min(e.alto, e.y(o.hasta)) - top;
+  if (alto <= 0) return "";
+  const libres = bancalesLibres(g, sector, n, todas);
+  const tramos = [];
+  libres.forEach((b) => {
+    const t = tramos[tramos.length - 1];
+    if (t && t[1] === b - 1) t[1] = b; else tramos.push([b, b]);
+  });
+  return tramos.map(([a, z]) => `<i class="lz-libre" style="left:${(a - 1) * LZ.bancal}px;
+    width:${(z - a + 1) * LZ.bancal}px;top:${top}px;height:${alto}px"></i>`).join("");
+}
+
 function mapaDeCultivos() {
   const todas = (leer(LS.generaciones, []) || []);
   const asignadas = todas.filter((g) => g.sector && bancalesDe(g).length);
   const sueltas = todas.filter((g) => !(g.sector && bancalesDe(g).length));
   const sel = todas.find((g) => g.id === genSeleccionada);
+  const e = escalaTemporada();
+  const bloques = bloquesDelMapa();
 
-  const d0 = inicioDeTemporada();
-  const d1 = new Date(d0); d1.setFullYear(d1.getFullYear() + 1);
-  const ini = Math.floor(d0.getTime() / 86400000);
-  const dias = Math.max(1, Math.floor(d1.getTime() / 86400000) - ini);
-  const alto = (iso) => ((diaDe(iso) - ini) / dias) * 100;
+  if (!bloques.length) {
+    return `<div class="tarjeta">
+      <h2>Mapa de cultivos</h2>
+      ${barraDePlan("mapa")}
+      <p class="nota">Todavía no hay sectores. Cargalos en Configuración y
+      aparecen acá para ubicar las generaciones.</p>
+    </div>`;
+  }
 
-  // Los meses del eje vertical
-  const filasMes = [];
-  const cur = new Date(d0);
-  while (cur < d1) {
-    const a = Math.floor(cur.getTime() / 86400000);
+  // Los meses del eje vertical, con su línea.
+  const meses = [];
+  const cur = new Date(e.d0);
+  while (cur < e.d1) {
     const sig = new Date(cur); sig.setMonth(sig.getMonth() + 1);
-    filasMes.push({
-      nombre: MESES_CORTOS[cur.getMonth()],
-      top: ((a - ini) / dias) * 100,
-      alto: ((Math.floor(sig.getTime() / 86400000) - a) / dias) * 100,
-    });
+    const top = e.y(isoDe(cur));
+    meses.push({ nombre: MESES_CORTOS[cur.getMonth()], top, alto: e.y(isoDe(sig)) - top });
     cur.setMonth(cur.getMonth() + 1);
   }
-  const hoyPct = alto(hoy());
+  const hoyY = e.y(hoy());
 
-  const grillaDe = (s) => {
-    const n = Number(s.bancales) || 0;
-    const aqui = asignadas.filter((g) => claveArea(g.sector) === claveArea(s.sector));
-    // Cuando hay una generación elegida, se marcan los bancales donde entraría
-    // sin pisar a nadie. Es lo que convierte el mapa en una ayuda y no en un
-    // dibujo: se ve el hueco antes de decidir.
-    const libres = new Set();
-    if (sel) {
-      for (let b = 1; b <= n; b++) {
-        const bs = bancalesQueOcuparia(sel, b, n);
-        if (bs.length && !chocanCon(sel, s.sector, bs, todas).length) libres.add(b);
-      }
-    }
+  const puesta = (g) => {
+    const o = ocupacionDe(g);
+    if (!o) return "";
+    const bs = bancalesDe(g);
+    const desdeB = Math.min(...bs), hastaB = Math.max(...bs);
+    const top = Math.max(0, e.y(o.desde));
+    const fin = Math.min(e.alto, e.y(o.hasta));
+    if (fin <= top) return "";
+    const sembrada = ("sembrada" in g) ? g.sembrada : g.estado === "Sembrado";
+    const ancho = (hastaB - desdeB + 1) * LZ.bancal;
+    // Con dos bancales o más entra el nombre acostado; con uno, va parado.
+    const acostado = ancho >= 2 * LZ.bancal;
+    return `<div class="lz-puesta${sembrada ? " sembrada" : ""}${acostado ? " acostada" : ""}${
+      g.id === genSeleccionada ? " elegida" : ""}" data-puesta="${esc(g.id)}"
+      style="left:${(desdeB - 1) * LZ.bancal}px;width:${ancho - 1}px;top:${top}px;
+             height:${fin - top}px;background:${colorEtapa(g.cultivo, sembrada ? "cosecha" : "campo")}"
+      title="${esc(g.cultivo)} G${g.generacion} · bancal ${bs.join(", ")} · ${
+        fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}${sembrada ? " · sembrada" : ""}">
+      <span>${esc(g.cultivo)} G${g.generacion}${acostado
+        ? `<small>${fechaCorta(o.desde)} – ${fechaCorta(o.hasta)}</small>` : ""}</span>
+    </div>`;
+  };
 
-    const pos = conPos.find((x) => x.sector === s.sector) || { fila: 1, columna: 1 };
-    return `<div class="sector-mapa${sectorMoviendo === s.sector ? " levantado" : ""}"
-                 style="grid-row:${pos.fila};grid-column:${pos.columna}">
-      <h4>
-        <button type="button" class="agarre" data-mover-sector="${esc(s.sector)}"
-                title="Mover este sector a otro lugar del campo">⤧</button>
-        ${esc(s.sector)} <span>${n} bancales</span>
-      </h4>
-      <!-- Los números de bancal van arriba, de izquierda a derecha: sin ellos
-           hay que contar columnas con el dedo para saber cuál es el 17. -->
-      <div class="numeros-bancal" style="--cols:${n}">
-        <span class="hueco"></span>
-        ${Array.from({ length: n }, (_, i) => `<span${
+  const bloque = (b) => {
+    const aqui = asignadas.filter((g) => claveArea(g.sector) === claveArea(b.sector));
+    return `<div class="lz-bloque" data-bloque="${esc(b.sector)}"
+                 style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px">
+      <div class="lz-cab" data-agarrar="${esc(b.sector)}" title="Arrastrá para mover el sector">
+        <span class="lz-asa">⠿</span><b>${esc(b.sector)}</b>
+        <span class="lz-dato">${b.n} bancales · ${aqui.length} generaciones</span>
+      </div>
+      <!-- Los números de bancal arriba: sin ellos hay que contar columnas
+           para saber cuál es el 17. -->
+      <div class="lz-numeros" style="left:${LZ.borde + LZ.meses}px">
+        ${Array.from({ length: b.n }, (_, i) => `<span${
           (i + 1) % 5 === 0 || i === 0 ? ' class="marcado"' : ""}>${i + 1}</span>`).join("")}
       </div>
-      <div class="grilla" style="--cols:${n}" data-sector="${esc(s.sector)}">
-        <div class="meses-y">
-          ${filasMes.map((m) => `<div class="mes-y" style="top:${m.top}%;height:${m.alto}%">${m.nombre}</div>`).join("")}
-        </div>
-        <div class="camas">
-          ${Array.from({ length: n }, (_, i) => `<div class="cama${
-            sel ? (libres.has(i + 1) ? " libre" : " ocupada") : ""}"
-            data-bancal="${i + 1}" title="Bancal ${i + 1}"></div>`).join("")}
-          ${aqui.map((g) => {
-            const o = ocupacionDe(g);
-            if (!o) return "";
-            const bs = bancalesDe(g);
-            const desdeB = Math.min(...bs), hastaB = Math.max(...bs);
-            const top = Math.max(0, alto(o.desde));
-            const fin = Math.min(100, alto(o.hasta));
-            if (fin <= top) return "";
-            const sembrada = ("sembrada" in g) ? g.sembrada : g.estado === "Sembrado";
-            return `<div class="puesta${sembrada ? " sembrada" : ""}${
-              g.id === genSeleccionada ? " elegida" : ""}"
-              data-puesta="${esc(g.id)}"
-              style="left:${((desdeB - 1) / n) * 100}%;width:${((hastaB - desdeB + 1) / n) * 100}%;
-                     top:${top}%;height:${fin - top}%"
-              title="${esc(g.cultivo)} G${g.generacion} · bancal ${bs.join(", ")} · ${
-                fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}">
-              <span>${esc(g.cultivo)} G${g.generacion}</span>
-            </div>`;
-          }).join("")}
-          ${hoyPct >= 0 && hoyPct <= 100
-            ? `<div class="hoy-y" style="top:${hoyPct}%"></div>` : ""}
-        </div>
+      <div class="lz-meses" style="left:${LZ.borde}px;top:${LZ.cab}px;height:${e.alto}px">
+        ${meses.map((m) => `<span style="top:${m.top}px;height:${m.alto}px">${m.nombre}</span>`).join("")}
+      </div>
+      <div class="lz-grilla" data-grilla="${esc(b.sector)}" data-n="${b.n}"
+           style="left:${LZ.borde + LZ.meses}px;top:${LZ.cab}px;width:${b.n * LZ.bancal}px;
+                  height:${e.alto}px;--bancal:${LZ.bancal}px">
+        ${meses.slice(1).map((m) => `<i class="lz-linea-mes" style="top:${m.top}px"></i>`).join("")}
+        ${sel ? franjaLibre(sel, b.sector, b.n, todas, e) : ""}
+        ${aqui.map(puesta).join("")}
+        ${hoyY >= 0 && hoyY <= e.alto ? `<i class="lz-hoy" style="top:${hoyY}px"></i>` : ""}
+        <div class="lz-previa"></div>
       </div>
     </div>`;
   };
@@ -2664,67 +2738,36 @@ function mapaDeCultivos() {
     porCultivo.get(g.cultivo).push(g);
   });
 
-  // Los sectores se acomodan como están en el campo, no en el orden en que se
-  // cargaron. Cada uno tiene fila y columna; los que nunca se acomodaron caen
-  // en una fila, que es lo que había antes.
-  const conPos = sectores().map((s, i) => ({
-    ...s,
-    fila: Number(s.fila) || 1,
-    columna: Number(s.columna) || (i + 1),
-  }));
-  // Mientras se mueve un sector se agrega una fila y una columna de más, para
-  // poder soltarlo afuera del bloque. Antes quedaban siempre, y esa columna
-  // vacía de 300 px era lo que empujaba el mapa a tener scroll horizontal.
-  const extra = sectorMoviendo ? 1 : 0;
-  const filasMapa = Math.max(...conPos.map((s) => s.fila)) + extra;
-  const colsMapa = Math.max(...conPos.map((s) => s.columna)) + extra;
-  const ocupadaPor = (f, c) => conPos.find((s) => s.fila === f && s.columna === c);
-
+  const o = sel ? ocupacionDe(sel) : null;
   return `
   <div class="tarjeta">
     <h2>Mapa de cultivos <small>${asignadas.length} de ${todas.length} ubicadas</small></h2>
     ${barraDePlan("mapa")}
 
-    <p class="nota">${sel
-      ? `Elegiste <b>${esc(sel.cultivo)} G${sel.generacion}</b>, que ocupa
-         ${Math.max(1, Math.round(Number(sel.camas) || 1))} bancal(es).
-         Los bancales en verde están libres en sus fechas: tocá uno para ubicarla.
-         <button type="button" class="secundario" id="cancelar-eleccion">Cancelar</button>`
-      : `Cada bancal es una columna y los meses van hacia abajo. Elegí una
-         generación de la lista y después el bancal donde va. Tocá una ya
-         puesta para moverla o sacarla.`}</p>
+    <div class="lz-estado">${sel
+      ? `<b>${esc(sel.cultivo)} G${sel.generacion}</b>
+         <span>${Math.max(1, Math.round(Number(sel.camas) || 1))} bancal(es)${
+           o ? ` · ${fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}` : ""}${
+           sel.sector ? ` · ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}` : " · sin ubicar"}</span>
+         <span class="lz-ayuda">En verde, los bancales libres en esas fechas: tocá uno o arrastrala.</span>
+         ${sel.sector ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
+         <button type="button" class="secundario" id="cancelar-eleccion">Listo</button>`
+      : `<span class="lz-ayuda">Arrastrá un sector por su título para acomodarlo como está
+         en el campo. Arrastrá una generación de la lista a un bancal, o una ya puesta a
+         otro. La rueda del mouse acerca y aleja; arrastrando un lugar vacío se mueve el mapa.</span>`}
+    </div>
 
-    <!-- El mapa y la lista, lado a lado y cada uno con su propio scroll: al
-         buscar una generación entre setenta y nueve, la lista se desplaza sola
-         y el mapa se queda donde estaba. -->
     <div class="mapa-con-lista">
       <div class="mapa-panel">
         <div class="mapa-zoom">
-          <button type="button" class="secundario" data-zoom="-">−</button>
+          <button type="button" class="secundario" data-zoom="-" title="Alejar">−</button>
           <span id="nivel-zoom">100%</span>
-          <button type="button" class="secundario" data-zoom="+">+</button>
-          <small>arrastrá el mapa para moverlo</small>
+          <button type="button" class="secundario" data-zoom="+" title="Acercar">+</button>
+          <button type="button" class="secundario ajustar" id="ajustar-mapa"
+                  title="Que entre todo el campo">Ajustar</button>
         </div>
-        <div class="mapa-scroll" id="mapa-scroll">
-          <div class="mapa-sectores" id="mapa-lienzo"
-               style="grid-template-columns:repeat(${colsMapa}, minmax(260px, 1fr));
-                      grid-template-rows:repeat(${filasMapa}, auto);
-                      --filas-mapa:${Math.max(1, filasMapa - extra)}">
-            ${sectores().map(grillaDe).join("")}
-            ${sectorMoviendo ? Array.from({ length: filasMapa }, (_, f) =>
-                Array.from({ length: colsMapa }, (_, c) => {
-                  const quien = ocupadaPor(f + 1, c + 1);
-                  // Una celda con otro sector también sirve: se intercambian.
-                  // Es lo natural cuando se reordena, y así nunca quedan dos
-                  // sectores en el mismo lugar.
-                  if (quien && quien.sector === sectorMoviendo) return "";
-                  return `<button type="button" class="celda-destino${quien ? " con-sector" : ""}"
-                            data-destino="${f + 1},${c + 1}"
-                            style="grid-row:${f + 1};grid-column:${c + 1}">
-                            ${quien ? `intercambiar con ${esc(quien.sector)}` : "soltar acá"}
-                          </button>`;
-                }).join("")).join("") : ""}
-          </div>
+        <div class="lz-vista" id="lz-vista">
+          <div class="lz-lienzo" id="lz-lienzo">${bloques.map(bloque).join("")}</div>
         </div>
       </div>
 
@@ -2733,17 +2776,20 @@ function mapaDeCultivos() {
         <div class="lista-scroll">
     ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
       <details class="gen-cultivo"${sel && sel.cultivo === cultivo ? " open" : ""}>
-        <summary>${esc(cultivo)} <span>${lista.length}</span></summary>
+        <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
+          esc(cultivo)} <span>${lista.length}</span></summary>
         ${lista.map((g) => {
-          const o = ocupacionDe(g);
-          return `<div class="registro elegible${g.id === genSeleccionada ? " elegida" : ""}"
-                       data-elegir="${esc(g.id)}" role="button" tabindex="0">
+          const oc = ocupacionDe(g);
+          return `<div class="registro elegible lz-arrastrable${g.id === genSeleccionada ? " elegida" : ""}"
+                       data-elegir="${esc(g.id)}" role="button" tabindex="0"
+                       title="Arrastrala a un bancal, o tocala y después tocá el bancal">
             <div>
               <div class="detalle">G${g.generacion} <span class="gen">${
-                Math.max(1, Math.round(Number(g.camas) || 1))} cama(s)</span></div>
-              <div class="cuando">${o ? `ocupa del ${fechaCorta(o.desde)} al ${fechaCorta(o.hasta)}`
+                Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)</span></div>
+              <div class="cuando">${oc ? `ocupa del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
                 : "sin fechas suficientes"}</div>
             </div>
+            <span class="lz-asa">⠿</span>
           </div>`;
         }).join("")}
       </details>`).join("")
@@ -2775,6 +2821,11 @@ function pantallaPlanificar() {
     <h2>Cultivos de la temporada</h2>
     ${barraDePlan("planificar")}
 
+    <!-- El formulario a la izquierda y lo planificado a la derecha, cada uno
+         con su scroll: se carga una serie mirando qué hay. En el teléfono se
+         apilan. -->
+    <div class="planificar-dos">
+    <div class="planificar-form">
     <p class="nota">Todo lo de un cultivo se decide acá: el marco de plantación,
     cuántas generaciones y cada cuánto. La superficie, las plantas y los kilos
     esperados salen de esos números, no se cargan aparte.</p>
@@ -2840,13 +2891,16 @@ function pantallaPlanificar() {
 
       <button class="principal">Agregar al plan</button>
     </form>
-  </div>
+    </div>
 
-  <div class="tarjeta">
-    <h2>En el plan <small>${gens.length} generaciones</small></h2>
+    <div class="planificar-lista">
+    <h3 class="sub">En el plan <small>${gens.length} generaciones</small></h3>
+    <div class="lista-scroll">
     ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
       <details class="gen-cultivo">
-        <summary>${esc(cultivo)} <span>${lista.length} generación(es)</span></summary>
+        <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
+          esc(cultivo)} <span>${lista.length} generación(es) · ${
+          num(lista.reduce((a, g) => a + (Number(g.camas) || 0), 0), 1)} bancales</span></summary>
         ${lista.map((g) => {
           const cuando = g.fecha_almacigo || g.fecha_campo;
           return `<div class="registro">
@@ -2864,8 +2918,11 @@ function pantallaPlanificar() {
         }).join("")}
       </details>`).join("")
       : `<p class="nota">Todavía no hay generaciones planificadas.</p>`}
+    </div>
     <p class="nota">Las que ya se sembraron no se pueden sacar del plan: son
     parte de lo que pasó, no de lo que se piensa hacer.</p>
+    </div>
+    </div>
   </div>`;
 }
 
@@ -4618,101 +4675,100 @@ function prepararPlan() {
   prepararMapa();
 }
 
-// Cuánto se ve el mapa. Queda fuera del render para que no se pierda al
-// redibujar: acomodar el zoom y que se resetee al ubicar una generación sería
-// insoportable.
-let zoomMapa = 1;
-// El sector que se está moviendo, si hay uno. Mientras tanto aparecen las
-// celdas donde se lo puede soltar.
-let sectorMoviendo = "";
+// Un arrastre con el mouse o el dedo. Se escucha en la ventana y no en el
+// elemento: al arrastrar una generación desde la lista, el puntero sale de la
+// lista y tiene que seguir llegando. `umbral` son los píxeles que hay que mover
+// para que cuente como arrastre y no como un toque.
+function seguirArrastre(ev, { alEmpezar, alMover, alSoltar, alTocar, umbral = 5 }) {
+  const x0 = ev.clientX, y0 = ev.clientY;
+  let arrastrando = false;
+  const mover = (e) => {
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    if (!arrastrando) {
+      if (Math.abs(dx) < umbral && Math.abs(dy) < umbral) return;
+      arrastrando = true;
+      if (alEmpezar) alEmpezar(e);
+    }
+    e.preventDefault();
+    alMover(e, dx, dy);
+  };
+  const soltar = (e) => {
+    window.removeEventListener("pointermove", mover);
+    window.removeEventListener("pointerup", soltar);
+    window.removeEventListener("pointercancel", soltar);
+    if (arrastrando) alSoltar(e, e.type === "pointercancel");
+    else if (alTocar) alTocar(e);
+  };
+  window.addEventListener("pointermove", mover, { passive: false });
+  window.addEventListener("pointerup", soltar);
+  window.addEventListener("pointercancel", soltar);
+}
 
 function prepararMapa() {
-  if (!$(".mapa-sectores")) return;
+  const vista = $("#lz-vista");
+  if (!vista) return;
+  const lienzo = $("#lz-lienzo");
   const todas = leer(LS.generaciones, []) || [];
+  const e = escalaTemporada();
+  const bloques = bloquesDelMapa();
 
   // ---- zoom y desplazamiento ----
-  const lienzo = $("#mapa-lienzo");
-  const scroll = $("#mapa-scroll");
-  const aplicarZoom = () => {
-    lienzo.style.width = `${100 / zoomMapa}%`;
-    lienzo.style.transform = `scale(${zoomMapa})`;
-    $("#nivel-zoom").textContent = `${Math.round(zoomMapa * 100)}%`;
+  const aplicar = () => {
+    lienzo.style.transform = `translate(${vistaMapa.x}px, ${vistaMapa.y}px) scale(${vistaMapa.s})`;
+    $("#nivel-zoom").textContent = `${Math.round(vistaMapa.s * 100)}%`;
   };
-  aplicarZoom();
+  // Que entre todo el campo en la vista, centrado.
+  const ajustar = () => {
+    const minX = Math.min(...bloques.map((b) => b.x)), minY = Math.min(...bloques.map((b) => b.y));
+    const maxX = Math.max(...bloques.map((b) => b.x + b.w)), maxY = Math.max(...bloques.map((b) => b.y + b.h));
+    const vw = vista.clientWidth, vh = vista.clientHeight;
+    const s = Math.max(0.25, Math.min(1.5, (vw - 40) / (maxX - minX), (vh - 40) / (maxY - minY)));
+    vistaMapa = { s, x: (vw - (maxX - minX) * s) / 2 - minX * s, y: 20 - minY * s };
+  };
+  if (!vistaMapa) ajustar();
+  aplicar();
+
+  const zoomEn = (px, py, factor) => {
+    const s = Math.max(0.25, Math.min(3, vistaMapa.s * factor));
+    const k = s / vistaMapa.s;
+    vistaMapa = { s, x: px - (px - vistaMapa.x) * k, y: py - (py - vistaMapa.y) * k };
+    aplicar();
+  };
+  // La rueda acerca y aleja sobre el puntero, como en cualquier mapa: lo que
+  // está bajo el mouse se queda quieto.
+  vista.onwheel = (ev) => {
+    ev.preventDefault();
+    const r = vista.getBoundingClientRect();
+    zoomEn(ev.clientX - r.left - vista.clientLeft, ev.clientY - r.top - vista.clientTop,
+      ev.deltaY < 0 ? 1.1 : 1 / 1.1);
+  };
   document.querySelectorAll("[data-zoom]").forEach((b) => {
-    b.onclick = () => {
-      zoomMapa = Math.min(3, Math.max(0.5,
-        zoomMapa + (b.dataset.zoom === "+" ? 0.25 : -0.25)));
-      aplicarZoom();
-    };
+    b.onclick = () => zoomEn(vista.clientWidth / 2, vista.clientHeight / 2,
+      b.dataset.zoom === "+" ? 1.25 : 1 / 1.25);
   });
+  $("#ajustar-mapa").onclick = () => { ajustar(); aplicar(); };
 
-  // Arrastrar para moverse, agarrando cualquier lugar vacío. No se toma el
-  // gesto sobre un bancal ni sobre una generación: ahí el clic es para ubicar.
-  let ax = 0, ay = 0, sx = 0, sy = 0, moviendo = false;
-  scroll.onpointerdown = (e) => {
-    if (e.target.closest(".cama, [data-puesta]")) return;
-    moviendo = true;
-    ax = e.clientX; ay = e.clientY;
-    sx = scroll.scrollLeft; sy = scroll.scrollTop;
-    scroll.classList.add("moviendo");
-    try { scroll.setPointerCapture(e.pointerId); } catch (_) { /* sin captura igual anda */ }
+  // Del punto de la pantalla al punto del lienzo, deshaciendo zoom y desplazamiento.
+  const aLienzo = (cx, cy) => {
+    // El lienzo arranca adentro del borde de la ventana, no en su canto.
+    const r = vista.getBoundingClientRect();
+    const x = cx - r.left - vista.clientLeft, y = cy - r.top - vista.clientTop;
+    return { x: (x - vistaMapa.x) / vistaMapa.s, y: (y - vistaMapa.y) / vistaMapa.s };
   };
-  scroll.onpointermove = (e) => {
-    if (!moviendo) return;
-    scroll.scrollLeft = sx - (e.clientX - ax);
-    scroll.scrollTop = sy - (e.clientY - ay);
+  // Qué sector y qué bancal hay bajo el puntero. Se mira el sector entero, no
+  // solo la grilla: soltar un poco arriba o abajo igual cae en su bancal.
+  const bancalBajo = (cx, cy) => {
+    const p = aLienzo(cx, cy);
+    for (const b of bloques) {
+      const gx = b.x + LZ.borde + LZ.meses;
+      if (p.x >= gx && p.x < gx + b.n * LZ.bancal && p.y >= b.y && p.y <= b.y + b.h) {
+        return { b, bancal: Math.floor((p.x - gx) / LZ.bancal) + 1 };
+      }
+    }
+    return null;
   };
-  const soltarMapa = (e) => {
-    if (!moviendo) return;
-    moviendo = false;
-    scroll.classList.remove("moviendo");
-    try { scroll.releasePointerCapture(e.pointerId); } catch (_) { /* ya soltado */ }
-  };
-  scroll.onpointerup = soltarMapa;
-  scroll.onpointercancel = soltarMapa;
 
-  // ---- mover sectores ----
-  // Se levanta con el agarre y se suelta en una celda. Soltar sobre otro
-  // sector los intercambia, así nunca quedan dos en el mismo lugar.
-  document.querySelectorAll("[data-mover-sector]").forEach((b) => {
-    b.onclick = (e) => {
-      e.stopPropagation();
-      sectorMoviendo = sectorMoviendo === b.dataset.moverSector ? "" : b.dataset.moverSector;
-      render("plan", true);
-      if (sectorMoviendo) aviso(`Elegí dónde va ${sectorMoviendo} en el campo`);
-    };
-  });
-
-  document.querySelectorAll("[data-destino]").forEach((celda) => {
-    celda.onclick = (e) => {
-      e.stopPropagation();
-      const [fila, columna] = celda.dataset.destino.split(",").map(Number);
-      const lista = sectores().map((s, i) => ({
-        ...s,
-        fila: Number(s.fila) || 1,
-        columna: Number(s.columna) || (i + 1),
-      }));
-      const moviendo = lista.find((s) => s.sector === sectorMoviendo);
-      if (!moviendo) { sectorMoviendo = ""; render("plan", true); return; }
-      const otro = lista.find((s) => s.fila === fila && s.columna === columna);
-      // El que estaba ahí pasa al lugar que dejó el que se movió.
-      if (otro) { otro.fila = moviendo.fila; otro.columna = moviendo.columna; }
-      moviendo.fila = fila;
-      moviendo.columna = columna;
-
-      // Se compacta: si quedó una fila o columna entera vacía a la izquierda o
-      // arriba, se corre todo para que el mapa no arranque con un hueco.
-      const minF = Math.min(...lista.map((s) => s.fila));
-      const minC = Math.min(...lista.map((s) => s.columna));
-      lista.forEach((s) => { s.fila -= minF - 1; s.columna -= minC - 1; });
-
-      const nombre = sectorMoviendo;
-      sectorMoviendo = "";
-      guardarConfig({ sectores: lista }, `${nombre} movido ✓`, "plan");
-    };
-  });
-
+  // ---- ubicar generaciones ----
   const guardarUbicacion = (g, sector, bancales) => {
     guardarRegistro("generaciones", {
       generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
@@ -4730,64 +4786,196 @@ function prepararMapa() {
     render("plan", true);
   };
 
-  // Elegir una generación de la lista de abajo.
+  // Ponerla en un bancal. Se avisa si choca pero no se prohíbe: dos cultivos
+  // pueden compartir un bancal a propósito, y quien está en el campo sabe mejor
+  // que la cuenta.
+  const ubicar = (g, sector, n, desde) => {
+    const bs = bancalesQueOcuparia(g, desde, n);
+    if (!bs.length) return aviso("Ese sector no tiene bancales suficientes.", true);
+    if (claveArea(g.sector) === claveArea(sector) && bancalesDe(g).join() === bs.join()) {
+      render("plan", true);           // quedó donde estaba
+      return;
+    }
+    const choques = chocanCon(g, sector, bs, todas);
+    if (choques.length) {
+      const cuales = choques.slice(0, 3).map((x) => `${x.cultivo} G${x.generacion}`).join(", ");
+      if (!confirm(`Ahí se superpone con ${cuales}` +
+        `${choques.length > 3 ? ` y ${choques.length - 3} más` : ""}.\n¿Ponerla igual?`)) {
+        render("plan", true);
+        return;
+      }
+    }
+    guardarUbicacion(g, sector, bs);
+  };
+
+  // Lo que se ve mientras se arrastra una generación: en el sector de abajo,
+  // la franja de bancales libres en sus fechas y dónde caería. Verde si entra,
+  // rojo si pisa a otra.
+  const limpiarPrevia = () => document.querySelectorAll(".lz-previa")
+    .forEach((p) => { p.innerHTML = ""; });
+  const mostrarPrevia = (g, destino, agarre) => {
+    limpiarPrevia();
+    if (!destino) return;
+    const { b, bancal } = destino;
+    const o = ocupacionDe(g);
+    if (!o) return;
+    const bs = bancalesQueOcuparia(g, Math.max(1, bancal - agarre), b.n);
+    if (!bs.length) return;
+    const top = Math.max(0, e.y(o.desde));
+    const alto = Math.min(e.alto, e.y(o.hasta)) - top;
+    const choca = chocanCon(g, b.sector, bs, todas).length > 0;
+    const previa = document.querySelector(`.lz-grilla[data-grilla="${CSS.escape(b.sector)}"] .lz-previa`);
+    previa.innerHTML = franjaLibre(g, b.sector, b.n, todas, e)
+      + `<i class="lz-destino${choca ? " choca" : ""}" style="left:${(bs[0] - 1) * LZ.bancal}px;
+          width:${bs.length * LZ.bancal}px;top:${top}px;height:${Math.max(alto, 4)}px"></i>`;
+  };
+
+  // Arrastrar una generación: desde la lista o desde el mapa. Lo que sigue al
+  // puntero es una etiqueta; la ubicación se decide por el bancal bajo el
+  // puntero, y la altura no se toca porque la fijan las fechas del plan.
+  const arrastrarGeneracion = (ev, g, agarre, original) => {
+    let flotante = null, destino = null;
+    seguirArrastre(ev, {
+      alEmpezar: () => {
+        flotante = document.createElement("div");
+        flotante.className = "lz-flotante";
+        flotante.style.background = colorEtapa(g.cultivo, "campo");
+        flotante.textContent = `${g.cultivo} G${g.generacion} · ${
+          Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)`;
+        document.body.appendChild(flotante);
+        document.body.classList.add("lz-arrastrando");
+        if (original) original.classList.add("levantada");
+      },
+      alMover: (m) => {
+        flotante.style.left = `${m.clientX + 14}px`;
+        flotante.style.top = `${m.clientY + 10}px`;
+        destino = bancalBajo(m.clientX, m.clientY);
+        mostrarPrevia(g, destino, agarre);
+      },
+      alSoltar: (_, cancelado) => {
+        flotante.remove();
+        document.body.classList.remove("lz-arrastrando");
+        limpiarPrevia();
+        if (original) original.classList.remove("levantada");
+        if (cancelado || !destino) return;
+        ubicar(g, destino.b.sector, destino.b.n, Math.max(1, destino.bancal - agarre));
+      },
+      alTocar: () => {
+        genSeleccionada = genSeleccionada === g.id ? "" : g.id;
+        render("plan", true);
+      },
+    });
+  };
+
+  // Desde la lista de las que faltan ubicar.
   document.querySelectorAll("[data-elegir]").forEach((el) => {
-    const elegir = () => {
-      genSeleccionada = genSeleccionada === el.dataset.elegir ? "" : el.dataset.elegir;
-      render("plan", true);
+    const g = todas.find((x) => x.id === el.dataset.elegir);
+    if (!g) return;
+    el.onpointerdown = (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      arrastrarGeneracion(ev, g, 0, null);
     };
-    el.onclick = elegir;
-    el.onkeydown = (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); elegir(); }
+    el.onkeydown = (k) => {
+      if (k.key === "Enter" || k.key === " ") {
+        k.preventDefault();
+        genSeleccionada = genSeleccionada === g.id ? "" : g.id;
+        render("plan", true);
+      }
     };
   });
+
+  // ---- un solo punto de entrada para el lienzo ----
+  // Según dónde se aprieta: una generación puesta se arrastra, el título de un
+  // sector mueve el sector, y cualquier otro lugar mueve el mapa. Un toque sin
+  // arrastrar sobre un bancal ubica la generación elegida.
+  vista.onpointerdown = (ev) => {
+    if (ev.button !== 0) return;
+    const puestaEl = ev.target.closest("[data-puesta]");
+    const agarre = ev.target.closest("[data-agarrar]");
+
+    if (puestaEl) {
+      ev.preventDefault();
+      const g = todas.find((x) => x.id === puestaEl.dataset.puesta);
+      if (!g) return;
+      // Cuántos bancales a la derecha de su primer bancal se la agarró: así,
+      // agarrando un brócoli de tres bancales por el del medio, al soltar queda
+      // donde se ve y no corrida.
+      const aqui = bancalBajo(ev.clientX, ev.clientY);
+      const primero = Math.min(...bancalesDe(g));
+      arrastrarGeneracion(ev, g, aqui ? Math.max(0, aqui.bancal - primero) : 0, puestaEl);
+      return;
+    }
+
+    if (agarre) {
+      ev.preventDefault();
+      const b = bloques.find((x) => x.sector === agarre.dataset.agarrar);
+      const el = agarre.closest(".lz-bloque");
+      seguirArrastre(ev, {
+        alEmpezar: () => el.classList.add("levantado"),
+        alMover: (_, dx, dy) => {
+          el.style.left = `${b.x + dx / vistaMapa.s}px`;
+          el.style.top = `${b.y + dy / vistaMapa.s}px`;
+        },
+        alSoltar: (m, cancelado) => {
+          el.classList.remove("levantado");
+          if (cancelado) { render("plan", true); return; }
+          const dx = (m.clientX - ev.clientX) / vistaMapa.s;
+          const dy = (m.clientY - ev.clientY) / vistaMapa.s;
+          moverSector(b.sector, b.x + dx, b.y + dy);
+        },
+      });
+      return;
+    }
+
+    // Mover el mapa. Sin esto el navegador selecciona texto al arrastrar.
+    ev.preventDefault();
+    const x0 = vistaMapa.x, y0 = vistaMapa.y;
+    seguirArrastre(ev, {
+      umbral: 3,
+      alEmpezar: () => vista.classList.add("moviendo"),
+      alMover: (_, dx, dy) => { vistaMapa.x = x0 + dx; vistaMapa.y = y0 + dy; aplicar(); },
+      alSoltar: () => vista.classList.remove("moviendo"),
+      alTocar: (t) => {
+        // Un toque sobre un bancal con una generación elegida: va ahí.
+        const g = todas.find((x) => x.id === genSeleccionada);
+        const d = g && bancalBajo(t.clientX, t.clientY);
+        if (d) ubicar(g, d.b.sector, d.b.n, d.bancal);
+      },
+    });
+  };
+
+  // Guarda la posición nueva de un sector. Se redondea a pasos de 25 px, que es
+  // lo que hace que alinearlos a ojo sea fácil. Si quedó algo a la izquierda o
+  // arriba del cero, se corre todo el campo junto: las posiciones se guardan
+  // desde 1 y un número negativo se perdería.
+  const moverSector = (nombre, x, y) => {
+    const pos = bloques.map((b) => ({
+      sector: b.sector,
+      x: Math.round((b.sector === nombre ? x : b.x) / LZ.paso) * LZ.paso,
+      y: Math.round((b.sector === nombre ? y : b.y) / LZ.paso) * LZ.paso,
+    }));
+    const minX = Math.min(...pos.map((p) => p.x)), minY = Math.min(...pos.map((p) => p.y));
+    // La vista se corre lo mismo, así en pantalla no salta nada.
+    vistaMapa.x += minX * vistaMapa.s;
+    vistaMapa.y += minY * vistaMapa.s;
+    const lista = sectores().map((s) => {
+      const p = pos.find((q) => q.sector === s.sector);
+      return { ...s, columna: (p.x - minX) / LZ.paso + 1, fila: (p.y - minY) / LZ.paso + 1 };
+    });
+    guardarConfig({ sectores: lista }, `${nombre} movido ✓`, "plan");
+  };
 
   const cancelar = $("#cancelar-eleccion");
   if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; render("plan", true); };
-
-  // Tocar un bancal: si hay una generación elegida, ahí va.
-  document.querySelectorAll(".cama").forEach((cama) => {
-    cama.onclick = () => {
-      const g = todas.find((x) => x.id === genSeleccionada);
-      if (!g) return;
-      const sector = cama.closest("[data-sector]").dataset.sector;
-      const n = Number((sectores().find((s) =>
-        claveArea(s.sector) === claveArea(sector)) || {}).bancales) || 0;
-      const bs = bancalesQueOcuparia(g, parseInt(cama.dataset.bancal, 10), n);
-      if (!bs.length) return aviso("Ese sector no tiene bancales suficientes.", true);
-
-      // Se avisa pero no se prohíbe: dos cultivos pueden compartir un bancal a
-      // propósito, y quien está en el campo sabe mejor que la cuenta.
-      const choques = chocanCon(g, sector, bs, todas);
-      if (choques.length) {
-        const cuales = choques.slice(0, 3)
-          .map((x) => `${x.cultivo} G${x.generacion}`).join(", ");
-        if (!confirm(`Ahí se superpone con ${cuales}` +
-          `${choques.length > 3 ? ` y ${choques.length - 3} más` : ""}.\n¿Ponerla igual?`)) return;
-      }
-      guardarUbicacion(g, sector, bs);
-    };
-  });
-
-  // Tocar una ya puesta: se elige, y desde ahí se la mueve o se la saca.
-  document.querySelectorAll("[data-puesta]").forEach((el) => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      const g = todas.find((x) => x.id === el.dataset.puesta);
-      if (!g) return;
-      if (genSeleccionada === g.id) {
-        if (confirm(`¿Sacar ${g.cultivo} G${g.generacion} del mapa?\n` +
-                    "Queda en el plan, solo sin lugar asignado.")) {
-          guardarUbicacion(g, "", []);
-        }
-        return;
-      }
-      genSeleccionada = g.id;
-      render("plan", true);
-      aviso(`${g.cultivo} G${g.generacion}: tocá otro bancal para moverla, ` +
-            "o tocala de nuevo para sacarla del mapa");
-    };
-  });
+  const sacar = $("#sacar-del-mapa");
+  if (sacar) sacar.onclick = () => {
+    const g = todas.find((x) => x.id === genSeleccionada);
+    if (g && confirm(`¿Sacar ${g.cultivo} G${g.generacion} del mapa?\n` +
+                     "Queda en el plan, solo sin lugar asignado.")) {
+      guardarUbicacion(g, "", []);
+    }
+  };
 }
 
 function prepararGeneraciones() {
