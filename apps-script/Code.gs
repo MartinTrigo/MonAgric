@@ -1,5 +1,8 @@
 // ==========================================================
-// MonAgric — servicio Apps Script (varias chacras)
+// AMA Producción — servicio Apps Script (varias chacras)
+// AMA = Aplicaciones para el Manejo Agroecológico. El repositorio y la
+// dirección de la app siguen llamándose MonAgric a propósito: cambiarlos le
+// borraría a cada teléfono su credencial. Lo que se ve dice AMA.
 //
 // Un solo servicio atiende a todas las chacras: cada registro dice de que
 // chacra viene y se escribe en la planilla de esa chacra. Asi cada colectivo
@@ -7,7 +10,7 @@
 // hay que publicar un servicio por chacra.
 //
 // PARA SUMAR UNA CHACRA (no hace falta tocar este codigo):
-//   1. Crear una planilla nueva en Drive, por ejemplo "MonAgric · Chacra X".
+//   1. Crear una planilla nueva en Drive, por ejemplo "AMA Producción · Chacra X".
 //   2. En el editor: Configuracion del proyecto (engranaje) → Propiedades del
 //      script → agregar/editar la propiedad CHACRAS con un JSON asi:
 //        {"tica":"1PrP0F…","vega":"1AbC…"}
@@ -395,7 +398,7 @@ function atender(p) {
   }
 
   // Sin credencial solo se sabe que el servicio existe.
-  return respuesta({ ok: true, servicio: "MonAgric", chacras: chacrasConocidas(),
+  return respuesta({ ok: true, servicio: "AMA Producción", chacras: chacrasConocidas(),
                      hora: new Date().toISOString() });
 }
 
@@ -1317,7 +1320,7 @@ function espejarHorasDeTica() {
 // ---------- Cuentas de sueldos, leidas del proyecto Bioma ----------
 //
 // La deuda la calcula bioma-db, que es el unico lugar que tiene los dos lados:
-// las horas y los pagos. MonAgric no calcula ni guarda nada de esto: lo pide y
+// las horas y los pagos. AMA no calcula ni guarda nada de esto: lo pide y
 // lo muestra. Llevar la cuenta en dos lados daria dos verdades sobre la misma
 // plata, que es justo lo que este arreglo viene a evitar.
 //
@@ -1340,7 +1343,7 @@ function urlCuentasDe(chacra) {
 }
 
 // Quienes pueden ver las cuentas de todo el equipo. El resto ve la suya y nada
-// mas. El endpoint de Bioma no puede distinguir quien pregunta, pero MonAgric
+// mas. El endpoint de Bioma no puede distinguir quien pregunta, pero AMA
 // si: sabe de quien es cada telefono por su credencial, no por el nombre que
 // eligio en una lista. Por eso el filtro se hace aca.
 function puedeVerTodasLasCuentas(chacra, persona) {
@@ -1581,7 +1584,7 @@ function cuentasParaElTelefono(chacra, persona, forzar) {
 //    "No cuentas con el permiso para llamar a UrlFetchApp.fetch".
 //
 // 2. Avisar si los nombres de Bioma coinciden con las personas registradas en
-//    MonAgric. Es la unica llave que une las dos cosas: si un telefono figura
+//    AMA. Es la unica llave que une las dos cosas: si un telefono figura
 //    como "Lucas" y en las horas dice "Luqui", esa persona abre Cuentas y no ve
 //    nada. Mejor descubrirlo aca que en el celular de alguien.
 //
