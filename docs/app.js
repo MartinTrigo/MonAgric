@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 59 · 28/9/2026";
+const VERSION_APP = "versión 60 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2911,6 +2911,24 @@ let marcoEditando = "";
 const arranqueDe = (g) => g.fecha_almacigo || g.fecha_campo || "";
 const esSembrada = (g) => (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado");
 
+/* Cuántos días pasa en bandeja este cultivo EN ESTE PLAN: los que ya tienen
+   sus generaciones con fecha a campo. Si todas dicen lo mismo, ese es el dato;
+   si no coinciden, se toma el que más se repite. Sirve para que las
+   generaciones nuevas salgan iguales a las que ya estaban: antes las nuevas
+   se calculaban con el catálogo por estación (30 días en primavera) y las
+   que venían del plan tenían 40, así que el mismo repollo trasplantaba en
+   fechas distintas según cuándo se lo había cargado (28/09). */
+function diasBandejaDelCultivo(cultivo, gens = leer(LS.generaciones, []) || []) {
+  const cuenta = {};
+  gens.filter((g) => claveArea(g.cultivo) === claveArea(cultivo) && g.fecha_almacigo && g.fecha_campo)
+    .forEach((g) => {
+      const d = diaDe(g.fecha_campo) - diaDe(g.fecha_almacigo);
+      if (d > 0) cuenta[d] = (cuenta[d] || 0) + 1;
+    });
+  const [dias] = Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0] || [];
+  return dias ? Number(dias) : 0;
+}
+
 // En cuántas partes iguales se puede partir: las que dejan bancales enteros.
 function partesPosibles(g) {
   const c = Number(g.camas) || 0;
@@ -2982,6 +3000,13 @@ function cultivoEditable(cultivo, lista, todas) {
       </div>
       <label>Rinde esperado (kg/m²)</label>
       <input type="text" name="rinde" inputmode="decimal" value="${esc(String(ya.rinde_kg_m2 || p.rinde_ref_kg_m2 || ""))}">
+      ${lista.some((g) => g.fecha_almacigo) ? `
+      <label>Días en almácigo <small>(todas las generaciones sin sembrar)</small></label>
+      <input type="text" name="bandeja" inputmode="numeric" value="${
+        diasBandejaDelCultivo(cultivo, todas) || diasAlmacigo(cultivo, arranqueDe(lista[0])) || ""}">
+      <p class="nota">De la siembra en bandeja al bancal. Se escribe la fecha a campo de
+      cada generación, así todas trasplantan igual. De ahí a la cosecha van
+      ${p.dias_trasplante_cosecha ? `${p.dias_trasplante_cosecha} días` : "los días"} del catálogo.</p>` : ""}
       <div class="editar-gen-botones">
         <button class="principal">Guardar</button>
         <button type="button" class="secundario" data-cancelar-marco>Cancelar</button>
@@ -4995,8 +5020,23 @@ function prepararEdicionCultivos() {
       if (i >= 0) plan[i] = nuevo; else plan.push(nuevo);
       CFG = { ...CFG, plan };
       replanearCultivo(cultivo, todas());
+      // Los días en bandeja se aplican a todas las generaciones sin sembrar:
+      // su fecha a campo pasa a ser la de bandeja más esos días. Las ya
+      // sembradas no se tocan: lo que pasó con ellas es un hecho.
+      const bandeja = f.bandeja ? parseInt(f.bandeja.value, 10) || 0 : 0;
+      let corridas = 0;
+      if (bandeja > 0) {
+        todas().filter((g) => claveArea(g.cultivo) === k && g.fecha_almacigo && !esSembrada(g))
+          .forEach((g) => {
+            const campo = sumarDias(g.fecha_almacigo, bandeja);
+            if (campo && campo !== g.fecha_campo) {
+              guardarGeneracion({ ...g, fecha_campo: campo }, "");
+              corridas++;
+            }
+          });
+      }
       marcoEditando = "";
-      aviso(`${cultivo}: marco y rinde guardados ✓`);
+      aviso(`${cultivo}: guardado ✓${corridas ? ` · ${corridas} generación(es) con ${bandeja} días en almácigo` : ""}`);
       render("plan", true);
     };
   });
@@ -5458,7 +5498,8 @@ function prepararGeneraciones() {
     const primera = fs[0], ultima = fs[fs.length - 1];
     // Cuándo estaría cosechándose la última, que es lo que dice si la serie
     // entra en la temporada o se va de largo.
-    const campoUlt = directa ? ultima : sumarDias(ultima, diasAlmacigo(cultivo, ultima));
+    const campoUlt = directa ? ultima : sumarDias(ultima,
+      diasBandejaDelCultivo(cultivo, existentes) || diasAlmacigo(cultivo, ultima));
     const cosechaUlt = aCosecha ? sumarDias(campoUlt, aCosecha) : "";
 
     const c = cuentas();
@@ -5515,6 +5556,8 @@ function prepararGeneraciones() {
       guardarConfig({ plan }, "", "");
     }
 
+    // Las nuevas trasplantan igual que las que ya hay de este cultivo.
+    const bandeja = directa ? 0 : diasBandejaDelCultivo(cultivo, existentes);
     fs.forEach((fecha, i) => {
       const n = desdeN + i;
       guardarGeneracion({
@@ -5525,7 +5568,7 @@ function prepararGeneraciones() {
         metodo: f.metodo.value,
         // En siembra directa la planta arranca en el bancal: no hay bandeja.
         fecha_almacigo: directa ? "" : fecha,
-        fecha_campo: directa ? fecha : "",
+        fecha_campo: directa ? fecha : (bandeja ? sumarDias(fecha, bandeja) : ""),
         camas, sector: f.sector.value,
         estado: "Planificado",
       }, `${fs.length} generación(es) de ${cultivo} al plan ✓`);
