@@ -1443,9 +1443,35 @@ function tokenDeProyeccionValido(chacra, token) {
   try {
     var p = PropertiesService.getScriptProperties().getProperty("PROYECCION_TOKENS");
     if (!p) return false;
-    var esperado = JSON.parse(p)[String(chacra).toLowerCase()] || "";
-    return !!esperado && esperado === String(token);
+    // Sin espacios de los costados: al pegar en la propiedad se cuelan solos.
+    var esperado = String(JSON.parse(p)[String(chacra).toLowerCase()] || "").trim();
+    return !!esperado && esperado === String(token).trim();
   } catch (e) { return false; }
+}
+
+// Se ejecuta A MANO desde el editor cuando AMA Economia dice que la clave no
+// abre la proyeccion. Dice que tiene la propiedad sin mostrar la clave entera,
+// para compararla con tools/token_proyeccion.txt. No hace falta implementar
+// para correrla: alcanza con guardar.
+function revisarClaveProyeccion() {
+  var p = PropertiesService.getScriptProperties().getProperty("PROYECCION_TOKENS");
+  if (p === null) {
+    Logger.log("No existe la propiedad PROYECCION_TOKENS (revisar el nombre, en mayusculas).");
+    return;
+  }
+  var datos;
+  try { datos = JSON.parse(p); } catch (e) {
+    Logger.log("PROYECCION_TOKENS no es un JSON. Tiene que ser {\"tica\": \"<clave>\"}, con");
+    Logger.log("llaves y comillas rectas. Hoy empieza con: " + String(p).slice(0, 6) + "...");
+    return;
+  }
+  Object.keys(datos).forEach(function (k) {
+    var t = String(datos[k] || "");
+    Logger.log("chacra '" + k + "': clave de " + t.trim().length + " caracteres, empieza con "
+               + t.trim().slice(0, 4) + " y termina con " + t.trim().slice(-4)
+               + (t !== t.trim() ? " (tiene espacios de mas)" : ""));
+  });
+  if (!datos.tica) Logger.log("OJO: no hay clave para 'tica' (en minusculas).");
 }
 
 // Lo que la chacra decidio producir: el plan de la configuracion, cultivo por
