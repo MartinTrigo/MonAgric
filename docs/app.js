@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 49 · 27/9/2026";
+const VERSION_APP = "versión 50 · 27/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -70,6 +70,7 @@ const LS = {
   ultimos: "monagric_ultimos",
   almacigos: "monagric_almacigos",
   modoCosecha: "monagric_modo_cosecha",
+  planPlegado: "monagric_plan_plegado",
   fichas: "monagric_fichas",
   generaciones: "monagric_generaciones",
 };
@@ -1405,19 +1406,22 @@ const plantillas = {
     // Un cultivo abierto reemplaza la lista: en el teléfono no hay lugar para
     // las dos cosas, y en la notebook la ficha se lee mejor sola.
     if (cultivoAbierto) return fichaCultivo(cultivoAbierto);
-    if (vistaPlan === "mapa") return mapaDeCultivos();
+    // Planificar es trabajo de notebook. En el teléfono estas dos pantallas no
+    // se leen, así que se avisa en vez de mostrarlas rotas.
+    if (vistaPlan === "mapa") {
+      return pantallaAncha() ? mapaDeCultivos()
+        : barraDePlan("mapa") + tarjetaSoloNotebook("El mapa de cultivos");
+    }
+    if (vistaPlan === "grafico") {
+      return pantallaAncha() ? planEstrategico()
+        : barraDePlan("grafico") + tarjetaSoloNotebook("El plan estratégico");
+    }
     if (vistaPlan === "planificar") return pantallaPlanificar();
-    if (vistaPlan === "grafico") return planEstrategico();
 
     return `
     <div class="tarjeta">
       <h2>Plan de la temporada <small>${plan.length} cultivos</small></h2>
-      <div class="pestanas-tareas">
-        <button type="button" class="pestana activa" data-plan-vista="lista">Resumen</button>
-        <button type="button" class="pestana" data-plan-vista="planificar">Cultivos</button>
-        <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
-        <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
-      </div>
+      ${barraDePlan("lista")}
       ${plan.length ? plan.map((p) => {
         const logrado = porCultivo[p.cultivo] || 0;
         const pct = p.cosecha_esperada_kg ? (logrado / p.cosecha_esperada_kg) * 100 : 0;
@@ -1440,12 +1444,35 @@ const plantillas = {
     </div>
 
     <div class="tarjeta">
-      <h2>Sectores de riego</h2>
-      ${sectores().map((s) => `<div class="registro">
-        <div><div class="detalle">Sector ${esc(s.sector)}</div>
-          <div class="cuando">${esc(s.tipo_riego)}</div></div>
-        <span class="etiqueta ok">${s.bancales} bancales</span>
-      </div>`).join("")}
+      <h2>Sectores <small>${num(sectores().reduce((a, s) => a + (Number(s.bancales) || 0), 0))} bancales</small></h2>
+      <p class="nota">Cada croquis muestra los bancales del sector y cuántos
+      están ocupados por el plan. Desde el teléfono es la forma de ver cómo
+      quedó el campo sin abrir el mapa.</p>
+      <div class="croquis-sectores">
+        ${sectores().map((s) => {
+          const n = Number(s.bancales) || 0;
+          // Qué bancales del sector tienen algo asignado. Es lo mismo que
+          // dibuja el mapa, resumido a una miniatura que entra en un teléfono.
+          const tomados = new Set();
+          (leer(LS.generaciones, []) || [])
+            .filter((g) => claveArea(g.sector) === claveArea(s.sector))
+            .forEach((g) => bancalesDe(g).forEach((x) => tomados.add(x)));
+          const sup = n * m2;
+          return `<div class="croquis">
+            <div class="croquis-cab">
+              <b>${esc(s.sector)}</b>
+              <span>${tomados.size} de ${n} ocupados</span>
+            </div>
+            <div class="croquis-camas" style="--cols:${Math.min(n, 13)}">
+              ${Array.from({ length: n }, (_, i) => `<i class="${
+                tomados.has(i + 1) ? "lleno" : ""}" title="Bancal ${i + 1}"></i>`).join("")}
+            </div>
+            <div class="croquis-pie">
+              ${num(sup)} m²${s.tipo_riego ? ` · ${esc(s.tipo_riego)}` : ""}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
       <p class="nota" style="margin-top:10px">
         Bancal de ${num(b.largo_m, 1)} × ${num(b.ancho_m, 1)} m (${num(m2, 1)} m²)
         ${b.pasillo_m ? ` · pasillo ${num(b.pasillo_m, 1)} m` : ""}
@@ -1454,10 +1481,31 @@ const plantillas = {
     </div>
 
     <div class="tarjeta">
-      <h2>Integrantes <small>${integrantes().length}</small></h2>
+      <h2>La temporada</h2>
+      <div class="datos">
+        <div class="dato"><span>Chacra</span><b>${
+          esc(CFG?.nombre || chacraActual()?.nombre || "")}</b></div>
+        ${CFG?.temporada?.nombre
+          ? `<div class="dato"><span>Temporada</span><b>${esc(CFG.temporada.nombre)}</b></div>` : ""}
+        ${CFG?.temporada?.inicio
+          ? `<div class="dato"><span>Empezó</span><b>${fechaCorta(CFG.temporada.inicio)}</b></div>` : ""}
+        ${CFG?.temporada?.fin
+          ? `<div class="dato"><span>Termina</span><b>${fechaCorta(CFG.temporada.fin)}</b></div>` : ""}
+        <div class="dato"><span>Cultivos</span><b>${plan.length}</b></div>
+        <div class="dato"><span>Generaciones</span><b>${(leer(LS.generaciones, []) || []).length}</b></div>
+        <div class="dato"><span>Superficie</span><b>${
+          num(plan.reduce((a, p) => a + (p.superficie_m2 || 0), 0))} m²</b></div>
+        <div class="dato"><span>Cosecha esperada</span><b>${
+          num(plan.reduce((a, p) => a + (p.cosecha_esperada_kg || 0), 0))} kg</b></div>
+      </div>
+
+      <h3 class="sub">Quiénes trabajan <small>${integrantes().length}</small></h3>
       <div class="chips-nombres">
         ${integrantes().map((n) => `<span class="chip-nombre">${esc(n)}</span>`).join("")}
       </div>
+
+      <h3 class="sub">Áreas de trabajo</h3>
+      <p class="nota">${areas().map((a) => esc(a.nombre)).join(" · ")}</p>
     </div>
 
     <div class="tarjeta">
@@ -1986,12 +2034,7 @@ function planEstrategico() {
   const total = (leer(LS.generaciones, []) || []).length;
 
   const cabecera = `
-    <div class="pestanas-tareas">
-      <button type="button" class="pestana" data-plan-vista="lista">Resumen</button>
-        <button type="button" class="pestana" data-plan-vista="planificar">Cultivos</button>
-        <button type="button" class="pestana activa" data-plan-vista="grafico">Plan estratégico</button>
-        <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
-    </div>`;
+    ${barraDePlan("grafico")}`;
 
   if (!gens.length) {
     return `<div class="tarjeta">
@@ -2235,6 +2278,52 @@ function correrGeneracion(id, dias) {
   render("plan", true);
 }
 
+// La barra de la sección Plan. Estaba repetida en cada pantalla, con el
+// formato variando un poco en cada una: se escribe una sola vez acá.
+//
+// En el teléfono es una fila de pestañas; en pantallas anchas es una columna a
+// la izquierda que se pliega a solo iconos. Planificar y mirar el campo es
+// trabajo de notebook, y en columna quedan a la vista todas las secciones sin
+// comerle ancho al gráfico.
+const SECCIONES_PLAN = [
+  { id: "lista", nombre: "Resumen", icono: "☰", siempre: true },
+  { id: "planificar", nombre: "Cultivos", icono: "🌱", siempre: true },
+  { id: "grafico", nombre: "Plan estratégico", icono: "▤", soloAncha: true },
+  { id: "mapa", nombre: "Mapa", icono: "▦", soloAncha: true },
+];
+
+// Ancho mínimo para planificar de verdad. Debajo de eso, el gráfico y el mapa
+// no se leen: veinticinco bancales en 375 px son columnas de quince píxeles.
+const ANCHO_PLANIFICAR = 900;
+const pantallaAncha = () => window.innerWidth >= ANCHO_PLANIFICAR;
+
+function barraDePlan(activa) {
+  return `<nav class="plan-nav${leer(LS.planPlegado, false) ? " plegada" : ""}">
+    <button type="button" class="plan-nav-btn plegar" id="plegar-plan"
+            title="Mostrar u ocultar los nombres">
+      <span class="ico">☰</span><span class="txt">Ocultar</span>
+    </button>
+    ${SECCIONES_PLAN.filter((s) => s.siempre || pantallaAncha()).map((s) => `
+      <button type="button" class="plan-nav-btn${s.id === activa ? " activa" : ""}"
+              data-plan-vista="${s.id}">
+        <span class="ico">${s.icono}</span><span class="txt">${esc(s.nombre)}</span>
+      </button>`).join("")}
+    <button type="button" class="plan-nav-btn" data-ir-configuracion>
+      <span class="ico">⚙</span><span class="txt">Configuración</span>
+    </button>
+  </nav>`;
+}
+
+// El gráfico y el mapa no se muestran en pantalla angosta, y se dice por qué.
+const tarjetaSoloNotebook = (que) => `<div class="tarjeta">
+  <h2>${esc(que)}</h2>
+  <p class="nota">Esta pantalla es para la computadora. ${esc(que)} necesita
+  ancho para leerse: veinticinco bancales en la pantalla de un teléfono quedan
+  en columnas de quince píxeles, y las fechas no entran.</p>
+  <p class="nota">Desde el teléfono, <b>Resumen</b> tiene todo lo planificado:
+  los cultivos, los sectores y lo que toca sembrar.</p>
+</div>`;
+
 // ---- Mapa de cultivos ----
 // Dónde va cada generación y por cuánto tiempo. Es la otra mitad de la
 // planificación: el plan estratégico dice CUÁNDO, el mapa dice DÓNDE, y hasta
@@ -2368,12 +2457,7 @@ function mapaDeCultivos() {
   return `
   <div class="tarjeta">
     <h2>Mapa de cultivos <small>${asignadas.length} de ${todas.length} ubicadas</small></h2>
-    <div class="pestanas-tareas">
-      <button type="button" class="pestana" data-plan-vista="lista">Resumen</button>
-        <button type="button" class="pestana" data-plan-vista="planificar">Cultivos</button>
-        <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
-        <button type="button" class="pestana activa" data-plan-vista="mapa">Mapa</button>
-    </div>
+    ${barraDePlan("mapa")}
 
     <p class="nota">${sel
       ? `Elegiste <b>${esc(sel.cultivo)} G${sel.generacion}</b>, que ocupa
@@ -2447,12 +2531,7 @@ function pantallaPlanificar() {
   return `
   <div class="tarjeta">
     <h2>Cultivos de la temporada</h2>
-    <div class="pestanas-tareas">
-      <button type="button" class="pestana" data-plan-vista="lista">Resumen</button>
-        <button type="button" class="pestana activa" data-plan-vista="planificar">Cultivos</button>
-        <button type="button" class="pestana" data-plan-vista="grafico">Plan estratégico</button>
-        <button type="button" class="pestana" data-plan-vista="mapa">Mapa</button>
-    </div>
+    ${barraDePlan("planificar")}
 
     <p class="nota">Todo lo de un cultivo se decide acá: el marco de plantación,
     cuántas generaciones y cada cuánto. La superficie, las plantas y los kilos
@@ -3008,7 +3087,16 @@ function render(vista, conservarScroll = false) {
       vistaPlan = b.dataset.planVista;
       cultivoAbierto = "";
       render("plan");
+      window.scrollTo(0, 0);
     };
+  });
+  const plegar = $("#plegar-plan");
+  if (plegar) plegar.onclick = () => {
+    escribir(LS.planPlegado, !leer(LS.planPlegado, false));
+    render("plan", true);
+  };
+  document.querySelectorAll("[data-ir-configuracion]").forEach((b) => {
+    b.onclick = () => render("configuracion");
   });
   document.querySelectorAll("[name=orden-plan]").forEach((r) => {
     r.onchange = () => { ordenPlan = r.value; render("plan", true); };

@@ -400,6 +400,125 @@ button.secundario {
 .gen-cultivo[open] summary::before { content: "▾ "; }
 .gen-cultivo summary span { font-weight: 400; color: var(--tenue); font-size: .85rem; }
 
+/* ---- croquis de los sectores ----
+   Una miniatura por sector: cada cuadradito es un bancal y los llenos son los
+   que el plan ya ocupó. Es lo que deja ver cómo quedó el campo desde el
+   teléfono, donde el mapa no entra. */
+.croquis-sectores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 10px 0;
+}
+.croquis {
+  border: 1px solid var(--sage-light);
+  border-radius: 9px;
+  padding: 9px 10px;
+  background: #fff;
+}
+.croquis-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.croquis-cab b { font-size: .92rem; color: var(--sage-dark); }
+.croquis-cab span { font-size: .72rem; color: var(--tenue); }
+.croquis-camas {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.croquis-camas i {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--crema);
+  border: 1px solid #e6eae3;
+}
+.croquis-camas i.lleno { background: var(--sage); border-color: var(--sage); }
+.croquis-pie { font-size: .74rem; color: var(--tenue); }
+
+/* ---- la barra de la sección Plan ----
+   En el teléfono, una fila de pestañas como las de Tareas. En pantallas anchas
+   se acomoda como columna a la izquierda de la tarjeta y se puede plegar a
+   solo iconos, que es lo que deja el ancho libre para el gráfico y el mapa. */
+.plan-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.plan-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  font-family: inherit;
+  font-size: .87rem;
+  font-weight: 600;
+  color: var(--tenue);
+  background: #fff;
+  border: 1.5px solid var(--sage-light);
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.plan-nav-btn.activa {
+  background: var(--sage);
+  border-color: var(--sage);
+  color: #fff;
+}
+.plan-nav-btn .ico { font-size: 1rem; line-height: 1; }
+/* El botón de plegar no tiene sentido en el teléfono: ahí es una fila. */
+.plan-nav .plegar { display: none; }
+
+@media (min-width: 900px) {
+  /* La tarjeta se parte en dos: la columna de secciones y el contenido. */
+  #vista > .tarjeta:has(.plan-nav) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 20px;
+    align-items: start;
+  }
+  #vista > .tarjeta:has(.plan-nav) > .plan-nav {
+    grid-row: 1 / 99;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 3px;
+    width: 178px;
+    margin-bottom: 0;
+    padding-right: 16px;
+    border-right: 1px solid var(--sage-light);
+    position: sticky;
+    top: 12px;
+  }
+  .plan-nav .plegar { display: flex; }
+  .plan-nav-btn {
+    border: none;
+    background: none;
+    border-radius: 9px;
+    justify-content: flex-start;
+    padding: 9px 11px;
+  }
+  .plan-nav-btn:hover { background: var(--crema); }
+  .plan-nav-btn.activa { background: var(--sage-suave); color: var(--sage-dark); }
+  .plan-nav .plegar {
+    margin-bottom: 6px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--sage-light);
+    border-radius: 0;
+    color: var(--tenue);
+  }
+
+  /* Plegada: solo iconos, y la columna se achica a su ancho. */
+  #vista > .tarjeta:has(.plan-nav.plegada) > .plan-nav { width: 44px; padding-right: 10px; }
+  .plan-nav.plegada .txt { display: none; }
+  .plan-nav.plegada .plan-nav-btn { justify-content: center; padding: 9px 0; gap: 0; }
+}
+
 /* ---- mapa de cultivos: espacio y tiempo a la vez ----
    Cada bancal es una columna y los meses bajan por las filas. Un cultivo
    plantado ocupa un rectángulo: ancho = los bancales que toma, alto = desde
