@@ -894,7 +894,10 @@ button.secundario {
   /* El gráfico y el mapa necesitan todo el ancho: partidos en dos columnas se
      vuelven ilegibles. */
   #vista > .tarjeta:has(.plan-grafico),
-  #vista > .tarjeta:has(.mapa-sectores) { column-span: all; }
+  #vista > .tarjeta:has(.mapa-sectores),
+  /* La tarjeta con la barra de Plan es el marco de la seccion: partida en
+     una de tres columnas, la barra y su contenido quedaban en 500 px. */
+  #vista > .tarjeta:has(.plan-nav) { column-span: all; }
 }
 
 /* "Saber más": la referencia del cultivo va al final y plegada. Quien abre la
@@ -1366,3 +1369,28 @@ h3.sub {
   white-space: nowrap;
 }
 @media (max-width: 359px) { .topbar h1 small { display: none; } }
+
+/* ---- a lo ancho: el gráfico y el mapa usan toda la pantalla ----
+   En la notebook el contenido estaba limitado a 1180 px y el mapa quedaba en
+   un rectángulo chico con márgenes vacíos a los dos lados. Estas dos pantallas
+   son las únicas donde el ancho es el dato: un campo de 106 bancales o una
+   temporada de doce meses. El resto de la app mantiene su ancho, porque un
+   formulario muy ancho se lee peor. */
+@media (min-width: 1000px) {
+  body.a-lo-ancho main {
+    max-width: none;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  body.a-lo-ancho #vista { columns: 1; }
+
+  /* El mapa y la lista llenan el alto disponible, no una fracción fija. */
+  body.a-lo-ancho .mapa-scroll { max-height: calc(100vh - 250px); }
+  body.a-lo-ancho .lista-scroll { max-height: calc(100vh - 290px); }
+  /* Cada grilla se reparte el alto según cuántas filas de sectores hay: con
+     el campo en dos filas, entero en la pantalla sin tener que bajar. */
+  body.a-lo-ancho .grilla {
+    height: max(240px, calc((100vh - 300px) / var(--filas-mapa, 1) - 62px));
+  }
+  body.a-lo-ancho .mapa-con-lista { grid-template-columns: minmax(0, 1fr) 280px; }
+}

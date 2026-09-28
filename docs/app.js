@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 51 · 27/9/2026";
+const VERSION_APP = "versión 52 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2277,7 +2277,9 @@ function correrGeneracion(id, dias) {
     generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
     metodo: g.metodo, fecha_almacigo: nueva.fecha_almacigo,
     fecha_campo: nueva.fecha_campo, camas: g.camas, sector: g.sector,
-    bancales: g.bancales, estado: g.estado, origen: "AMA",
+    // Solo números: si la planilla alguna vez convirtió "4, 5, 6" en una
+    // fecha, reenviarlo tal cual lo volvía a guardar dañado.
+    bancales: bancalesDe(g).join(", "), estado: g.estado, origen: "AMA",
   }, `${g.cultivo} G${g.generacion}: ${fechaCorta(antes)} → ${fechaCorta(despues)} ✓`);
 
   // Se mueve en la copia local para que el gráfico responda al instante.
@@ -2475,10 +2477,12 @@ function mapaDeCultivos() {
     fila: Number(s.fila) || 1,
     columna: Number(s.columna) || (i + 1),
   }));
-  // Se deja siempre una fila y una columna de más, para poder soltar un sector
-  // afuera del bloque y armar la disposición real del campo.
-  const filasMapa = Math.max(...conPos.map((s) => s.fila)) + 1;
-  const colsMapa = Math.max(...conPos.map((s) => s.columna)) + 1;
+  // Mientras se mueve un sector se agrega una fila y una columna de más, para
+  // poder soltarlo afuera del bloque. Antes quedaban siempre, y esa columna
+  // vacía de 300 px era lo que empujaba el mapa a tener scroll horizontal.
+  const extra = sectorMoviendo ? 1 : 0;
+  const filasMapa = Math.max(...conPos.map((s) => s.fila)) + extra;
+  const colsMapa = Math.max(...conPos.map((s) => s.columna)) + extra;
   const ocupadaPor = (f, c) => conPos.find((s) => s.fila === f && s.columna === c);
 
   return `
@@ -2508,8 +2512,9 @@ function mapaDeCultivos() {
         </div>
         <div class="mapa-scroll" id="mapa-scroll">
           <div class="mapa-sectores" id="mapa-lienzo"
-               style="grid-template-columns:repeat(${colsMapa}, minmax(300px, 1fr));
-                      grid-template-rows:repeat(${filasMapa}, auto)">
+               style="grid-template-columns:repeat(${colsMapa}, minmax(260px, 1fr));
+                      grid-template-rows:repeat(${filasMapa}, auto);
+                      --filas-mapa:${Math.max(1, filasMapa - extra)}">
             ${sectores().map(grillaDe).join("")}
             ${sectorMoviendo ? Array.from({ length: filasMapa }, (_, f) =>
                 Array.from({ length: colsMapa }, (_, c) => {
@@ -3086,6 +3091,12 @@ function render(vista, conservarScroll = false) {
   if (vista !== "cuentas") cuentaAbierta = "";
   vistaActual = vista;
   const scroll = window.scrollY;
+  // El gráfico y el mapa usan todo el ancho de la pantalla. El resto de la app
+  // queda con el ancho de siempre: un formulario de 1800 px es incómodo de
+  // leer, pero un campo de 106 bancales achicado a 1180 px desperdicia lo que
+  // la notebook tiene de sobra.
+  document.body.classList.toggle("a-lo-ancho",
+    vista === "plan" && !cultivoAbierto && (vistaPlan === "grafico" || vistaPlan === "mapa"));
   $("#vista").innerHTML = plantillas[vista]();
   // Al cambiar de sección se arranca de arriba; al redibujar la misma porque
   // llegaron datos, se deja donde estaba.

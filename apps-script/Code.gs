@@ -1108,7 +1108,11 @@ function generacionesDelPlan(chacra) {
         sector: String(f[8] || ""),
         // Si una fila vieja quedo con la fecha que invento la planilla al leer
         // "1, 2, 3", se devuelve vacia: mejor sin lugar que con uno falso.
-        bancales: (f[9] instanceof Date) ? "" : String(f[9] || ""),
+        // Solo una lista de numeros. Una celda que la planilla convirtio en
+        // fecha, o el texto de esa fecha guardado despues, se devuelve vacia:
+        // mejor sin lugar que con uno falso.
+        bancales: /^\s*\d+(\s*,\s*\d+)*\s*$/.test(String(f[9] instanceof Date ? "x" : f[9] || ""))
+          ? String(f[9]) : "",
         estado: String(f[10] || "Planificado"),
         // Lo que de verdad paso, calculado contra la hoja Siembras.
         sembrada: !!real,
