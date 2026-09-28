@@ -1541,3 +1541,11 @@ button.peligro { color: var(--peligro); border-color: #f0c9c3; }
   font-size: .82rem; color: var(--tenue);
 }
 .partir .secundario { width: auto; margin: 0; padding: 4px 10px; font-size: .82rem; }
+
+/* Barra estimada: al catálogo le faltan días y el largo es un supuesto. Se
+   raya para que no se la lea como un dato. */
+.plan-gen.estimada .tramo {
+  background-image: repeating-linear-gradient(135deg,
+    rgba(255,255,255,.45) 0 4px, transparent 4px 9px);
+}
+.estimada-marca { color: var(--amber); font-weight: 700; }

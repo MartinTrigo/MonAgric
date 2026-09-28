@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 58 · 28/9/2026";
+const VERSION_APP = "versión 59 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -2069,6 +2069,10 @@ function nombreGen(g, todas = leer(LS.generaciones, []) || []) {
   return `G${g.generacion}${"abcdefghij"[orden.indexOf(g.id)] || ""}`;
 }
 
+// Lo que se supone cuando el catálogo no dice nada: solo para poder dibujar
+// la barra, que queda marcada como estimada. No se guarda en ningún lado.
+const DIAS_SUPUESTOS = { almacigo: 28, cosecha: 60 };
+
 // Los cuatro momentos de una generación. En siembra directa no hay tramo de
 // almácigo: la planta arranca en el bancal.
 function tramosDe(g) {
@@ -2080,15 +2084,27 @@ function tramosDe(g) {
   const aCampo = g.fecha_campo || "";
   // De la bandeja al bancal: si el plan trae la fecha se respeta, porque es
   // una decisión; si no, se estima con los días de almácigo de la estación.
-  const campo = aCampo || sumarDias(inicioTodo, diasAlmacigo(g.cultivo, inicioTodo));
-  const aCosecha = directa
+  //
+  // Si el catálogo no tiene los días, la barra igual se dibuja, con un largo
+  // supuesto y marcada como estimada. Antes la fila quedaba vacía —el nombre
+  // sin barra, como pasó con Pak choi el 28/09— y no se entendía por qué.
+  const faltan = [];
+  let enBandeja = directa || aCampo ? 0 : diasAlmacigo(g.cultivo, inicioTodo);
+  if (!directa && !aCampo && !enBandeja) { enBandeja = DIAS_SUPUESTOS.almacigo; faltan.push("días de almácigo"); }
+  const campo = aCampo || sumarDias(inicioTodo, enBandeja) || inicioTodo;
+  let aCosecha = directa
     ? (p.dias_a_cosecha || 0)
     : (p.dias_trasplante_cosecha || 0);
-  const inicioCosecha = aCosecha ? sumarDias(campo, aCosecha) : "";
+  if (!aCosecha) { aCosecha = DIAS_SUPUESTOS.cosecha; faltan.push("días a cosecha"); }
+  const inicioCosecha = sumarDias(campo, aCosecha);
   const dura = p.dias_en_cosecha_max || p.dias_en_cosecha || 0;
+  // Sin ventana de cosecha la barra termina donde empieza a cosecharse: no se
+  // inventa cuánto dura, pero se avisa que falta.
+  if (!dura) faltan.push("días en cosecha");
   const finCosecha = inicioCosecha && dura ? sumarDias(inicioCosecha, dura) : inicioCosecha;
 
-  return { inicio: inicioTodo, campo, inicioCosecha, fin: finCosecha || campo, directa };
+  return { inicio: inicioTodo, campo, inicioCosecha, fin: finCosecha || campo, directa,
+           faltan };
 }
 
 const diaDe = (iso) => Math.floor(new Date(iso + "T00:00:00").getTime() / 86400000);
@@ -2213,11 +2229,14 @@ function planEstrategico() {
     // Una línea algo más marcada donde empieza otro cultivo: separa los grupos.
     const nuevoCultivo = ordenPlan === "cultivo" && i > 0 && gens[i - 1].cultivo !== g.cultivo;
     const nombre = nombreGen(g, todasGens);
+    // Si al catálogo le faltan días, la barra es una estimación y se ve así.
+    const estimada = t.faltan && t.faltan.length;
     return `<div class="plan-gen${movible ? " movible" : ""}${g.id === genPanel ? " abierta" : ""}${
-                 nuevoCultivo ? " nuevo-cultivo" : ""}"
+                 nuevoCultivo ? " nuevo-cultivo" : ""}${estimada ? " estimada" : ""}"
                  data-gen="${esc(g.id)}" ${movible ? `data-mover="${esc(g.id)}"` : ""}>
-      <div class="plan-nombre" title="${esc(g.cultivo)} ${nombre}${g.camas ? ` · ${num(g.camas, 1)} bancal(es)` : ""}">
-        ${esc(g.cultivo)} <span>${nombre}</span>
+      <div class="plan-nombre" title="${esc(g.cultivo)} ${nombre}${g.camas ? ` · ${num(g.camas, 1)} bancal(es)` : ""}${
+        estimada ? ` · barra estimada: faltan en el catálogo los ${t.faltan.join(" y los ")}` : ""}">
+        ${esc(g.cultivo)} <span>${nombre}</span>${estimada ? ` <span class="estimada-marca">≈</span>` : ""}
       </div>
       <div class="plan-pista${
         (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado") ? " sembrada" : ""}">
@@ -3542,6 +3561,14 @@ function render(vista, conservarScroll = false) {
   vistaActual = vista;
   campoTocado = false;           // la pantalla nueva arranca sin nada cargado
   const scroll = window.scrollY;
+  // Lo que tiene scroll propio —el plan estratégico, las listas de Cultivos y
+  // del mapa— también se queda donde estaba. Redibujar crea todo de nuevo, y
+  // sin esto el gráfico volvía arriba después de cada sincronización aunque
+  // la página no se moviera.
+  const CON_SCROLL = "#vista .plan-scroll, #vista .lista-scroll";
+  const internos = conservarScroll
+    ? [...document.querySelectorAll(CON_SCROLL)].map((el) => [el.scrollTop, el.scrollLeft])
+    : [];
   // El gráfico y el mapa usan todo el ancho de la pantalla. El resto de la app
   // queda con el ancho de siempre: un formulario de 1800 px es incómodo de
   // leer, pero un campo de 106 bancales achicado a 1180 px desperdicia lo que
@@ -3552,6 +3579,9 @@ function render(vista, conservarScroll = false) {
   // Al cambiar de sección se arranca de arriba; al redibujar la misma porque
   // llegaron datos, se deja donde estaba.
   window.scrollTo(0, conservarScroll ? scroll : 0);
+  document.querySelectorAll(CON_SCROLL).forEach((el, i) => {
+    if (internos[i]) { el.scrollTop = internos[i][0]; el.scrollLeft = internos[i][1]; }
+  });
   document.querySelectorAll(".tab").forEach((t) =>
     t.classList.toggle("activa", t.dataset.vista === vista));
 
@@ -4591,7 +4621,8 @@ function prepararTareas() {
           });
         }
       }
-      render("tareas");
+      // Tildar una tarea de abajo no tiene que llevar la lista al principio.
+      render("tareas", true);
     };
   });
 }
@@ -5502,7 +5533,9 @@ function prepararGeneraciones() {
     // Aparece ya en la lista y en el gráfico: sale de la copia local, que
     // incluye lo que todavía está en camino a la planilla.
     cultivoEditando = cultivo;
-    render("plan");
+    render("plan", true);
+    const nuevo = document.querySelector(`[data-cultivo-lista="${CSS.escape(cultivo)}"]`);
+    if (nuevo) nuevo.scrollIntoView({ block: "nearest" });
   };
 
   // Sacar una del plan.
@@ -5517,7 +5550,7 @@ function prepararGeneraciones() {
       const quedan = todas.filter((g) => g.id !== id);
       escribir(LS.generaciones, quedan);
       if (sacada) replanearCultivo(sacada.cultivo, quedan);
-      render("plan");
+      render("plan", true);
     };
   });
 }
