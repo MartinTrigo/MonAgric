@@ -6,7 +6,17 @@ que falta hacer.
 
 ---
 
-## Proyección en AMA Economía — hecha el 28/09, falta activarla
+## Proyección en AMA Economía — ACTIVA desde el 28/09
+
+Las dos propiedades de cada lado están cargadas y `probarProyeccion` en
+bioma-db devolvió los 21 cultivos. Tropiezos de la instalación, por si hay que
+repetirla: `AMA_URL` va con la dirección completa (…/macros/s/<id>/exec, no
+solo el id), y `AMA_PROYECCION_TOKEN` va con la clave sola, sin llaves; las
+llaves van del lado de AMA (`PROYECCION_TOKENS`). La versión de bioma-db que
+avisa claro si `AMA_URL` está incompleta está en el repo y entra con la
+próxima actualización del script.
+
+Lo que sigue es texto de la instalación:
 
 La pestaña **Proyección** de AMA Economía cruza el plan de AMA Producción
 (cultivo, m², rinde, kg: lo que está en Plan / Configuración) con los precios
