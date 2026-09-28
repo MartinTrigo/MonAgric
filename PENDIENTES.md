@@ -8,8 +8,11 @@ que falta hacer.
 
 ## Proyección en AMA Economía — ACTIVA desde el 28/09
 
-Las dos propiedades de cada lado están cargadas y `probarProyeccion` en
-bioma-db devolvió los 21 cultivos. Tropiezos de la instalación, por si hay que
+Las dos propiedades de cada lado están cargadas, `probarProyeccion` en
+bioma-db devolvió los 21 cultivos y la pestaña muestra cada cultivo y el total
+(confirmado por Martín). Hizo falta otra Nueva versión de bioma-db después de
+aprobar el permiso de llamar afuera: sin eso la app recibía una página de
+Google en vez de datos. Tropiezos de la instalación, por si hay que
 repetirla: `AMA_URL` va con la dirección completa (…/macros/s/<id>/exec, no
 solo el id), y `AMA_PROYECCION_TOKEN` va con la clave sola, sin llaves; las
 llaves van del lado de AMA (`PROYECCION_TOKENS`). La versión de bioma-db que
