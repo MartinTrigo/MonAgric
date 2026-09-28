@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 56 · 28/9/2026";
+const VERSION_APP = "versión 57 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -645,7 +645,7 @@ async function sincronizar(silencioso = true) {
   await Promise.all([traerResumen(), traerDatosHoras(), traerTareas(),
                      traerConfig(), traerCatalogo()]);
   refrescarEstado();
-  if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) render(vistaActual);
+  if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) redibujarConDatos(vistaActual);
 }
 
 // El servicio de la planilla de horas recibe un registro por vez y con sus
@@ -1897,7 +1897,7 @@ async function traerFichasTexto() {
   try {
     const r = await fetch("fichas.json");
     FICHAS = await r.json();
-    if (vistaActual === "plan" && cultivoAbierto) render("plan", true);
+    if (vistaActual === "plan" && cultivoAbierto) redibujarConDatos("plan");
   } catch { /* sin señal la primera vez: se muestra el resto de la ficha */ }
   finally { bajandoFichas = false; }
 }
@@ -2003,8 +2003,8 @@ async function traerGeneraciones(forzar = false) {
     const cambio = JSON.stringify(leer(LS.generaciones, null)) !== JSON.stringify(d.generaciones);
     escribir(LS.generaciones, d.generaciones);
     if (!cambio) return;
-    if (vistaActual === "inicio") render("inicio", true);
-    else if (vistaActual === "plan" && vistaPlan !== "lista") render("plan", true);
+    if (vistaActual === "inicio") redibujarConDatos("inicio");
+    else if (vistaActual === "plan" && vistaPlan !== "lista") redibujarConDatos("plan");
   } catch { /* sin señal: se usa lo último que se bajó */ }
 }
 
@@ -3251,7 +3251,7 @@ async function traerFicha(cultivo, forzar = false) {
     const delPanel = (leer(LS.generaciones, []) || []).find((x) => x.id === genPanel);
     if (cambio && vistaActual === "plan"
         && (cultivoAbierto === cultivo || delPanel?.cultivo === cultivo)) {
-      render("plan", true);
+      redibujarConDatos("plan");
     }
   } catch { /* sin señal: se muestra lo último que se bajó */ }
 }
@@ -3268,7 +3268,7 @@ async function traerAlmacigos(forzar = false) {
     if (!d.ok || !Array.isArray(d.almacigos)) return;
     const cambio = JSON.stringify(leer(LS.almacigos, null)) !== JSON.stringify(d.almacigos);
     escribir(LS.almacigos, d.almacigos);
-    if (cambio && vistaActual === "trasplantes") render("trasplantes", true);
+    if (cambio && vistaActual === "trasplantes") redibujarConDatos("trasplantes");
   } catch { /* sin conexión: se usa lo último que se bajó */ }
 }
 
@@ -3338,12 +3338,39 @@ function filaRegistro(r) {
 // ==========================================================
 // RENDER Y FORMULARIOS
 // ==========================================================
+// ¿La persona tocó algún campo desde que se dibujó la pantalla? Solo cuentan
+// los eventos de verdad (isTrusted): varias pantallas completan campos solas al
+// abrirse —la fecha, quién trabajó, lo sugerido— y eso no es estar cargando.
+// Guardar el formulario o cambiar de pantalla lo vuelve a cero.
+let campoTocado = false;
+["input", "change"].forEach((tipo) => document.addEventListener(tipo, (e) => {
+  if (e.isTrusted && e.target.closest && e.target.closest("#vista")) campoTocado = true;
+}, true));
+document.addEventListener("submit", () => { campoTocado = false; }, true);
+const formularioEmpezado = () => campoTocado;
+
+/* Redibujar porque llegaron datos, no porque la persona hizo algo. Estos
+   pedidos terminan solos, segundos después, y antes redibujaban con la
+   pantalla vuelta arriba y el formulario en blanco: al terminar cada
+   sincronización —o sea, después de cada cosa guardada— la pantalla saltaba
+   al principio y se perdía lo que se estaba escribiendo (28/09: "no me deja
+   trabajar"). Ahora se queda donde estaba, y si hay algo a medio cargar o un
+   arrastre en el mapa, no se redibuja: los datos nuevos aparecen en el
+   próximo cambio de pantalla. */
+function redibujarConDatos(vista) {
+  if (vistaActual !== vista) return;
+  if (document.body.classList.contains("lz-arrastrando")) return;
+  if (formularioEmpezado()) return;
+  render(vista, true);
+}
+
 function render(vista, conservarScroll = false) {
   if (vista === "configuracion" && vistaActual !== "configuracion") {
     vistaPrevia = vistaActual;
   }
   if (vista !== "cuentas") cuentaAbierta = "";
   vistaActual = vista;
+  campoTocado = false;           // la pantalla nueva arranca sin nada cargado
   const scroll = window.scrollY;
   // El gráfico y el mapa usan todo el ancho de la pantalla. El resto de la app
   // queda con el ancho de siempre: un formulario de 1800 px es incómodo de
@@ -3431,7 +3458,7 @@ function render(vista, conservarScroll = false) {
   // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
   // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
   if (vista === "cuentas") traerCuentas().then((cambio) => {
-    if (cambio && vistaActual === "cuentas") render("cuentas", true);
+    if (cambio && vistaActual === "cuentas") redibujarConDatos("cuentas");
   });
 
   // La pestaña de Cuentas solo existe para las chacras que tienen economía
@@ -5381,7 +5408,7 @@ window.addEventListener("online", () => sincronizar());
   if (horasVanAparte()) await traerDatosHoras();   // nombres del equipo del proyecto
   await traerConfig();
   await traerCatalogo();
-  if (["inicio", "plan"].includes(vistaActual)) render(vistaActual);
+  if (["inicio", "plan"].includes(vistaActual)) redibujarConDatos(vistaActual);
   sincronizar();
 })();
 

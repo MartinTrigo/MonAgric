@@ -81,6 +81,12 @@ cambiar archivos hay que subir `CACHE` en `sw.js` y `VERSION_APP` en `app.js`.
 7. **Al pedir datos dentro de `render()`, poner guard.** Sin él, la respuesta
    redibuja, redibujar vuelve a pedir, y queda un lazo que manda la pantalla
    arriba y golpea el servicio. Pasó con `traerCuentas`.
+8. **Lo que redibuja porque llegaron datos va por `redibujarConDatos()`,
+   nunca `render(vista)` a secas.** `render` sin `true` vuelve la pantalla
+   arriba y borra los formularios; al terminar cada sincronización eso hacía
+   saltar la pantalla después de cada cosa guardada (28/09, "no me deja
+   trabajar"). `redibujarConDatos` conserva el scroll y no redibuja si la
+   persona tocó un campo o está arrastrando en el mapa.
 
 ## Multi-chacra: lo que no hay que romper
 
