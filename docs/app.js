@@ -1,5 +1,5 @@
 // ==========================================================
-// AMA — App de Monitoreo Agrícola Agroecológico, desde el celular.
+// AMA Producción — Aplicaciones para el Manejo Agroecológico, desde el celular.
 // El nombre interno sigue siendo monagric: las claves de almacenamiento, la
 // direccion del repositorio y las planillas no se tocan, porque cambiarlas le
 // borraria a cada telefono su credencial y lo que tenga sin enviar.
@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 53 · 28/9/2026";
+const VERSION_APP = "versión 54 · 28/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -1834,7 +1834,7 @@ const plantillas = {
     </div>` : ""}
     <div class="tarjeta">
       <h2>Acerca de</h2>
-      <p class="nota"><b>AMA</b> — App de Monitoreo Agrícola Agroecológico.
+      <p class="nota"><b>AMA Producción</b> — Aplicaciones para el Manejo Agroecológico.
       Los registros se guardan en este teléfono (funciona sin señal) y se envían a la
       planilla de la chacra cuando hay conexión.</p>
       <p class="nota" style="margin-top:8px">

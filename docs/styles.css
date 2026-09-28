@@ -1368,6 +1368,7 @@ h3.sub {
   letter-spacing: .01em;
   white-space: nowrap;
 }
+@media (max-width: 599px) { .topbar h1 small { display: block; margin-left: 0; } }
 @media (max-width: 359px) { .topbar h1 small { display: none; } }
 
 /* ---- a lo ancho: el gráfico y el mapa usan toda la pantalla ----

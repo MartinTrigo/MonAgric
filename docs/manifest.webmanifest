@@ -1,6 +1,6 @@
 {
-  "name": "AMA - App de Monitoreo Agrícola Agroecológico",
-  "short_name": "AMA",
+  "name": "AMA Producción · Aplicaciones para el Manejo Agroecológico",
+  "short_name": "AMA Producción",
   "description": "Monitoreo agrícola agroecológico: siembras, trasplantes, cosechas y horas de trabajo",
   "start_url": ".",
   "display": "standalone",
