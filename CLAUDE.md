@@ -88,6 +88,24 @@ cambiar archivos hay que subir `CACHE` en `sw.js` y `VERSION_APP` en `app.js`.
    trabajar"). `redibujarConDatos` conserva el scroll y no redibuja si la
    persona tocó un campo o está arrastrando en el mapa.
 
+## El plan y la carga de datos, juntos (29/09)
+
+- **"Para sembrar" y "Para trasplantar" viven en su sección**, arriba del
+  formulario, como listas desplegables. Inicio solo muestra cuántas hay.
+  Tocar una completa el formulario con el plan: fecha de hoy (contra ella se
+  compara después lo planificado), cultivo, variedad, generación, bandejas
+  (plantas del marco ÷ alvéolos, una planta por alvéolo), y en trasplantes los
+  bancales que el plan le dio en el mapa. Todo queda editable.
+- **Lo que se registra es lo que se hizo, tal cual**: fecha real, marco real.
+  La diferencia con el plan sale de comparar las hojas, no se anota aparte.
+- **Corregir y borrar registros** desde "Últimos movimientos" (siembras,
+  trasplantes, cosechas, horas; las de Tica en la planilla de Bioma). El
+  servicio rearma la fila con la misma receta que al cargarla y deja copia de
+  cómo estaba en la hoja **Cambios** de la chacra: un borrado por error se
+  recupera de ahí. Los botones aparecen solo si la configuración trae
+  `corregir: true` (servicio nuevo); contra uno viejo quedarían en la cola.
+- La generación del plan tiene **Variedad** (columna al final de la hoja).
+
 ## Multi-chacra: lo que no hay que romper
 
 Cuatro de las cinco chacras no tienen nada que ver con la economía de Bioma.

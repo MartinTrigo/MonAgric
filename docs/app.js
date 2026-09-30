@@ -22,7 +22,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 60 · 28/9/2026";
+const VERSION_APP = "versión 61 · 30/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -632,6 +632,16 @@ async function sincronizar(silencioso = true) {
       .filter((t) => tipos.has(t)).forEach((t) => traerUltimos(t, true));
     // Las generaciones tienen su propio pedido: el plan entero.
     if (tipos.has("generaciones") || tipos.has("generacion_borrar")) traerGeneraciones(true);
+    // Una corrección o un borrado: se vuelve a pedir esa hoja, y si fue una
+    // siembra, también lo que depende de ella (lo sembrado del plan, los
+    // almácigos que esperan).
+    const corregidas = new Set(enviadosAhora
+      .filter((r) => r.tipo === "registro_editar" || r.tipo === "registro_borrar")
+      .map((r) => r.datos.hoja));
+    corregidas.forEach((h) => traerUltimos(h, true));
+    if (corregidas.has("siembras") || corregidas.has("trasplantes")) {
+      traerGeneraciones(true); traerAlmacigos(true);
+    }
     // Un trasplante recién subido saca su almácigo de la lista de pendientes,
     // y una siembra nueva puede sumar uno: las dos cosas cambian esa lista.
     if (tipos.has("trasplantes") || tipos.has("siembras")) traerAlmacigos(true);
@@ -944,7 +954,7 @@ const plantillas = {
       </div>
     </div>
 
-    ${tarjetaSiembrasPendientes()}
+    ${tarjetaParaHacer()}
 
     <div class="tarjeta">
       <h2>Lo cargado ${resumen ? "desde la chacra" : "<small>(solo este teléfono)</small>"}</h2>
@@ -981,8 +991,10 @@ const plantillas = {
     if (!hayConfig()) return tarjetaSinConfig();
     const yo = leer(LS.nombre, "");
     return `
-    <div class="tarjeta">
+    ${tarjetaParaSembrar()}
+    <div class="tarjeta" id="tarjeta-form-siembra">
       <h2>&#127793; Registrar siembra</h2>
+      <div id="desde-el-plan"></div>
       <form id="form-siembras">
         <label>Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
@@ -1066,24 +1078,13 @@ const plantillas = {
     });
 
     return `
-    ${listos.length || pronto.length ? `<div class="tarjeta">
-      <h2>Para trasplantar</h2>
-      <p class="nota">Según los días en almácigo de cada cultivo, contados desde
-      que se sembró. Es una guía: manda lo que se ve en la bandeja.</p>
-      ${listos.map((s) => `<div class="registro">
-        <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""} · G${s.generacion}</div>
-          <div class="cuando alerta">${esc(estadoAlmacigo(s).texto)}</div></div>
-      </div>`).join("")}
-      ${pronto.map((s) => `<div class="registro">
-        <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""} · G${s.generacion}</div>
-          <div class="cuando">${esc(estadoAlmacigo(s).texto)}</div></div>
-      </div>`).join("")}
-    </div>` : ""}
+    ${tarjetaParaTrasplantar(pend, listos, pronto)}
 
-    <div class="tarjeta">
+    <div class="tarjeta" id="tarjeta-form-trasplante">
       <h2>&#127807; Registrar trasplante${
         pend.length ? ` <small>${pend.length} almácigos esperando</small>` : ""}</h2>
       ${origen}
+      <div id="desde-el-plan"></div>
       <form id="form-trasplantes">
         <label>¿Qué cultivo?</label>
         ${buscadorCultivo("", "cultivo")}
@@ -1267,7 +1268,7 @@ const plantillas = {
       </form>
     </div>
 
-    ${horasVanAparte() ? `
+    ${horasVanAparte() && !CFG?.corregir ? `
     <div class="tarjeta">
       <h2>Últimos movimientos <small>planilla del proyecto</small></h2>
       ${pendientesHoras.map((r) => `<div class="registro">
@@ -1953,42 +1954,151 @@ function siembrasAgrupadas(dias = DIAS_AVISO) {
     .sort((a, b) => String(a.cuando).localeCompare(String(b.cuando)));
 }
 
-function tarjetaSiembrasPendientes() {
+// ---- Lo que el plan dice que toca hacer ----
+// La planificación y la carga de datos eran dos mundos: el plan se miraba en
+// Heirloom y en AMA se anotaba. Ahora el plan dice qué toca, y tocarlo deja el
+// formulario completo con lo que ya se sabe —cultivo, variedad, generación,
+// bandejas, bancales, marco—. Quien carga solo confirma o corrige.
+let abiertoParaSembrar = false;
+let abiertoParaTrasplantar = false;
+
+// Cuántas plantas pide el plan para esa cantidad de bancales, y en cuántas
+// bandejas entran. Sin esta cuenta había que salir a buscar el marco de
+// plantación y hacerla a mano antes de sembrar.
+function bandejasDelPlan(cultivo, bancales, alveolos) {
+  const plan = enPlan(cultivo) || {};
+  const p = perfil(cultivo) || {};
+  const lineas = plan.lineas || p.lineas_bancal || 0;
+  const distancia = plan.distancia_cm || p.distancia_cm || 0;
+  const plantas = plantasDe({ bancales, lineas, distancia_cm: distancia });
+  if (!plantas || !alveolos) return null;
+  return { plantas, lineas, distancia, bancales, alveolos,
+           bandejas: Math.ceil(plantas / alveolos) };
+}
+
+// La última variedad que se sembró de un cultivo: si el plan no la dice, es
+// la mejor apuesta.
+function ultimaVariedad(cultivo) {
+  const k = claveArea(cultivo);
+  const locales = pendientes.concat(enviados)
+    .filter((r) => r.tipo === "siembras" && claveArea(r.datos.cultivo) === k && r.datos.variedad)
+    .map((r) => r.datos.variedad);
+  if (locales.length) return locales[0];
+  const fila = (leer(LS.ultimos, {}).siembras || [])
+    .find((f) => claveArea(f.Cultivo) === k && f.Variedad);
+  return fila ? fila.Variedad : "";
+}
+
+// "G3", "G2 a G4" si son seguidas, o "G2, G3, G4 y G6" si falta alguna: "G2 a
+// G6" hacía creer que la G5 también estaba en el grupo.
+function etiquetaGeneraciones(gs) {
+  const o = [...gs].sort((a, b) => a - b);
+  if (o.length === 1) return `G${o[0]}`;
+  const seguidas = o.every((n, i) => i === 0 || n === o[i - 1] + 1);
+  const texto = seguidas ? `G${o[0]} a G${o[o.length - 1]}`
+    : `${o.slice(0, -1).map((n) => `G${n}`).join(", ")} y G${o[o.length - 1]}`;
+  return `${texto} <small>(${o.length} juntas)</small>`;
+}
+
+const cuandoTexto = (d) => (d === 0 ? "hoy"
+  : d < 0 ? `atrasada ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`
+  : `en ${d} día${d === 1 ? "" : "s"}`);
+
+// Inicio: solo cuántas hay y un botón a cada lista. Las listas viven en su
+// sección, al lado del formulario donde se cargan.
+function tarjetaParaHacer() {
+  const siembras = siembrasAgrupadas();
+  const almacigos = almacigosPendientes()
+    .filter((s) => { const d = estadoAlmacigo(s).dias; return d !== null && d <= DIAS_AVISO; });
+  if (!siembras.length && !almacigos.length) return "";
+  const atrasadas = siembras.filter((g) => g.cuando < hoy()).length;
+  const listos = almacigos.filter((s) => (estadoAlmacigo(s).dias ?? 99) <= 0).length;
+  return `<div class="tarjeta para-hacer">
+    <h2>Para hacer <small>según el plan</small></h2>
+    <div class="para-hacer-botones">
+      ${siembras.length ? `<button type="button" class="secundario" data-ir-pendientes="siembras">
+        &#127793; ${siembras.length} para sembrar${atrasadas ? ` <span class="etiqueta alerta">${atrasadas} atrasada${atrasadas === 1 ? "" : "s"}</span>` : ""}
+      </button>` : ""}
+      ${almacigos.length ? `<button type="button" class="secundario" data-ir-pendientes="trasplantes">
+        &#127807; ${almacigos.length} para trasplantar${listos ? ` <span class="etiqueta alerta">${listos} listo${listos === 1 ? "" : "s"}</span>` : ""}
+      </button>` : ""}
+    </div>
+  </div>`;
+}
+
+function tarjetaParaSembrar() {
   const pend = siembrasAgrupadas();
   if (!pend.length) return "";
-  const atrasadas = pend.filter((g) => g.cuando < hoy());
-
-  return `<div class="tarjeta">
-    <h2>&#127793; Para sembrar <small>${pend.length}</small></h2>
-    <p class="nota">Del plan de la temporada. Tocá una para cargarla: se abre
-    Siembras con el cultivo y la generación puestos. Desaparece de acá cuando
-    la siembra queda guardada, no antes.</p>
-    ${pend.slice(0, 8).map((g) => {
+  const atrasadas = pend.filter((g) => g.cuando < hoy()).length;
+  const semana = pend.filter((g) => g.cuando >= hoy() && diasEntre(hoy(), g.cuando) <= 7).length;
+  return `<details class="tarjeta desplegable" id="lista-para-sembrar"${abiertoParaSembrar ? " open" : ""}>
+    <summary>
+      <h2>&#127793; Para sembrar <small>${pend.length}</small></h2>
+      <span class="desplegable-resumen">${
+        atrasadas ? `<span class="etiqueta alerta">${atrasadas} atrasada${atrasadas === 1 ? "" : "s"}</span>` : ""}${
+        semana ? `<span class="etiqueta ok">${semana} esta semana</span>` : ""}</span>
+    </summary>
+    <p class="nota">Del plan de la temporada. Tocá una y el formulario se completa
+    con lo que dice el plan: revisá, cambiá lo que haga falta y guardá.</p>
+    ${pend.map((g) => {
       const d = diasEntre(hoy(), g.cuando);
-      const cuando = d === 0 ? "hoy"
-        : d < 0 ? `atrasada ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`
-        : `en ${d} día${d === 1 ? "" : "s"}`;
-      const gs = g.generaciones;
-      const etiqueta = gs.length === 1 ? `G${gs[0]}`
-        : `G${Math.min(...gs)} a G${Math.max(...gs)} <small>(${gs.length} juntas)</small>`;
+      const b = g.fecha_almacigo ? bandejasDelPlan(g.cultivo, g.camasTotal || 1, 128) : null;
+      const etiqueta = etiquetaGeneraciones(g.generaciones);
       return `<div class="registro abre-siembra" role="button" tabindex="0"
-                   data-sembrar="${esc(JSON.stringify({
-                     cultivo: g.cultivo, generacion: Math.min(...gs),
-                     directa: !g.fecha_almacigo }))}">
+                   data-sembrar="${esc(JSON.stringify({ cultivo: g.cultivo, cuando: g.cuando }))}">
         <div>
-          <div class="detalle">${esc(g.cultivo)} <span class="gen">${etiqueta}</span></div>
+          <div class="detalle">${esc(g.cultivo)}${g.variedad ? ` <span class="gen">${esc(g.variedad)}</span>` : ""}
+            <span class="gen">${etiqueta}</span></div>
           <div class="cuando">${g.fecha_almacigo ? "en bandeja" : "siembra directa"}${
-            g.camasTotal ? ` · ${num(g.camasTotal, 1)} cama(s)` : ""}${
+            g.camasTotal ? ` · ${num(g.camasTotal, 1)} bancal(es)` : ""}${
+            b ? ` · ${b.bandejas} bandeja${b.bandejas === 1 ? "" : "s"}` : ""}${
             g.sector ? ` · ${esc(g.sector)}` : ""} · ${fechaCorta(g.cuando)}</div>
         </div>
-        <span class="etiqueta ${d < 0 ? "alerta" : "ok"}">${cuando}</span>
+        <span class="etiqueta ${d < 0 ? "alerta" : "ok"}">${cuandoTexto(d)}</span>
       </div>`;
     }).join("")}
-    ${pend.length > 8 ? `<p class="nota">y ${pend.length - 8} más en el plan estratégico.</p>` : ""}
-    ${atrasadas.length ? `<p class="nota">${atrasadas.length} ya pasó su fecha.
-      Si no se van a sembrar, conviene sacarlas de la hoja «Plan generaciones»
-      para que dejen de aparecer.</p>` : ""}
+  </details>`;
+}
+
+function tarjetaParaTrasplantar(pend, listos, pronto) {
+  if (!pend.length) return "";
+  const despues = pend.filter((s) => !listos.includes(s) && !pronto.includes(s));
+  const fila = (s, alerta) => `<div class="registro abre-trasplante" role="button" tabindex="0"
+      data-trasplantar="${esc(s.id)}">
+    <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? ` <span class="gen">${esc(s.variedad)}</span>` : ""}
+      <span class="gen">G${s.generacion}</span></div>
+      <div class="cuando">sembrado el ${fechaCorta(s.fecha)}${s.plantines ? ` · ${num(s.plantines)} plantines` : ""}${
+        (() => {
+          const bs = bancalesPlanificados(s.cultivo, s.generacion);
+          return bs.length ? ` · ${esc(bs[0].sector)} ${bs.map((x) => x.bancal).join(", ")}` : "";
+        })()}</div></div>
+    <span class="etiqueta ${alerta ? "alerta" : "ok"}">${esc(estadoAlmacigo(s).texto)}</span>
   </div>`;
+  return `<details class="tarjeta desplegable" id="lista-para-trasplantar"${abiertoParaTrasplantar ? " open" : ""}>
+    <summary>
+      <h2>&#127807; Para trasplantar <small>${pend.length}</small></h2>
+      <span class="desplegable-resumen">${
+        listos.length ? `<span class="etiqueta alerta">${listos.length} listo${listos.length === 1 ? "" : "s"}</span>` : ""}${
+        pronto.length ? `<span class="etiqueta ok">${pronto.length} esta semana</span>` : ""}</span>
+    </summary>
+    <p class="nota">Los almácigos que esperan, según sus días en bandeja: es una
+    guía, manda lo que se ve en la bandeja. Tocá uno y el formulario se completa
+    con el plan —bancales, marco, generación—.</p>
+    ${listos.map((s) => fila(s, true)).join("")}
+    ${pronto.map((s) => fila(s, false)).join("")}
+    ${despues.map((s) => fila(s, false)).join("")}
+  </details>`;
+}
+
+// Dónde puso el plan a una generación: sector y bancales, uno por renglón.
+// Si se partió en varias partes, se juntan todas: son la misma siembra.
+function bancalesPlanificados(cultivo, generacion) {
+  const k = claveArea(cultivo);
+  const out = [];
+  (leer(LS.generaciones, []) || [])
+    .filter((g) => claveArea(g.cultivo) === k && Number(g.generacion) === Number(generacion) && g.sector)
+    .forEach((g) => bancalesDe(g).forEach((b) => out.push({ sector: g.sector, bancal: b })));
+  return out;
 }
 
 // ---- Plan estratégico ----
@@ -2037,7 +2147,7 @@ function conPendientesDelPlan(lista) {
       generacion: Number(d.generacion) || 1, metodo: d.metodo || "",
       fecha_almacigo: d.fecha_almacigo || "", fecha_campo: d.fecha_campo || "",
       camas: Number(d.camas) || 0, sector: d.sector || "", bancales: d.bancales || "",
-      estado: d.estado || "Planificado",
+      estado: d.estado || "Planificado", variedad: d.variedad || "",
     };
     out = previa ? out.map((x) => (x.id === id ? nueva : x)) : out.concat(nueva);
   });
@@ -2051,7 +2161,7 @@ function guardarGeneracion(g, mensaje) {
     generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
     metodo: g.metodo, fecha_almacigo: g.fecha_almacigo || "",
     fecha_campo: g.fecha_campo || "", camas: g.camas || "",
-    sector: g.sector || "",
+    sector: g.sector || "", variedad: g.variedad || "",
     // Solo números: si la planilla alguna vez convirtió "4, 5, 6" en una
     // fecha, reenviarlo tal cual lo volvía a guardar dañado.
     bancales: bancalesDe(g).join(", "), estado: g.estado || "Planificado", origen: "AMA",
@@ -2457,8 +2567,11 @@ function prepararPanelGeneracion() {
   // etapa como hecha es ese registro, no un tilde en el plan.
   panel.querySelectorAll("[data-panel-sembrar]").forEach((b) => {
     b.onclick = () => {
+      const lugar = bancalesPlanificados(g.cultivo, g.generacion)[0] || {};
       siembraSugerida = { cultivo: g.cultivo, generacion: g.generacion,
-                          directa: !g.fecha_almacigo };
+                          directa: !g.fecha_almacigo, camas: Number(g.camas) || 0,
+                          variedad: g.variedad || "", sector: lugar.sector || g.sector || "",
+                          bancal: lugar.bancal || "", cuando: g.fecha_almacigo || g.fecha_campo };
       genPanel = "";
       render("siembras");
     };
@@ -2954,6 +3067,8 @@ function formularioGeneracion(g) {
         <input type="text" name="camas" inputmode="decimal" value="${esc(String(g.camas || ""))}">
       </div>
     </div>
+    <label>Variedad</label>
+    <input type="text" name="variedad" maxlength="40" value="${esc(g.variedad || "")}">
     <div class="fila">
       <div class="solo-almacigo"${directa ? " hidden" : ""}>
         <label>Siembra en bandeja</label>
@@ -3064,6 +3179,8 @@ function pantallaPlanificar() {
     <form id="form-generaciones">
       <label>Cultivo</label>
       ${buscadorCultivo("", "cultivo")}
+      <label>Variedad <small>(opcional)</small></label>
+      <input type="text" name="variedad" maxlength="40" autocomplete="off" placeholder="Ej: Corazón de buey">
 
       <h3 class="sub">Marco de plantación</h3>
       <p class="nota">Viene del catálogo. Si acá se hace distinto, cambialo:
@@ -3392,7 +3509,10 @@ function historialDe(tipo) {
   // Lo cargado en este teléfono que todavía no figura en la lista de la chacra:
   // sea porque falta enviarlo o porque recién se envió y la planilla aún no lo
   // devolvió. Si no, el registro parecía desaparecer apenas se guardaba.
-  const locales = pendientes.concat(enviados)
+  // Las horas de Tica vuelven de la planilla de Bioma con otro id (su marca
+  // temporal): de las locales se muestran solo las que todavía no salieron.
+  const soloPorEnviar = tipo === "horas" && horasVanAparte();
+  const locales = (soloPorEnviar ? pendientes : pendientes.concat(enviados))
     .filter((r) => r.tipo === tipo && !yaEnLaPlanilla.has(String(r.id)))
     .slice(0, 5);
 
@@ -3400,8 +3520,10 @@ function historialDe(tipo) {
     ? locales.map(filaRegistro).join("") + delEquipo.map((f) => filaEquipo(tipo, f)).join("")
     : `<p class="nota">Todavía no hay registros cargados.</p>`;
 
-  return `<div class="tarjeta">
+  return `<div class="tarjeta" id="historial-${tipo}">
     <h2>Últimos movimientos <small>de la chacra</small></h2>
+    ${CFG?.corregir && delEquipo.length ? `<p class="nota">✎ corrige un registro y 🗑 lo borra.
+      Lo que se cambia queda copiado, como estaba, en la hoja «Cambios» de la planilla.</p>` : ""}
     ${cuerpo}
     <a class="enlace-planilla" href="${esc(enlacePlanilla())}" target="_blank" rel="noopener">
       Ver todo en la planilla</a>
@@ -3436,10 +3558,17 @@ function filaEquipo(tipo, f) {
     detalle = esc(f.Tarea || f.Cultivo || "");
     extra = "";
   }
-  return `<div class="registro">
+  const clave = `${tipo}|${f.Id}`;
+  const corregible = CFG?.corregir && f.Id && CORRECCION[tipo];
+  return `<div class="registro${registroEditando === clave ? " editando" : ""}">
     <div><div class="detalle">${detalle}</div>
       <div class="cuando">${fechaCorta(f.Fecha)}${extra ? " · " + extra : ""}</div></div>
-  </div>`;
+    ${corregible ? `<button type="button" class="quitar editar" data-corregir="${esc(clave)}"
+        aria-label="Corregir" title="Corregir">✎</button>
+      <button type="button" class="quitar" data-borrar-registro="${esc(clave)}"
+        aria-label="Borrar" title="Borrar">🗑</button>` : ""}
+  </div>
+  ${corregible && registroEditando === clave ? formularioCorreccion(tipo, f) : ""}`;
 }
 
 // Trae del servicio las últimas filas de una hoja y las guarda para verlas
@@ -3542,11 +3671,197 @@ function filaRegistro(r) {
     return "";        // config y demás: no son movimientos, no se listan
   }
 
+  // Lo que todavía no salió se puede sacar de la cola: un error se arregla
+  // antes de que llegue a la planilla.
+  const cancelable = esperando && pendientes.some((x) => x.id === r.id)
+    && ["siembras", "trasplantes", "cosechas", "horas"].includes(r.tipo);
   return `<div class="registro">
     <div><div class="detalle">${[titulo, detalle].filter(Boolean).join(" — ")}</div>
       <div class="cuando">${fechaCorta(d.fecha || d.hecha_el || "")}</div></div>
     <span class="etiqueta ${esperando ? "espera" : "ok"}">${esperando ? "Por enviar" : "Enviado"}</span>
+    ${cancelable ? `<button type="button" class="quitar" data-cancelar-registro="${esc(r.id)}"
+      aria-label="No enviar" title="Sacarlo de la cola: no se envía">&times;</button>` : ""}
   </div>`;
+}
+
+// ---- Corregir o borrar lo ya cargado ----
+// Antes, un error de carga se arreglaba abriendo la planilla. Ahora desde la
+// misma lista de "últimos movimientos". El servicio rearma la fila con la
+// misma receta que al cargarla y deja copia de cómo estaba en la hoja Cambios.
+let registroEditando = "";   // "tipo|id"
+
+// Qué se puede corregir de cada tipo: [dato, rótulo, clase de campo].
+const CORRECCION = {
+  siembras: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
+    ["variedad", "Variedad", "texto"], ["generacion", "Generación", "numero"],
+    ["tipo", "Tipo", "tipoSiembra"], ["bandejas", "Bandejas", "numero"],
+    ["tipo_bandeja", "Alvéolos", "alveolos"], ["sector", "Sector (directa)", "sector"],
+    ["bancal", "Bancal (directa)", "numero"], ["operador", "Operador", "persona"],
+    ["observaciones", "Observaciones", "texto"]],
+  trasplantes: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
+    ["variedad", "Variedad", "texto"], ["generacion", "Generación", "numero"],
+    ["sector", "Sector", "sector"], ["bancal", "Bancal", "numero"],
+    ["lineas", "Líneas", "numero"], ["distancia_cm", "Distancia (cm)", "numero"],
+    ["disposicion", "Disposición", "disposicion"], ["plantines", "Plantines", "numero"],
+    ["operador", "Operador", "persona"], ["observaciones", "Observaciones", "texto"]],
+  cosechas: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
+    ["kg", "Kg", "numero"], ["operador", "Cosechó", "persona"]],
+  horas: [["fecha", "Fecha", "fecha"], ["integrante", "Quién", "persona"],
+    ["horas", "Horas", "numero"], ["area", "Área", "area"],
+    ["actividad", "Actividad", "texto"], ["observaciones", "Qué se hizo", "texto"]],
+};
+// Todo lo que guarda la hoja de ese tipo: lo que no se corrige viaja como
+// estaba, porque el servicio rearma la fila entera.
+const DE_LA_HOJA = {
+  siembras: { fecha: "Fecha", cultivo: "Cultivo", variedad: "Variedad", tipo: "Tipo",
+    generacion: "Generación", bandejas: "Bandejas", tipo_bandeja: "Alvéolos",
+    plantines: "Plantines", sector: "Sector", bancal: "Bancal",
+    trasplante_estimado: "Trasplante estimado", cosecha_estimada: "Cosecha estimada",
+    operador: "Operador", observaciones: "Observaciones" },
+  trasplantes: { fecha: "Fecha", siembra_id: "Siembra origen", fecha_siembra: "Fecha siembra",
+    dias_almacigo_real: "Días en almácigo", dias_almacigo_teorico: "Días teóricos",
+    diferencia_dias: "Diferencia días", cultivo: "Cultivo", variedad: "Variedad",
+    generacion: "Generación", sector: "Sector", bancal: "Bancal", lineas: "Líneas",
+    distancia_cm: "Distancia cm", disposicion: "Disposición", marco: "Marco",
+    plantines: "Plantines", operador: "Operador", observaciones: "Observaciones" },
+  cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó" },
+  horas: { fecha: "Fecha", integrante: "Integrante", horas: "Horas", actividad: "Actividad",
+    area: "Área", observaciones: "Observaciones" },
+};
+const datosDeFila = (tipo, f) => Object.fromEntries(
+  Object.entries(DE_LA_HOJA[tipo]).map(([k, c]) => [k, f[c] ?? ""]));
+
+function campoCorreccion([k, rotulo, clase], v) {
+  const val = v == null ? "" : String(v);
+  const opciones = (lista) => {
+    const todas = lista.includes(val) || !val ? lista : [val, ...lista];
+    return todas.map((o) => `<option${String(o) === val ? " selected" : ""}>${esc(String(o))}</option>`).join("");
+  };
+  let campo;
+  if (clase === "fecha") campo = `<input type="date" name="${k}" value="${esc(val.slice(0, 10))}">`;
+  else if (clase === "numero") campo = `<input type="text" name="${k}" inputmode="decimal" value="${esc(val)}">`;
+  else if (clase === "cultivo") campo = `<select name="${k}">${opciones(cultivosOrdenados().lista)}</select>`;
+  else if (clase === "tipoSiembra") campo = `<select name="${k}">${opciones(tiposSiembra())}</select>`;
+  else if (clase === "alveolos") campo = `<select name="${k}">${opciones(tiposBandeja().map(String))}</select>`;
+  else if (clase === "disposicion") campo = `<select name="${k}">${opciones(DISPOSICIONES)}</select>`;
+  else if (clase === "persona") campo = `<select name="${k}">${opciones(integrantes())}</select>`;
+  else if (clase === "sector") campo = `<select name="${k}"><option value="">—</option>${
+    sectores().map((s) => `<option${s.sector === val ? " selected" : ""}>${esc(s.sector)}</option>`).join("")}</select>`;
+  else if (clase === "area") campo = `<select name="${k}">${opcionesArea(val)}</select>`;
+  else campo = `<input type="text" name="${k}" value="${esc(val)}">`;
+  return `<div><label>${esc(rotulo)}</label>${campo}</div>`;
+}
+
+function formularioCorreccion(tipo, f) {
+  const d = datosDeFila(tipo, f);
+  const campos = CORRECCION[tipo].map((c) => campoCorreccion(c, d[c[0]]));
+  // De a dos por renglón, como el resto de los formularios.
+  const filas = [];
+  for (let i = 0; i < campos.length; i += 2) filas.push(`<div class="fila">${campos[i]}${campos[i + 1] || ""}</div>`);
+  return `<form class="editar-gen" data-form-correccion="${esc(`${tipo}|${f.Id}`)}">
+    ${filas.join("")}
+    <div class="editar-gen-botones">
+      <button class="principal">Guardar corrección</button>
+      <button type="button" class="secundario" data-cancelar-correccion>Cancelar</button>
+    </div>
+  </form>`;
+}
+
+// Lo corregido, listo para la hoja: lo que se deduce de otros datos se vuelve
+// a calcular, igual que al cargarlo.
+function datosCorregidos(tipo, f, form) {
+  const d = datosDeFila(tipo, f);
+  CORRECCION[tipo].forEach(([k, , clase]) => {
+    const v = form.elements[k] ? form.elements[k].value.trim() : d[k];
+    d[k] = clase === "numero" ? (v === "" ? "" : aNumero(v)) : v;
+  });
+  if (tipo === "siembras") {
+    d.generacion = parseInt(d.generacion, 10) || 1;
+    const conBandeja = EN_BANDEJA.has(d.tipo);
+    d.bandejas = conBandeja ? parseInt(d.bandejas, 10) || 0 : 0;
+    d.tipo_bandeja = conBandeja ? parseInt(d.tipo_bandeja, 10) || 0 : 0;
+    d.plantines = conBandeja ? d.bandejas * d.tipo_bandeja : 0;
+    if (conBandeja) { d.sector = ""; d.bancal = ""; }
+    const p = perfil(d.cultivo) || {};
+    d.trasplante_estimado = conBandeja ? sumarDias(d.fecha, diasAlmacigo(d.cultivo, d.fecha)) : "";
+    d.cosecha_estimada = sumarDias(d.fecha, d.tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha);
+  } else if (tipo === "trasplantes") {
+    d.generacion = parseInt(d.generacion, 10) || 1;
+    const real = d.fecha_siembra ? diasEntre(String(d.fecha_siembra).slice(0, 10), d.fecha) : null;
+    d.dias_almacigo_real = real === null ? "" : real;
+    d.diferencia_dias = real === null || !d.dias_almacigo_teorico ? "" : real - Number(d.dias_almacigo_teorico);
+  }
+  return d;
+}
+
+// La copia local de "últimos", corregida o sin la fila, para que la pantalla
+// responda sin esperar a la planilla.
+function tocarUltimos(tipo, id, datos) {
+  const u = leer(LS.ultimos, {});
+  u[tipo] = (u[tipo] || []).flatMap((f) => {
+    if (String(f.Id) !== String(id)) return [f];
+    if (!datos) return [];
+    const nueva = { ...f };
+    Object.entries(DE_LA_HOJA[tipo]).forEach(([k, c]) => { nueva[c] = datos[k]; });
+    return [nueva];
+  });
+  escribir(LS.ultimos, u);
+}
+
+function prepararCorrecciones() {
+  const buscarFila = (clave) => {
+    const [tipo, ...resto] = clave.split("|");
+    const id = resto.join("|");
+    const f = (leer(LS.ultimos, {})[tipo] || []).find((x) => String(x.Id) === id);
+    return { tipo, id, f };
+  };
+  document.querySelectorAll("[data-corregir]").forEach((b) => {
+    b.onclick = () => {
+      registroEditando = registroEditando === b.dataset.corregir ? "" : b.dataset.corregir;
+      render(vistaActual, true);
+    };
+  });
+  document.querySelectorAll("[data-cancelar-correccion]").forEach((b) => {
+    b.onclick = () => { registroEditando = ""; render(vistaActual, true); };
+  });
+  document.querySelectorAll("[data-form-correccion]").forEach((form) => {
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const { tipo, id, f } = buscarFila(form.dataset.formCorreccion);
+      if (!f) return;
+      const datos = datosCorregidos(tipo, f, form);
+      if (!datos.fecha) return aviso("Falta la fecha.", true);
+      guardarRegistro("registro_editar", { hoja: tipo, id, datos }, "Corrección guardada ✓");
+      tocarUltimos(tipo, id, datos);
+      registroEditando = "";
+      render(vistaActual, true);
+    };
+  });
+  document.querySelectorAll("[data-borrar-registro]").forEach((b) => {
+    b.onclick = () => {
+      const { tipo, id, f } = buscarFila(b.dataset.borrarRegistro);
+      if (!f) return;
+      const que = [f.Cultivo || f.Integrante, f.Fecha ? fechaCorta(f.Fecha) : ""].filter(Boolean).join(" del ");
+      // Una siembra con trasplantes deja a esos trasplantes sin su origen.
+      const hijos = tipo === "siembras"
+        ? (leer(LS.ultimos, {}).trasplantes || []).filter((x) => String(x["Siembra origen"]) === id).length : 0;
+      if (!confirm(`¿Borrar ${que}?` + (hijos ? `\nOJO: tiene ${hijos} trasplante(s) cargado(s) que salen de esta siembra.` : "")
+                   + "\nQueda una copia en la hoja «Cambios» de la planilla.")) return;
+      guardarRegistro("registro_borrar", { hoja: tipo, id }, "Registro borrado ✓");
+      tocarUltimos(tipo, id, null);
+      registroEditando = "";
+      render(vistaActual, true);
+    };
+  });
+  document.querySelectorAll("[data-cancelar-registro]").forEach((b) => {
+    b.onclick = () => {
+      if (!confirm("¿Sacarlo de la cola? No se va a enviar.")) return;
+      pendientes = pendientes.filter((r) => r.id !== b.dataset.cancelarRegistro);
+      escribir(LS.pendientes, pendientes);
+      refrescarEstado();
+      render(vistaActual, true);
+    };
+  });
 }
 
 // ==========================================================
@@ -3617,6 +3932,7 @@ function render(vista, conservarScroll = false) {
    }[vista] || (() => {}))();
 
   prepararComunes();
+  prepararCorrecciones();
 
   // Las secciones de registro muestran lo último de toda la chacra.
   if (["siembras", "cosechas", "horas", "trasplantes"].includes(vista)) traerUltimos(vista);
@@ -3668,12 +3984,55 @@ function render(vista, conservarScroll = false) {
   // El plan también lo necesita Inicio, para avisar qué toca sembrar.
   if (vista === "plan" || vista === "inicio") traerGeneraciones();
 
-  // Tocar un aviso de "Para sembrar" abre el formulario con lo que ya se sabe.
+  // Tocar algo de "Para sembrar" completa el formulario con lo que dice el
+  // plan de esas generaciones: cuántos bancales, la variedad, dónde van.
+  // "Para trasplantar": el almácigo elegido, y con él el plan de esa generación.
+  document.querySelectorAll("[data-trasplantar]").forEach((fila) => {
+    const ir = () => {
+      const s = almacigosPendientes().find((x) => x.id === fila.dataset.trasplantar);
+      if (!s) return;
+      trasplanteSugerido = { cultivo: s.cultivo, generacion: s.generacion, siembra_id: s.id };
+      abiertoParaTrasplantar = false;
+      render("trasplantes");
+      const destino = $("#tarjeta-form-trasplante");
+      if (destino) destino.scrollIntoView({ block: "start" });
+    };
+    fila.onclick = ir;
+    fila.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); }
+    };
+  });
+  // Las listas recuerdan si estaban abiertas.
+  const listaS = $("#lista-para-sembrar");
+  if (listaS) listaS.addEventListener("toggle", () => { abiertoParaSembrar = listaS.open; });
+  const listaT = $("#lista-para-trasplantar");
+  if (listaT) listaT.addEventListener("toggle", () => { abiertoParaTrasplantar = listaT.open; });
+  // Inicio: los botones llevan a la sección con la lista abierta.
+  document.querySelectorAll("[data-ir-pendientes]").forEach((b) => {
+    b.onclick = () => {
+      if (b.dataset.irPendientes === "siembras") abiertoParaSembrar = true;
+      else abiertoParaTrasplantar = true;
+      render(b.dataset.irPendientes);
+    };
+  });
+
   document.querySelectorAll("[data-sembrar]").forEach((fila) => {
     const ir = () => {
-      try { siembraSugerida = JSON.parse(fila.dataset.sembrar); } catch { return; }
+      let clave;
+      try { clave = JSON.parse(fila.dataset.sembrar); } catch { return; }
+      const g = siembrasAgrupadas(9999).find((x) =>
+        claveArea(x.cultivo) === claveArea(clave.cultivo) && x.cuando === clave.cuando);
+      if (!g) return;
+      const lugar = bancalesPlanificados(g.cultivo, Math.min(...g.generaciones))[0] || {};
+      siembraSugerida = {
+        cultivo: g.cultivo, generacion: Math.min(...g.generaciones), generaciones: g.generaciones,
+        directa: !g.fecha_almacigo, camas: g.camasTotal || 0, variedad: g.variedad || "",
+        sector: lugar.sector || g.sector || "", bancal: lugar.bancal || "", cuando: g.cuando,
+      };
+      abiertoParaSembrar = false;
       render("siembras");
-      window.scrollTo(0, 0);
+      const destino = $("#tarjeta-form-siembra");
+      if (destino) destino.scrollIntoView({ block: "start" });
     };
     fila.onclick = ir;
     fila.onkeydown = (e) => {
@@ -3804,19 +4163,50 @@ function prepararSiembras() {
   enlazarSectorBancal(f);
   enlazarBuscadores(f);
 
-  // Si se llegó tocando un aviso de "Para sembrar", el formulario arranca con
-  // lo que el plan ya sabe. Queda todo editable: es una ayuda, no un dictado.
+  // Tocar algo de "Para sembrar" deja el formulario completo con lo que el
+  // plan ya sabe: la fecha de hoy (es contra ella que después se compara lo
+  // planificado), el cultivo, la variedad, la generación, y las bandejas ya
+  // calculadas con el marco del plan. Queda todo editable: es una ayuda, no un
+  // dictado.
+  let bandejasTocadas = false;
+  let delPlan = null;
+  f.bandejas.addEventListener("input", (e) => { if (e.isTrusted) bandejasTocadas = true; });
+  const sugerirBandejas = () => {
+    if (!delPlan || bandejasTocadas || !EN_BANDEJA.has(f.tipo.value)) return;
+    const b = bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0);
+    if (b) f.bandejas.value = b.bandejas;
+  };
   if (siembraSugerida) {
     const s = siembraSugerida;
     siembraSugerida = null;            // se usa una sola vez
+    delPlan = s;
+    f.fecha.value = hoy();
     f.cultivo.value = s.cultivo;
     const caja = f.querySelector("[data-buscador] .buscador-texto");
     if (caja) caja.value = s.cultivo;
+    f.variedad.value = s.variedad || ultimaVariedad(s.cultivo);
     f.generacion.value = s.generacion || 1;
     const tipo = s.directa ? "Siembra directa" : "Siembra almácigo";
     if ([...f.tipo.options].some((o) => o.value === tipo)) f.tipo.value = tipo;
-    aviso(`${s.cultivo} G${s.generacion}: revisá y guardá`);
+    // La bandeja de 128 es la de siempre; si la chacra no la tiene, la primera.
+    if ([...f.tipo_bandeja.options].some((o) => o.value === "128")) f.tipo_bandeja.value = "128";
+    sugerirBandejas();
+    // Siembra directa: el lugar que le dio el plan en el mapa.
+    if (s.directa && s.sector && f.sector) {
+      f.sector.value = s.sector;
+      f.sector.dispatchEvent(new Event("change"));
+      if (s.bancal && f.bancal) f.bancal.value = String(s.bancal);
+    }
+    const gs = s.generaciones || [s.generacion];
+    $("#desde-el-plan").innerHTML = `<div class="desde-plan">
+      <b>Del plan:</b> ${esc(s.cultivo)} ${etiquetaGeneraciones(gs)}
+      · planificada para el ${fechaCorta(s.cuando)}${s.camas ? ` · ${num(s.camas, 1)} bancal(es)` : ""}.
+      Revisá y guardá.
+      <button type="button" class="secundario" id="limpiar-plan">Cargar otra cosa</button>
+    </div>`;
+    $("#limpiar-plan").onclick = () => render("siembras");
   }
+  f.tipo_bandeja.addEventListener("change", sugerirBandejas);
 
   const actualizar = () => {
     const tipo = f.tipo.value;
@@ -3829,6 +4219,11 @@ function prepararSiembras() {
     if (conBandeja) {
       const total = (parseInt(f.bandejas.value, 10) || 0) * (parseInt(f.tipo_bandeja.value, 10) || 0);
       partes.push(`<b>${num(total)}</b> plantines`);
+      // Lo que pide el plan, para que la cuenta de las bandejas se vea.
+      const b = delPlan && claveArea(delPlan.cultivo) === claveArea(f.cultivo.value)
+        ? bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0) : null;
+      if (b) partes.push(`el plan pide <b>${num(b.plantas)} plantas</b> (${num(b.bancales, 1)} bancal(es),
+        ${b.lineas} líneas a ${b.distancia} cm) = ${b.bandejas} bandeja(s) de ${b.alveolos}`);
       // Los días dependen de la estación: se cuentan desde la fecha de siembra.
       const alm = diasAlmacigo(f.cultivo.value, f.fecha.value);
       if (alm) {
@@ -3887,7 +4282,9 @@ function prepararSiembras() {
 
     if (!leer(LS.nombre, "")) escribir(LS.nombre, datos.operador);
     guardarRegistro("siembras", datos);
-    render("inicio");
+    // Se queda en Siembras: lo guardado aparece en los últimos, sale de "Para
+    // sembrar", y la siguiente del plan está a un toque.
+    render("siembras");
   };
 }
 
@@ -4767,25 +5164,6 @@ function prepararTrasplantes() {
 
   f.siembra_id.addEventListener("change", alElegir);
 
-  // Si se llegó desde el detalle de una generación en el plan, el formulario
-  // arranca con su cultivo y su generación. Si su almácigo está en la lista,
-  // se elige también, que es lo que permite medir los días reales en bandeja.
-  if (trasplanteSugerido) {
-    const s = trasplanteSugerido;
-    trasplanteSugerido = null;             // se usa una sola vez
-    const op = s.siembra_id && [...f.siembra_id.options].find((o) => o.value === s.siembra_id);
-    if (op) {
-      f.siembra_id.value = s.siembra_id;
-      alElegir();
-    } else {
-      f.cultivo.value = s.cultivo;
-      const caja = f.querySelector("[data-buscador] .buscador-texto");
-      if (caja) caja.value = s.cultivo;
-      sugerirMarco(s.cultivo);
-    }
-    f.generacion.value = s.generacion || 1;
-    aviso(`${s.cultivo} G${s.generacion}: completá los bancales y guardá`);
-  }
   ["lineas", "distancia_cm", "plantines"].forEach((n) =>
     f[n].addEventListener("input", recalcular));
   f.disposicion.addEventListener("change", recalcular);
@@ -4807,12 +5185,55 @@ function prepararTrasplantes() {
   };
   engancharRenglones();
 
+  // Deja un renglón por cada bancal del plan, con su sector y su número.
+  function ponerDestinos(lista) {
+    renglones.innerHTML = lista.map((_, i) => renglonBancal(i)).join("");
+    proximo = lista.length;
+    [...renglones.querySelectorAll(".renglon-bancal")].forEach((div, i) => {
+      const sel = div.querySelector("[data-sector]");
+      sel.value = lista[i].sector;
+      div.querySelector("[data-bancal]").innerHTML = opcionesBancal(lista[i].sector, lista[i].bancal);
+    });
+    engancharRenglones();
+    recalcular();
+  }
+
   $("#btn-mas-bancal").onclick = () => {
     renglones.insertAdjacentHTML("beforeend", renglonBancal(proximo++));
     engancharRenglones();
     recalcular();
   };
 
+  // Si se llegó desde el detalle de una generación en el plan, el formulario
+  // arranca con su cultivo y su generación. Si su almácigo está en la lista,
+  // se elige también, que es lo que permite medir los días reales en bandeja.
+  if (trasplanteSugerido) {
+    const s = trasplanteSugerido;
+    trasplanteSugerido = null;             // se usa una sola vez
+    const op = s.siembra_id && [...f.siembra_id.options].find((o) => o.value === s.siembra_id);
+    if (op) {
+      f.siembra_id.value = s.siembra_id;
+      alElegir();
+    } else {
+      f.cultivo.value = s.cultivo;
+      const caja = f.querySelector("[data-buscador] .buscador-texto");
+      if (caja) caja.value = s.cultivo;
+      sugerirMarco(s.cultivo);
+    }
+    f.generacion.value = s.generacion || 1;
+    f.fecha.value = hoy();
+    // Los bancales que le dio el plan en el mapa, un renglón por bancal.
+    const lugares = bancalesPlanificados(s.cultivo, s.generacion);
+    if (lugares.length) ponerDestinos(lugares);
+    $("#desde-el-plan").innerHTML = `<div class="desde-plan">
+      <b>Del plan:</b> ${esc(s.cultivo)} G${s.generacion}${
+        lugares.length ? ` · ${esc(lugares[0].sector)} ${lugares.map((x) => x.bancal).join(", ")}`
+          : " · sin lugar en el mapa: elegí los bancales"}.
+      Revisá y guardá.
+      <button type="button" class="secundario" id="limpiar-plan">Cargar otra cosa</button>
+    </div>`;
+    $("#limpiar-plan").onclick = () => render("trasplantes");
+  }
   f.onsubmit = (e) => {
     e.preventDefault();
     const cultivo = f.cultivo.value;
@@ -5079,7 +5500,8 @@ function prepararEdicionCultivos() {
         if (!bancales.length) sector = "";
       }
       guardarGeneracion({ ...g, metodo, fecha_almacigo: almacigo, fecha_campo: campo,
-                          camas, sector, bancales: bancales.join(", ") },
+                          camas, sector, bancales: bancales.join(", "),
+                          variedad: f.variedad.value.trim() },
         `${g.cultivo} ${nombreGen(g)} actualizada ✓`);
       replanearCultivo(g.cultivo, todas());
       genEditando = "";
@@ -5569,7 +5991,7 @@ function prepararGeneraciones() {
         // En siembra directa la planta arranca en el bancal: no hay bandeja.
         fecha_almacigo: directa ? "" : fecha,
         fecha_campo: directa ? fecha : (bandeja ? sumarDias(fecha, bandeja) : ""),
-        camas, sector: f.sector.value,
+        camas, sector: f.sector.value, variedad: f.variedad.value.trim(),
         estado: "Planificado",
       }, `${fs.length} generación(es) de ${cultivo} al plan ✓`);
     });

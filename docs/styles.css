@@ -1549,3 +1549,45 @@ button.peligro { color: var(--peligro); border-color: #f0c9c3; }
     rgba(255,255,255,.45) 0 4px, transparent 4px 9px);
 }
 .estimada-marca { color: var(--amber); font-weight: 700; }
+
+/* ---- lo que el plan dice que toca: listas desplegables ----
+   Cerradas muestran cuántas hay y cuántas están atrasadas; abiertas, la lista.
+   Así no ocupan la pantalla entera antes del formulario. */
+details.desplegable > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+details.desplegable > summary::-webkit-details-marker { display: none; }
+details.desplegable > summary h2 { margin: 0; }
+details.desplegable > summary h2::before {
+  content: "▸ ";
+  color: var(--tenue);
+  font-size: .85em;
+}
+details.desplegable[open] > summary h2::before { content: "▾ "; }
+details.desplegable[open] > summary { margin-bottom: 8px; }
+.desplegable-resumen { display: flex; gap: 6px; flex-wrap: wrap; }
+.abre-siembra, .abre-trasplante { cursor: pointer; border-radius: 8px; }
+.abre-siembra:hover, .abre-trasplante:hover { background: var(--sage-suave); }
+
+/* Inicio: un botón por lista */
+.para-hacer-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.para-hacer-botones .secundario {
+  width: auto; margin: 0; display: inline-flex; align-items: center; gap: 6px;
+}
+
+/* El formulario llegó completado desde el plan: se dice de dónde. */
+.desde-plan {
+  background: var(--sage-suave);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  font-size: .88rem;
+  line-height: 1.45;
+}
+.desde-plan .secundario { width: auto; margin: 6px 0 0; padding: 4px 11px; font-size: .8rem; display: block; }

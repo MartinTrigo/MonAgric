@@ -70,6 +70,15 @@ def main() -> None:
         print(f"  [al dia]   los almacigos que esperan trasplante "
               f"({len(al['almacigos'])} esperando)")
 
+    # Corregir y borrar registros (29/09): la configuracion lo anuncia, y la app
+    # muestra los botones solo si lo ve.
+    cf = pedir("config=1&chacra=tica").get("config", {})
+    if cf.get("corregir"):
+        print("  [al dia]   corregir y borrar registros")
+    else:
+        print("  [ANTERIOR] corregir y borrar registros (los botones no aparecen)")
+        viejas.append("corregir y borrar registros")
+
     # La proyeccion para AMA Economia: con codigo viejo, "proyeccion" ni se
     # mira y la respuesta es la de un servicio sin nada que decir.
     pr = pedir("proyeccion=1&chacra=tica")

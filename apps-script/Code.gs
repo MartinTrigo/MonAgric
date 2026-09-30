@@ -123,9 +123,11 @@ var HOJAS = {
      queda como lo que era: una intencion contra la cual comparar. */
   generaciones: {
     nombre: "Plan generaciones",
+    // "Variedad" va al final (29/09): agregarla en el medio habria corrido
+    // las columnas de las filas que ya estaban escritas.
     encabezados: ["Id", "Temporada", "Cultivo", "Generación", "Método",
                   "Fecha almácigo", "Fecha a campo", "Camas", "Sector",
-                  "Bancales", "Estado", "Origen", "Recibido"],
+                  "Bancales", "Estado", "Origen", "Recibido", "Variedad"],
     fila: function (r) {
       var d = r.datos;
       // El id es estable y lo arma quien planifica: "gen-brocoli-4". Volver a
@@ -133,7 +135,7 @@ var HOJAS = {
       return [d.generacion_id || r.id, r.temporada || "", d.cultivo, d.generacion || 1,
               d.metodo || "", d.fecha_almacigo || "", d.fecha_campo || "",
               d.camas || "", d.sector || "", d.bancales || "",
-              d.estado || "Planificado", d.origen || "", new Date()];
+              d.estado || "Planificado", d.origen || "", new Date(), d.variedad || ""];
     },
   },
   trasplantes: {
@@ -388,6 +390,10 @@ function atender(p) {
       // Le avisa a la app si esta chacra tiene cuentas de sueldos. Las que no,
       // ni siquiera ven la seccion.
       cfg.cuentas = !!urlCuentasDe(chacra);
+      // Este servicio sabe corregir y borrar registros. La app muestra los
+      // botones solo si lo dice: contra una version anterior quedarian en la
+      // cola, fallando para siempre.
+      cfg.corregir = true;
       return respuesta({ ok: true, config: cfg });
     }
     if (p.resumen) return respuesta(calcularResumen(chacra));
@@ -446,6 +452,10 @@ function doPost(e) {
           // la misma generacion y nadie sabria cual vale.
           else if (r.tipo === "generaciones") { guardarGeneracion(libro, r); guardados++; }
           else if (r.tipo === "generacion_borrar") { borrarGeneracion(libro, r); guardados++; }
+          // Corregir o borrar un registro ya cargado: desde la lista de
+          // "ultimos movimientos" de cada seccion.
+          else if (r.tipo === "registro_editar") { corregirRegistro(chacra, libro, r, false); guardados++; }
+          else if (r.tipo === "registro_borrar") { corregirRegistro(chacra, libro, r, true); guardados++; }
         } catch (err) {
           noGuardados.push({ id: r.id, tipo: r.tipo, error: String(err) });
         }
@@ -455,7 +465,8 @@ function doPost(e) {
       // escritura por hoja: o no tienen hoja propia, o se escriben distinto.
       var SIN_HOJA = { tareas_hecha: 1, tareas_reabrir: 1, config: 1,
                        puntaje: 1, sugerencia: 1, cultivo: 1,
-                       generaciones: 1, generacion_borrar: 1 };
+                       generaciones: 1, generacion_borrar: 1,
+                       registro_editar: 1, registro_borrar: 1 };
       var porTipo = {};
       registros.forEach(function (r) {
         if (SIN_HOJA[r.tipo]) return;
@@ -1012,6 +1023,8 @@ function guardarGeneracion(libro, r) {
      fecha: "1, 2, 3" se convertia en el 1 de febrero de 2003 y la generacion
      quedaba sin lugar asignado aunque tuviera sector. */
   hoja.getRange(1, 10, hoja.getMaxRows(), 1).setNumberFormat("@");
+  // La hoja ya existia sin la columna Variedad: se le pone el encabezado.
+  if (!hoja.getRange(1, n).getValue()) hoja.getRange(1, n).setValue(def.encabezados[n - 1]);
 
   if (hoja.getLastRow() > 1) {
     var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
@@ -1130,6 +1143,7 @@ function generacionesDelPlan(chacra) {
         sembrada: !!real,
         siembra_id: real ? real.id : "",
         sembrada_el: real ? real.fecha : "",
+        variedad: String(f[13] || ""),
       };
     });
 }
@@ -1234,6 +1248,11 @@ function almacigosEsperando(chacra) {
 function ultimosDeHoja(chacra, cual, cuantos) {
   var def = HOJAS[String(cual).toLowerCase()];
   if (!def) return [];
+  // Las horas de Tica viven en la planilla de Bioma: se leen de ahi, con los
+  // mismos encabezados que las de las demas chacras.
+  if (def === HOJAS.horas && String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
+    return ultimasHorasDeTica(cuantos);
+  }
   var hoja = planillaDe(chacra).getSheetByName(def.nombre);
   if (!hoja || hoja.getLastRow() < 2) return [];
 
@@ -1250,6 +1269,102 @@ function ultimosDeHoja(chacra, cual, cuantos) {
     });
     return obj;
   }).reverse();          // el más nuevo primero
+}
+
+// ---------- Corregir y borrar registros ----------
+//
+// Antes, para arreglar una siembra mal cargada habia que abrir la planilla.
+// Ahora se corrige desde la lista de "ultimos movimientos" de cada seccion.
+//
+// Nada se pierde: cada cambio deja la fila COMO ESTABA en la hoja "Cambios"
+// de la chacra, con quien lo hizo y cuando. Si alguien borra algo por error,
+// se recupera copiando esa fila de vuelta.
+var CORREGIBLES = { siembras: 1, trasplantes: 1, cosechas: 1, horas: 1 };
+var CAMBIOS = { nombre: "Cambios",
+                encabezados: ["Cuándo", "Hoja", "Id", "Qué", "Quién", "Cómo estaba"] };
+
+function anotarCambio(libro, cual, id, que, quien, antes) {
+  var hoja = obtenerHoja(libro, CAMBIOS);
+  hoja.appendRow([new Date(), cual, id, que, quien || "", JSON.stringify(antes)]);
+}
+
+function corregirRegistro(chacra, libro, r, borrar) {
+  var d = r.datos || {};
+  var cual = String(d.hoja || "").toLowerCase();
+  var id = String(d.id || "");
+  if (!CORREGIBLES[cual] || !id) throw new Error("Ese registro no se puede corregir desde la app.");
+  if (cual === "horas" && String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
+    return corregirHoraDeTica(libro, id, d.datos || {}, borrar, r.dispositivo);
+  }
+  var def = HOJAS[cual];
+  var hoja = libro.getSheetByName(def.nombre);
+  if (!hoja || hoja.getLastRow() < 2) throw new Error("No encontré la hoja " + def.nombre + ".");
+  var n = def.encabezados.length;
+  var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) !== id) continue;
+    var fila = i + 2;
+    var antes = hoja.getRange(fila, 1, 1, n).getValues()[0];
+    var obj = {};
+    def.encabezados.forEach(function (c, j) { obj[c] = antes[j]; });
+    anotarCambio(libro, def.nombre, id, borrar ? "borrado" : "corregido", r.dispositivo, obj);
+    if (borrar) { hoja.deleteRow(fila); return; }
+    // La fila se rearma con la misma receta que al cargarla. Se conservan el
+    // id, la temporada y quien la cargo: corregir no es cargar de nuevo.
+    var iCargado = def.encabezados.indexOf("Cargado por");
+    var nueva = def.fila({ id: id, temporada: antes[1], datos: d.datos || {},
+                           dispositivo: iCargado >= 0 ? antes[iCargado] : "" });
+    hoja.getRange(fila, 1, 1, n).setValues([nueva]);
+    return;
+  }
+  // Ya no esta: otro telefono lo borro antes. No es un error que haya que
+  // reintentar para siempre.
+}
+
+// Las horas de Tica estan en la planilla de Bioma, en la hoja de respuestas:
+// Marca(1) Fecha(2) Trabajador(3) Horas(4) Actividad(5) Obs(6) Area(7). Se
+// identifican por la marca temporal, que no cambia aunque se reordenen.
+function hojaHorasDeTica() {
+  var hojas = SpreadsheetApp.openById(PLANILLA_HORAS_TICA).getSheets();
+  for (var i = 0; i < hojas.length; i++) {
+    if (hojas[i].getName().indexOf("Respuestas de formulario") === 0) return hojas[i];
+  }
+  throw new Error("No encontré las horas de Bioma.");
+}
+
+function ultimasHorasDeTica(cuantos) {
+  var hoja = hojaHorasDeTica();
+  if (hoja.getLastRow() < 2) return [];
+  var n = Math.min(Math.max(cuantos, 1), Math.min(hoja.getLastRow() - 1, 30));
+  var tz = Session.getScriptTimeZone();
+  var fecha = function (v) { return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || ""); };
+  return hoja.getRange(hoja.getLastRow() - n + 1, 1, n, 7).getValues().map(function (f) {
+    return { "Id": (f[0] instanceof Date) ? "bioma-" + f[0].getTime() : "",
+             "Fecha": fecha(f[1]), "Integrante": String(f[2] || ""), "Horas": f[3],
+             "Actividad": String(f[4] || ""), "Área": String(f[6] || ""),
+             "Observaciones": String(f[5] || ""), "Cargado por": "planilla de horas" };
+  }).reverse();
+}
+
+function corregirHoraDeTica(libro, id, datos, borrar, quien) {
+  var marca = Number(String(id).replace("bioma-", ""));
+  if (!marca) throw new Error("Esa hora no tiene marca: se corrige en la planilla.");
+  var hoja = hojaHorasDeTica();
+  var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, 7).getValues();
+  for (var i = filas.length - 1; i >= 0; i--) {
+    var m = filas[i][0];
+    if (!(m instanceof Date) || m.getTime() !== marca) continue;
+    anotarCambio(libro, "Horas (planilla de Bioma)", id, borrar ? "borrado" : "corregido", quien,
+                 { marca: m, fecha: filas[i][1], trabajador: filas[i][2], horas: filas[i][3],
+                   actividad: filas[i][4], obs: filas[i][5], area: filas[i][6] });
+    if (borrar) { hoja.deleteRow(i + 2); return; }
+    var p = String(datos.fecha || "").split("-");
+    var f = p.length === 3 ? new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0) : filas[i][1];
+    hoja.getRange(i + 2, 1, 1, 7).setValues([[m, f, String(datos.integrante || filas[i][2]),
+      Number(datos.horas) || filas[i][3], String(datos.actividad || ""),
+      String(datos.observaciones || ""), String(datos.area || "")]]);
+    return;
+  }
 }
 
 // ---------- Espejo de las horas de Chacra Tica ----------
