@@ -939,9 +939,10 @@ const plantillas = {
       <input type="url" id="aj-url" value="${esc(leer(LS.scriptUrl, ""))}"
              placeholder="ya viene configurado — dejalo vacío">
 
+      ${horasVanAparte() && !horasPorServicio() ? `
       <label>Servicio de horas <small>(planilla del proyecto)</small></label>
       <input type="url" id="aj-url-horas" value="${esc(leer(LS.urlHoras, ""))}"
-             placeholder="ya viene configurado — dejalo vacío">
+             placeholder="ya viene configurado — dejalo vacío">` : ""}
 
       <button class="principal" id="btn-guardar-ajustes">Guardar ajustes</button>
       <button class="secundario" id="btn-probar">Probar conexión</button>

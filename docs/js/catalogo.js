@@ -177,25 +177,31 @@ function replanearCultivo(cultivo, generaciones) {
   const m2 = bancalM2();
   if (!m2 || !CFG) return;
   const k = claveArea(cultivo);
-  const ya = (CFG.plan || []).find((p) => claveArea(p.cultivo) === k) || {};
+  const ya = (CFG.plan || []).find((p) => claveArea(p.cultivo) === k);
   const plan = (CFG.plan || []).filter((p) => claveArea(p.cultivo) !== k);
   const bancales = generaciones.filter((g) => claveArea(g.cultivo) === k)
     .reduce((a, g) => a + (Number(g.camas) || 0), 0);
+  let fila = null;
   if (bancales) {
     const p = perfil(cultivo) || {};
+    const antes = ya || {};
     const superficie = Math.round(bancales * m2 * 100) / 100;
-    const rinde = ya.rinde_kg_m2 || p.rinde_ref_kg_m2 || 0;
-    const lineas = ya.lineas || p.lineas_bancal || 0;
-    const distancia = ya.distancia_cm || p.distancia_cm || 0;
-    plan.push({
-      cultivo: ya.cultivo || cultivo, superficie_m2: superficie,
+    const rinde = antes.rinde_kg_m2 || p.rinde_ref_kg_m2 || 0;
+    const lineas = antes.lineas || p.lineas_bancal || 0;
+    const distancia = antes.distancia_cm || p.distancia_cm || 0;
+    fila = {
+      cultivo: antes.cultivo || cultivo, superficie_m2: superficie,
       cosecha_esperada_kg: Math.round(superficie * rinde),
       rinde_kg_m2: rinde, lineas, distancia_cm: distancia,
       plantas: plantasDe({ bancales, lineas, distancia_cm: distancia }),
-    });
+    };
+    plan.push(fila);
   }
+  // Sin generaciones y sin fila en el plan: no hay nada que cambiar.
+  if (!fila && !ya) return;
   plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
-  guardarConfig({ plan }, "", "");
+  guardarPartesDeConfig({ plan },
+    [["config_plan", fila || { cultivo: ya.cultivo, borrar: true }]], "", "");
 }
 
 // En Chacra Tica los nombres salen también de la planilla de horas del proyecto,

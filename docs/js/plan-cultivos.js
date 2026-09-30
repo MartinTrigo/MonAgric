@@ -568,16 +568,17 @@ function prepararGeneraciones() {
     const lineas = parseInt(f.lineas.value, 10) || 0;
     const distancia = aNumero(f.distancia.value) || 0;
     if (m2 && bancalesTotal) {
-      const plan = [...(CFG?.plan || [])].filter((p) => p.cultivo !== cultivo);
-      plan.push({
+      const plan = [...(CFG?.plan || [])].filter((p) => claveArea(p.cultivo) !== claveArea(cultivo));
+      const fila = {
         cultivo,
         superficie_m2: Math.round(superficie * 100) / 100,
         cosecha_esperada_kg: Math.round(superficie * rinde),
         rinde_kg_m2: rinde, lineas, distancia_cm: distancia,
         plantas: plantasDe({ bancales: bancalesTotal, lineas, distancia_cm: distancia }),
-      });
+      };
+      plan.push(fila);
       plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
-      guardarConfig({ plan }, "", "");
+      guardarPartesDeConfig({ plan }, [["config_plan", fila]], "", "");
     }
 
     // Las nuevas trasplantan igual que las que ya hay de este cultivo.

@@ -565,7 +565,13 @@ function prepararMapa() {
       const p = pos.find((q) => q.sector === s.sector);
       return { ...s, columna: (p.x - minX) / LZ.paso + 1, fila: (p.y - minY) / LZ.paso + 1 };
     });
-    guardarConfig({ sectores: lista }, `${nombre} movido ✓`, "plan");
+    // Solo viajan los sectores que cambiaron de lugar: casi siempre uno, todos
+    // cuando el campo entero se corrió para no quedar en negativo.
+    const movidos = lista.filter((s) => {
+      const antes = sectores().find((x) => x.sector === s.sector) || {};
+      return antes.fila !== s.fila || antes.columna !== s.columna;
+    }).map((s) => ["config_sector", { sector: s.sector, fila: s.fila, columna: s.columna }]);
+    guardarPartesDeConfig({ sectores: lista }, movidos, `${nombre} movido ✓`, "plan");
   };
 
   const cancelar = $("#cancelar-eleccion");

@@ -208,6 +208,22 @@ Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
 
 ### 0 bis. Cerrar el script de horas — es el único secreto a la vista
 
+> **30/09: resuelto en el código.** Las horas de Tica viajan con el resto de
+> la cola a `Code.gs`, que con la credencial ya validada las escribe en la
+> misma hoja de respuestas y con el mismo formato (bioma-db las importa igual:
+> lee por nombre de columna). Suma la columna 8, **"Cargado por"**, que cierra
+> el punto 2 de arriba. Los nombres del equipo llegan en la configuración
+> (`nombres_horas`). La app sigue por el camino viejo mientras el servicio no
+> anuncie `horas_por_servicio`, así que nada se rompe antes de implementar.
+>
+> **Falta, en este orden:** (1) implementar `Code.gs` como Nueva versión;
+> (2) `python tools/version_servicio.py` tiene que decir "las horas de Tica
+> entran por el servicio"; (3) cargar una hora real desde la app y ver la fila
+> con "Cargado por" en la planilla; (4) en la planilla de horas, Extensiones →
+> Apps Script → Implementar → Administrar implementaciones → **Archivar** la
+> del Web App; (5) sacar `URL_HORAS_POR_DEFECTO` y el camino viejo de la app.
+> Hasta el paso 4 la dirección sigue abierta.
+
 Verificado el 17/09 con pedidos reales. El servicio de AMA está bien cerrado:
 sin credencial no entrega config, ni cuentas, ni economía, y no escribe nada.
 La URL de bioma-mov nunca entró al historial de git.

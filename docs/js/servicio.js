@@ -41,9 +41,11 @@ async function sincronizar(silencioso = true) {
   const enviadosAhora = [];
   const fallaron = [];
 
-  // Las horas de Chacra Tica van al servicio del proyecto (un registro por vez);
-  // las de las demás chacras viajan con todo lo otro a su propia planilla.
-  const horas = horasVanAparte() ? pendientes.filter((r) => r.tipo === "horas") : [];
+  // Las horas de Chacra Tica, contra un servicio anterior, van al script de la
+  // planilla de horas (un registro por vez). Con el servicio nuevo viajan con
+  // todo lo otro y él las pasa a la planilla de Bioma (ver horasPorServicio).
+  const horas = horasVanAparte() && !horasPorServicio()
+    ? pendientes.filter((r) => r.tipo === "horas") : [];
   for (const r of horas) {
     try {
       await enviarHora(r);
@@ -147,9 +149,11 @@ async function enviarHora(r) {
   if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
 }
 
-// Nombres del equipo y últimos registros, de la planilla de horas.
+// Nombres del equipo y últimos registros, de la planilla de horas. Con el
+// servicio nuevo los nombres vienen en la configuración (nombres_horas) y los
+// últimos registros, en la lista de cada sección: no hay nada que pedir acá.
 async function traerDatosHoras() {
-  if (!navigator.onLine) return;
+  if (!navigator.onLine || horasPorServicio()) return;
   try {
     const r = await fetch(urlHoras());
     const d = await r.json();
@@ -353,6 +357,65 @@ function guardarConfig(cambios, mensaje = "Configuración guardada ✓", volverA
   if (volverA) render(volverA, volverA === vistaActual);
 }
 
+/* La configuración de a una parte (desde el 30/09). guardarConfig manda la
+   copia entera del teléfono y el servicio reescribe la hoja con ella: si otro
+   teléfono había movido un sector o replaneado otro cultivo después de que
+   este bajó su copia, lo pisaba sin avisar. Lo que se toca a cada rato —el
+   plan de un cultivo, que se rehace con cada generación, y dónde está un
+   sector en el mapa— viaja ahora como una parte suelta (config_plan,
+   config_sector), y el servicio cambia esa fila y nada más.
+
+   partes: [["config_plan", {cultivo, superficie_m2, …} | {cultivo, borrar}],
+            ["config_sector", {sector, fila, columna}], …]
+   Contra un servicio anterior, o con una configuración entera esperando en la
+   cola, se guarda entera como siempre. */
+function guardarPartesDeConfig(cambios, partes, mensaje = "Configuración guardada ✓", volverA = "configuracion") {
+  if (!CFG?.parcial || pendientes.some((r) => r.tipo === "config")) {
+    return guardarConfig(cambios, mensaje, volverA);
+  }
+  CFG = Object.assign({}, CFG, cambios);
+  escribir(LS.config, CFG);
+  const mismaParte = (tipo, a, b) => (tipo === "config_plan"
+    ? claveArea(a.cultivo) === claveArea(b.cultivo) : a.sector === b.sector);
+  partes.forEach(([tipo, datos]) => {
+    // Una parte nueva de lo mismo reemplaza a la que esperaba enviarse.
+    pendientes = pendientes.filter((r) => !(r.tipo === tipo && mismaParte(tipo, r.datos || {}, datos)));
+    pendientes.push({
+      id: uid(), tipo, datos,
+      temporada: CFG?.temporada?.nombre || "",
+      creado_en: ahora(),
+      dispositivo: leer(LS.nombre, ""),
+    });
+  });
+  escribir(LS.pendientes, pendientes);
+  refrescarEstado();
+  if (mensaje) aviso(mensaje);
+  sincronizar();
+  if (volverA) render(volverA, volverA === vistaActual);
+}
+
+// Las partes que siguen en la cola, encima de lo que devolvió el servicio:
+// si no, un sector recién movido volvía a su lugar viejo hasta que llegaran.
+function conPendientesDeConfig(cfg) {
+  pendientes.forEach((r) => {
+    const d = r.datos || {};
+    if (r.tipo === "config_plan") {
+      const k = claveArea(d.cultivo);
+      cfg.plan = (cfg.plan || []).filter((p) => claveArea(p.cultivo) !== k);
+      if (!d.borrar) {
+        cfg.plan.push({ cultivo: d.cultivo, superficie_m2: d.superficie_m2 || 0,
+          cosecha_esperada_kg: d.cosecha_esperada_kg || 0, rinde_kg_m2: d.rinde_kg_m2 || 0,
+          lineas: d.lineas || 0, distancia_cm: d.distancia_cm || 0, plantas: d.plantas || 0 });
+        cfg.plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
+      }
+    } else if (r.tipo === "config_sector") {
+      cfg.sectores = (cfg.sectores || []).map((s) => (s.sector === d.sector
+        ? { ...s, fila: Number(d.fila) || 0, columna: Number(d.columna) || 0 } : s));
+    }
+  });
+  return cfg;
+}
+
 // Trae del servicio la configuración de esta chacra.
 async function traerConfig() {
   if (!chacraCodigo() || !navigator.onLine) return;
@@ -360,6 +423,10 @@ async function traerConfig() {
     const d = await (await fetch(
       `${urlServicio()}?${conCredenciales("config=1")}`)).json();
     if (!d.ok || !d.config) return;
+    // Tica: los nombres del equipo, de la planilla de horas (servicio nuevo).
+    if (Array.isArray(d.config.nombres_horas) && d.config.nombres_horas.length) {
+      escribir(LS.nombresPlanilla, d.config.nombres_horas);
+    }
 
     // Si hay cosas esperando enviarse, lo del teléfono es más nuevo: no se pisa.
     if (!pendientes.some((r) => r.tipo === "config")) {
@@ -367,7 +434,7 @@ async function traerConfig() {
         const t = d.config.temporada || {};
         t.inicio = aFechaISO(t.inicio);
         t.fin = aFechaISO(t.fin);
-        CFG = d.config;
+        CFG = conPendientesDeConfig(d.config);
         escribir(LS.config, CFG);
       }
     }

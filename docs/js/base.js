@@ -31,7 +31,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 65 · 30/9/2026";
+const VERSION_APP = "versión 66 · 30/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -191,6 +191,11 @@ const chacraActual = () => CHACRAS.find((c) => c.codigo === chacraCodigo()) || n
 // Solo Chacra Tica manda las horas a la planilla del proyecto Bioma, donde está
 // el historial desde julio. Las demás las guardan en su propia hoja Horas.
 const horasVanAparte = () => !!chacraActual()?.horasAparte;
+// Desde el 30/09 esas horas entran por el servicio de AMA, con la credencial
+// del teléfono, y él las escribe en la planilla de Bioma. Antes iban directo
+// al script de la planilla de horas, que no pedía nada. Contra un servicio
+// anterior (sin esta marca en la configuración) se sigue por el camino viejo.
+const horasPorServicio = () => horasVanAparte() && !!CFG?.horas_por_servicio;
 
 // ---- Utilidades ----
 const $ = (sel) => document.querySelector(sel);

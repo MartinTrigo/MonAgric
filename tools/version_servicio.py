@@ -79,6 +79,20 @@ def main() -> None:
         print("  [ANTERIOR] corregir y borrar registros (los botones no aparecen)")
         viejas.append("corregir y borrar registros")
 
+    # 30/09: la configuracion por partes, y las horas de Tica entrando por
+    # este servicio con credencial (antes, por el script de horas abierto).
+    if cf.get("parcial"):
+        print("  [al dia]   la configuracion se guarda por partes")
+    else:
+        print("  [ANTERIOR] la configuracion se guarda por partes (sigue entera)")
+        viejas.append("la configuracion por partes")
+    if cf.get("horas_por_servicio"):
+        print(f"  [al dia]   las horas de Tica entran por el servicio "
+              f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")
+    else:
+        print("  [ANTERIOR] las horas de Tica siguen yendo al script de horas abierto")
+        viejas.append("las horas de Tica por el servicio")
+
     # La proyeccion para AMA Economia: con codigo viejo, "proyeccion" ni se
     # mira y la respuesta es la de un servicio sin nada que decir.
     pr = pedir("proyeccion=1&chacra=tica")

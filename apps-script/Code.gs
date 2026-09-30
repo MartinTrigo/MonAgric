@@ -394,6 +394,15 @@ function atender(p) {
       // botones solo si lo dice: contra una version anterior quedarian en la
       // cola, fallando para siempre.
       cfg.corregir = true;
+      // Sabe guardar la configuracion de a una parte (config_plan,
+      // config_sector). Contra una version anterior la app guarda entera.
+      cfg.parcial = true;
+      // Tica: sus horas entran por este servicio, y los nombres del equipo
+      // salen de la planilla de horas, como antes los daba el script aparte.
+      if (String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
+        cfg.horas_por_servicio = true;
+        try { cfg.nombres_horas = nombresDeHorasTica(); } catch (e) { cfg.nombres_horas = []; }
+      }
       return respuesta({ ok: true, config: cfg });
     }
     if (p.resumen) return respuesta(calcularResumen(chacra));
@@ -455,6 +464,10 @@ function doPost(e) {
           // Corregir o borrar un registro ya cargado: desde la lista de
           // "ultimos movimientos" de cada seccion.
           else if (r.tipo === "registro_editar") { corregirRegistro(chacra, libro, r, false); guardados++; }
+          // La configuracion de a una parte: un cultivo del plan, o donde esta
+          // un sector en el mapa. Ver cambiarPlanDeCultivo.
+          else if (r.tipo === "config_plan") { cambiarPlanDeCultivo(libro, r.datos || {}); guardados++; }
+          else if (r.tipo === "config_sector") { cambiarPosicionDeSector(libro, r.datos || {}); guardados++; }
           else if (r.tipo === "registro_borrar") { corregirRegistro(chacra, libro, r, true); guardados++; }
         } catch (err) {
           noGuardados.push({ id: r.id, tipo: r.tipo, error: String(err) });
@@ -466,7 +479,8 @@ function doPost(e) {
       var SIN_HOJA = { tareas_hecha: 1, tareas_reabrir: 1, config: 1,
                        puntaje: 1, sugerencia: 1, cultivo: 1,
                        generaciones: 1, generacion_borrar: 1,
-                       registro_editar: 1, registro_borrar: 1 };
+                       registro_editar: 1, registro_borrar: 1,
+                       config_plan: 1, config_sector: 1 };
       var porTipo = {};
       registros.forEach(function (r) {
         if (SIN_HOJA[r.tipo]) return;
@@ -481,6 +495,20 @@ function doPost(e) {
       });
 
       Object.keys(porTipo).forEach(function (tipo) {
+        // Las horas de Tica van a la planilla de Bioma, pero ahora entran por
+        // aca, con credencial, en vez de por el script de horas abierto.
+        // Si la planilla de Bioma falla, vuelven como no guardadas y el resto
+        // del lote se guarda igual.
+        if (tipo === "horas" && String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
+          try {
+            guardados += escribirHorasDeTica(porTipo[tipo], permiso.persona);
+          } catch (err) {
+            porTipo[tipo].forEach(function (r) {
+              noGuardados.push({ id: r.id, tipo: r.tipo, error: String(err) });
+            });
+          }
+          return;
+        }
         var def = HOJAS[tipo];
         var hoja = obtenerHoja(libro, def);
         var existentes = idsExistentes(hoja);
@@ -1338,11 +1366,11 @@ function ultimasHorasDeTica(cuantos) {
   var n = Math.min(Math.max(cuantos, 1), Math.min(hoja.getLastRow() - 1, 30));
   var tz = Session.getScriptTimeZone();
   var fecha = function (v) { return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || ""); };
-  return hoja.getRange(hoja.getLastRow() - n + 1, 1, n, 7).getValues().map(function (f) {
+  return hoja.getRange(hoja.getLastRow() - n + 1, 1, n, 8).getValues().map(function (f) {
     return { "Id": (f[0] instanceof Date) ? "bioma-" + f[0].getTime() : "",
              "Fecha": fecha(f[1]), "Integrante": String(f[2] || ""), "Horas": f[3],
              "Actividad": String(f[4] || ""), "Área": String(f[6] || ""),
-             "Observaciones": String(f[5] || ""), "Cargado por": "planilla de horas" };
+             "Observaciones": String(f[5] || ""), "Cargado por": String(f[7] || "planilla de horas") };
   }).reverse();
 }
 
@@ -1365,6 +1393,103 @@ function corregirHoraDeTica(libro, id, datos, borrar, quien) {
       String(datos.observaciones || ""), String(datos.area || "")]]);
     return;
   }
+}
+
+// ---------- La configuracion de a una parte ----------
+//
+// Guardar la configuracion reescribe la hoja Config entera con la copia del
+// telefono. Para lo que se edita a cada rato —el plan de un cultivo, que se
+// recalcula con cada generacion, y la posicion de un sector en el mapa— eso
+// era un riesgo: un telefono con una copia de la mañana, al guardar su
+// cultivo, borraba lo que otro habia cambiado despues (un sector movido, el
+// plan de otro cultivo). Estas dos tocan una sola fila y nada mas.
+
+function filasDeConfig_(libro) {
+  var hoja = hojaConfig(libro);
+  var n = hoja.getLastRow();
+  return { hoja: hoja, filas: n > 1 ? hoja.getRange(2, 1, n - 1, 2).getValues() : [] };
+}
+
+// Un cultivo del plan: se reemplaza su fila, se agrega si no estaba, o se
+// saca si viene { borrar: true }.
+function cambiarPlanDeCultivo(libro, p) {
+  if (!p.cultivo) throw new Error("Falta el cultivo.");
+  var c = filasDeConfig_(libro);
+  var fila = ["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
+              p.rinde_kg_m2 || 0, p.lineas || 0, p.distancia_cm || 0, p.plantas || 0];
+  for (var i = 0; i < c.filas.length; i++) {
+    if (String(c.filas[i][0]) !== "plan" || claveArea(c.filas[i][1]) !== claveArea(p.cultivo)) continue;
+    if (p.borrar) c.hoja.deleteRow(i + 2);
+    else c.hoja.getRange(i + 2, 1, 1, CONFIG_COLS).setValues([fila]);
+    return;
+  }
+  if (!p.borrar) c.hoja.getRange(c.hoja.getLastRow() + 1, 1, 1, CONFIG_COLS).setValues([fila]);
+}
+
+// Donde esta un sector en el mapa: solo su fila y columna. El resto del
+// sector (bancales, riego) se cambia en Configuracion.
+function cambiarPosicionDeSector(libro, s) {
+  var c = filasDeConfig_(libro);
+  for (var i = 0; i < c.filas.length; i++) {
+    if (String(c.filas[i][0]) !== "sector" || String(c.filas[i][1]) !== String(s.sector)) continue;
+    c.hoja.getRange(i + 2, 5, 1, 2).setValues([[Number(s.fila) || 0, Number(s.columna) || 0]]);
+    return;
+  }
+}
+
+// ---------- Las horas de Tica, por este servicio ----------
+//
+// Antes el telefono las mandaba directo al script de la planilla de horas,
+// que no pedia credencial y cuya direccion estaba en el codigo publico: con
+// ella cualquiera podia cargar horas, y de las horas salen los sueldos. Ahora
+// entran por aca, que ya sabe de que telefono vienen, y se escriben en la
+// misma hoja y con el mismo formato: bioma-db las sigue importando igual.
+//
+// Suma una columna: "Cargado por", la persona del telefono. bioma-db ubica
+// las columnas por nombre, asi que una mas al final no le cambia nada.
+function escribirHorasDeTica(registros, persona) {
+  var hoja = hojaHorasDeTica();
+  if (!hoja.getRange(1, 8).getValue()) hoja.getRange(1, 8).setValue("Cargado por").setFontWeight("bold");
+
+  // Un reintento no duplica: se miran las marcas de las ultimas filas.
+  var n = Math.min(hoja.getLastRow() - 1, 300);
+  var ya = {};
+  if (n > 0) {
+    hoja.getRange(hoja.getLastRow() - n + 1, 1, n, 3).getValues().forEach(function (f) {
+      if (f[0] instanceof Date) ya[Math.round(f[0].getTime() / 1000) + "|" + String(f[2])] = true;
+    });
+  }
+  var filas = [];
+  registros.forEach(function (r) {
+    var d = r.datos || {};
+    var marca = r.creado_en ? new Date(r.creado_en) : new Date();
+    // Al segundo: la planilla no siempre devuelve los milisegundos iguales.
+    var clave = Math.round(marca.getTime() / 1000) + "|" + String(d.integrante || "");
+    if (ya[clave]) return;
+    ya[clave] = true;
+    // Mediodia: una diferencia de zona horaria nunca cambia el dia.
+    var p = String(d.fecha || "").split("-");
+    var fecha = p.length === 3 ? new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0) : new Date();
+    filas.push([marca, fecha, String(d.integrante || ""), Number(d.horas) || 0,
+                String(d.actividad || ""), String(d.observaciones || ""),
+                String(d.area || d.proyecto || ""), persona || r.dispositivo || ""]);
+  });
+  if (filas.length) hoja.getRange(hoja.getLastRow() + 1, 1, filas.length, 8).setValues(filas);
+  return filas.length;
+}
+
+// Los nombres del equipo: la hoja Config de la planilla de horas, como los
+// daba el script aparte (sin los de relleno de la plantilla vieja).
+function nombresDeHorasTica() {
+  var hoja = SpreadsheetApp.openById(PLANILLA_HORAS_TICA).getSheetByName("Config");
+  if (!hoja || hoja.getLastRow() < 1) return [];
+  return hoja.getRange(1, 1, hoja.getLastRow(), 1).getValues()
+    .map(function (f) { return String(f[0]).trim(); })
+    .filter(function (v) {
+      return v && v !== "Trabajador" && v.indexOf("Configuración") !== 0
+        && v.indexOf("Editá") !== 0 && v.indexOf("Editár") !== 0
+        && !/^(Trabajador|Operador|Encargado|Integrante|Persona)\s*\d+$/i.test(v);
+    });
 }
 
 // ---------- Espejo de las horas de Chacra Tica ----------

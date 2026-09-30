@@ -133,6 +133,43 @@ almacenamiento del teléfono.</p>
       .find((g) => g.id === "gen-tomate-1-c").sembrada, true);
   pendientes = [];
 
+  // --- la configuración de a una parte ---
+  pendientes = [
+    { tipo: "config_plan", datos: { cultivo: "Lechuga", superficie_m2: 24, cosecha_esperada_kg: 72 } },
+    { tipo: "config_plan", datos: { cultivo: "Repollo bco", borrar: true } },
+    { tipo: "config_sector", datos: { sector: "Verano", fila: 3, columna: 9 } },
+  ];
+  const cfgServicio = conPendientesDeConfig(JSON.parse(JSON.stringify(CFG)));
+  igual("las partes en la cola se aplican sobre la configuración del servicio",
+    [cfgServicio.plan.map((p) => p.cultivo), cfgServicio.sectores.map((s) => [s.sector, s.fila, s.columna])],
+    // Primavera no tiene posición en los datos de prueba: queda como estaba.
+    [["Lechuga"], [["Primavera", null, null], ["Verano", 3, 9]]]);
+  {
+    // Sin pantalla ni red: se frena lo que dibuja y lo que sincroniza.
+    const frenar = { refrescarEstado, aviso, sincronizar };
+    refrescarEstado = aviso = sincronizar = () => {};
+    const cfgAntes = CFG, confirmada = configConfirmada;
+    configConfirmada = true;
+    try {
+      CFG = { ...cfgAntes, parcial: true };
+      pendientes = [];
+      guardarPartesDeConfig({}, [["config_plan", { cultivo: "Lechuga", superficie_m2: 12 }]], "", "");
+      guardarPartesDeConfig({}, [["config_plan", { cultivo: "lechugas", superficie_m2: 24 }]], "", "");
+      guardarPartesDeConfig({}, [["config_sector", { sector: "Verano", fila: 1, columna: 1 }]], "", "");
+      igual("una parte nueva del mismo cultivo reemplaza a la que esperaba",
+        pendientes.map((r) => [r.tipo, r.datos.superficie_m2 || r.datos.sector]),
+        [["config_plan", 24], ["config_sector", "Verano"]]);
+      CFG = { ...cfgAntes };
+      pendientes = [];
+      guardarPartesDeConfig({ plan: [] }, [["config_plan", { cultivo: "Lechuga" }]], "", "");
+      igual("contra un servicio anterior se guarda entera",
+        [pendientes.map((r) => r.tipo), pendientes[0].datos.plan], [["config"], []]);
+    } finally {
+      CFG = cfgAntes; configConfirmada = confirmada; pendientes = [];
+      ({ refrescarEstado, aviso, sincronizar } = frenar);
+    }
+  }
+
   // --- mapa ---
   igual("bancales que ocuparía una de 3 al final del sector", bancalesQueOcuparia({ camas: 3 }, 24, 25), [23, 24, 25]);
   const puestas = [{ id: "a", cultivo: "Acelga", fecha_almacigo: "2026-08-13", fecha_campo: "2026-09-22",

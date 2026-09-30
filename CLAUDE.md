@@ -51,6 +51,7 @@ docs/catalogo.json  cultivos y perfiles, iguales para todas las chacras
 docs/juego/         Pac-Farm, el juego
 apps-script/Code.gs            el "servidor" de las cinco chacras
 apps-script/Codigo-horas-bioma.gs  script aparte, vive en la planilla de horas
+                    (se retira: desde el 30/09 Code.gs escribe esas horas)
 tools/*.py          herramientas de administración (usan clave de admin)
 ```
 
@@ -125,6 +126,20 @@ Cuatro de las cinco chacras no tienen nada que ver con la economía de Bioma.
   muestra**. No es que se oculte en pantalla: no le llegan los datos.
 - `CHACRA_CON_HORAS_APARTE` = `tica`: es la única que manda sus horas a la
   planilla de Bioma en vez de a la suya. Las demás usan su hoja `Horas`.
+  **Desde el 30/09 esas horas entran por `Code.gs`** (con credencial, columna
+  "Cargado por"), no por el script de la planilla de horas, que no pedía
+  nada. La app usa el camino viejo solo si la configuración no trae
+  `horas_por_servicio`. Pasos que faltan: PENDIENTES 0 bis.
+
+## La configuración, entera o por partes (30/09)
+
+`guardarConfig` reescribe la hoja Config entera con la copia del teléfono:
+queda para la pantalla Configuración, que es deliberada. Lo que se toca a
+cada rato —el plan de un cultivo (se rehace con cada generación) y la
+posición de un sector en el mapa— va por `guardarPartesDeConfig`, que manda
+`config_plan` / `config_sector` y el servicio cambia esa fila sola. Así dos
+teléfonos no se pisan. **Algo nuevo que se edite seguido en la configuración
+va por partes**, no por `guardarConfig`.
 - Al agregar una función que toque plata o economía, preguntarse siempre si
   vale para una chacra o para todas.
 

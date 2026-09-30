@@ -35,8 +35,9 @@ propuesto abajo, con el código, para hacerlo de a un paso.
        │ Tareas, Plan gen.,  │  └────────────┘
        │ Horas, Cambios      │
        └─────────────────────┘
-  Horas de Tica ── POST directo ──► Codigo-horas-bioma.gs ──► planilla de horas de Bioma
-                   (sin credencial)    (URL en el código público)
+  Horas de Tica: viajan con todo lo demás a Code.gs, que las escribe en la
+  planilla de horas de Bioma (desde el 30/09; antes, POST directo y sin
+  credencial a Codigo-horas-bioma.gs, cuya URL estaba en el código público)
 ```
 
 **AMA Economía (bioma-mov)** es otra PWA con el mismo patrón, pero su
@@ -86,8 +87,9 @@ render(vista)
 formulario → datos → guardarRegistro("siembras", datos)
    → pendientes[] (memoria) + LS.pendientes  → aviso → sincronizar()
 sincronizar():
-   1. horas de Tica: POST de a una al script de horas
-   2. el resto: POST {credencial, registros} a Code.gs
+   1. horas de Tica, solo contra un servicio anterior al 30/09: POST de a una
+      al script de horas. Con el servicio nuevo van en el paso 2.
+   2. todo: POST {credencial, registros} a Code.gs
       Code.gs: permitido() → lock → por tipo: upsert/append en la hoja
       → respuesta {guardados, no_guardados[]}
    3. lo guardado pasa a `enviados`; lo fallido queda en la cola
@@ -106,8 +108,8 @@ encima por `conPendientesDelPlan`), `LS.config`, `LS.almacigos`.
 
 | # | Zona | Por qué es crítica | Estado |
 |---|---|---|---|
-| 1 | **La configuración se guarda entera** (`guardarConfig`) | Cada guardado reescribe la hoja Config completa con la copia del teléfono. Desde que el plan se edita seguido (cada generación rehace el plan del cultivo), dos teléfonos editando a la vez pueden pisarse: gana el último **entero**, no por cultivo. 12 lugares llaman a `guardarConfig`. | propuesta 4.3 |
-| 2 | **Script de horas de Tica abierto** | Su URL está en el código público y escribe filas de horas, de donde salen los sueldos. Ya anotado en PENDIENTES 0 bis. | propuesta 4.6 |
+| 1 | **La configuración se guarda entera** (`guardarConfig`) | Cada guardado reescribe la hoja Config completa con la copia del teléfono. Desde que el plan se edita seguido (cada generación rehace el plan del cultivo), dos teléfonos editando a la vez pueden pisarse: gana el último **entero**, no por cultivo. 12 lugares llaman a `guardarConfig`. | **resuelto 30/09** (4.3): el plan de un cultivo y la posición de un sector viajan sueltos |
+| 2 | **Script de horas de Tica abierto** | Su URL está en el código público y escribe filas de horas, de donde salen los sueldos. Ya anotado en PENDIENTES 0 bis. | **resuelto en código 30/09**: entran por `Code.gs` con credencial; falta archivar la implementación del script |
 | 3 | **Normalizadores de nombres distintos** | Cuatro reglas para "¿es el mismo cultivo?": `claveArea` de la app (saca tildes y la "s" final), `claveArea` del servidor (igual, a mano), `claveNombre` del servidor (**no** saca la "s"), `formaComparable` en Economía, `clave()` en cada herramienta. El cruce siembra↔plan del servidor usa `claveNombre`: una siembra de "Choclo" no marcaría sembrada una generación de "Choclos", y la app sí los junta. | propuesta 4.1 |
 | 4 | **El esquema de las hojas está escrito en varios lados** | Los encabezados viven en `HOJAS` (servidor) y se repiten como texto en la app (`DE_LA_HOJA`, `filaEquipo`, `almacigosPendientes`) y en las herramientas. Renombrar una columna rompe la app en silencio. | propuesta 4.2 |
 | 5 | **Redibujar todo con `innerHTML`** | Es la causa de raíz de los saltos de pantalla y los formularios borrados (28/09). Se emparchó bien (`redibujarConDatos`, `campoTocado`, scroll propio), pero cada pantalla nueva con estado propio puede volver a caer. | propuesta 4.5 |
@@ -213,10 +215,19 @@ Y un chequeo en `tools/version_servicio.py` que compare esos encabezados con
 los que usa la app (`DE_LA_HOJA` en `registros.js`): si alguien renombra una
 columna, la herramienta lo dice antes de que se rompa en un teléfono.
 
-### 4.3 Guardar la configuración por partes (la zona crítica #1)
+### 4.3 Guardar la configuración por partes (la zona crítica #1) — HECHO 30/09
 
-En vez de reescribir toda la hoja Config, operaciones chicas que tocan una
-fila, igual que las generaciones:
+Aplicado así: `config_plan` (`cambiarPlanDeCultivo`) y `config_sector`
+(`cambiarPosicionDeSector`, solo fila y columna) en `Code.gs`; la
+configuración anuncia `parcial: true`. En la app, `guardarPartesDeConfig`
+(servicio.js) lo usan `replanearCultivo`, el alta de series y mover un sector
+en el mapa; contra un servicio anterior, o con una configuración entera en la
+cola, guarda entera como antes. `conPendientesDeConfig` aplica lo que sigue en
+la cola sobre lo que devuelve el servicio. La pantalla Configuración sigue
+guardando entera: es rara y deliberada. Por ahora usa `claveArea` del
+servidor; cuando exista `claveCultivo` (4.1), pasa a esa.
+
+La propuesta original:
 
 ```js
 // Code.gs — tipo nuevo en doPost
@@ -287,7 +298,10 @@ nueva. Es lo que más se pide (Inicio, Plan, Proyección de Economía).
 
 ### 4.6 Seguridad e infraestructura (ya en PENDIENTES)
 
-Horas de Tica por el servicio de AMA (y despublicar el script de horas);
+Horas de Tica por el servicio de AMA — **hecho 30/09** (`escribirHorasDeTica`,
+con columna "Cargado por"; la app usa el camino viejo si el servicio no
+anuncia `horas_por_servicio`). Falta archivar la implementación del script de
+horas y sacar `URL_HORAS_POR_DEFECTO` de `base.js`.
 `Code.gs` a un proyecto propio; identificadores por persona en vez del nombre.
 
 ### 4.7 Versión de protocolo en AMA
