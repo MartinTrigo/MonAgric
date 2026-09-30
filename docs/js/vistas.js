@@ -371,7 +371,7 @@ const plantillas = {
         : (pendientesHoras.length ? "" : `<p class="nota">Cuando haya conexión se van a ver
             acá los últimos registros de todo el equipo.</p>`)}
       <a class="enlace-planilla" target="_blank" rel="noopener"
-         href="https://docs.google.com/spreadsheets/d/1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg/edit">
+         href="${esc(PLANILLA_HORAS_BIOMA)}">
         Ver la planilla de horas completa</a>
     </div>` : historialDe("horas")}`;
   },

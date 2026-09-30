@@ -31,7 +31,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 66 · 30/9/2026";
+const VERSION_APP = "versión 67 · 30/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -50,6 +50,10 @@ const EN_BANDEJA = new Set(["Siembra almácigo", "Esqueje"]);
 // Ese servicio recibe un registro por vez, con sus propios nombres de campo.
 const URL_HORAS_POR_DEFECTO =
   "https://script.google.com/macros/s/AKfycbyHBMsZAyLOACCgWclgHGDB6e6M8tw2VX_zonELRuFobPp3TdakCr4Wkh2b8TqtB7P2bw/exec";
+// La planilla misma, para el enlace "ver todo" de Horas en Tica. Abrirla pide
+// tener permiso en Drive: la dirección sola no da acceso a nada.
+const PLANILLA_HORAS_BIOMA =
+  "https://docs.google.com/spreadsheets/d/1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg/edit";
 
 // Siembras, cosechas y tareas van a la planilla MonAgric. La dirección viene
 // puesta para que nadie tenga que configurar nada: se abre el enlace, se elige

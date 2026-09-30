@@ -31,8 +31,13 @@ function historialDe(tipo) {
     ${CFG?.corregir && delEquipo.length ? `<p class="nota">✎ corrige un registro y 🗑 lo borra.
       Lo que se cambia queda copiado, como estaba, en la hoja «Cambios» de la planilla.</p>` : ""}
     ${cuerpo}
-    <a class="enlace-planilla" href="${esc(enlacePlanilla())}" target="_blank" rel="noopener">
-      Ver todo en la planilla</a>
+    ${tipo === "horas" && horasVanAparte()
+      // Las horas de Tica viven en la planilla de horas de Bioma: la hoja
+      // Horas de la chacra es solo una copia que se rehace una vez por día.
+      ? `<a class="enlace-planilla" href="${esc(PLANILLA_HORAS_BIOMA)}" target="_blank" rel="noopener">
+          Ver todo en la planilla de horas</a>`
+      : `<a class="enlace-planilla" href="${esc(enlacePlanilla())}" target="_blank" rel="noopener">
+          Ver todo en la planilla</a>`}
   </div>`;
 }
 
