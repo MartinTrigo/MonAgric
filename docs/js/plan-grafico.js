@@ -140,9 +140,14 @@ function planEstrategico() {
   // Cuánto tiene que medir un tramo, en porcentaje del eje, para que le entre
   // una fecha como "16/8". Depende del ancho real del gráfico, no de un número
   // fijo: en el teléfono el mismo tramo es mucho más angosto.
-  // 96 px por mes a zoom 100 %. El zoom solo estira el tiempo: las filas
-  // quedan iguales.
-  const anchoGrafico = Math.max(480, Math.round(meses.length * 96 * zoomPlan));
+  // Zoom 100 % = la temporada (julio a junio) ocupa justo el ancho de la
+  // pantalla; lo de después de junio queda a la derecha, a un desplazamiento.
+  // El ancho disponible se mide al dibujar (prepararZoomPlan) y se recuerda.
+  // El zoom solo estira el tiempo: las filas quedan iguales.
+  const disponible = anchoVistaPlan || Math.max(600, window.innerWidth - 420);
+  const pxMes = Math.max(30, (disponible - SANGRIA_PLAN - 28) / 12);
+  // El gráfico incluye la columna de nombres: los meses van aparte de ella.
+  const anchoGrafico = Math.max(480, Math.round(SANGRIA_PLAN + meses.length * pxMes * zoomPlan));
   const anchoMinimoFecha = (34 / anchoGrafico) * 100;
 
   const todasGens = leer(LS.generaciones, []) || [];
@@ -214,7 +219,7 @@ function planEstrategico() {
         <span>${Math.round(zoomPlan * 100)}%</span>
         <button type="button" class="secundario" data-zoom-plan="+" aria-label="Acercar">+</button>
         <button type="button" class="secundario" data-zoom-plan="ajustar"
-                title="Que entre todo el eje en el ancho de la pantalla">Ajustar</button>
+                title="La temporada, de julio a junio, en el ancho de la pantalla">Ajustar</button>
       </div>
     </div>
 
@@ -568,11 +573,20 @@ function prepararPlan() {
 // ver la temporada entera. Queda fuera del render para no perderse al
 // redibujar.
 let zoomPlan = 1;
+let anchoVistaPlan = 0;                // ancho visible del gráfico, medido
 const SANGRIA_PLAN = 118 + 8;          // columna de nombres + hueco, en px
 
 function prepararZoomPlan() {
   const sc = $(".plan-scroll");
   if (!sc || !$(".plan-grafico")) return;
+
+  // La primera vez (o si cambió el tamaño de la ventana) se mide el ancho de
+  // verdad y se vuelve a dibujar, para que al 100 % entre justo la temporada.
+  if (Math.abs(sc.clientWidth - anchoVistaPlan) > 20) {
+    anchoVistaPlan = sc.clientWidth;
+    render("plan", true);
+    return;
+  }
 
   // Cambia el zoom dejando quieto el punto del gráfico que está en `x` (px
   // desde el borde de la vista): lo que se miraba sigue ahí después.
@@ -591,8 +605,11 @@ function prepararZoomPlan() {
     b.onclick = () => {
       const z = b.dataset.zoomPlan;
       if (z === "ajustar") {
-        const meses = document.querySelectorAll(".plan-meses .mes").length || 12;
-        cambiar((sc.clientWidth - SANGRIA_PLAN - 28) / (meses * 96));
+        // Volver a la temporada entera en pantalla, desde julio.
+        zoomPlan = 1;
+        render("plan", true);
+        const sc2 = $(".plan-scroll");
+        if (sc2) sc2.scrollLeft = 0;
       } else {
         cambiar(zoomPlan * (z === "+" ? 1.25 : 1 / 1.25));
       }
