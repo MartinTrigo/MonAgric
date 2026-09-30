@@ -114,7 +114,7 @@ const plantillas = {
             <div>
               <label>Alvéolos por bandeja</label>
               <select name="tipo_bandeja">
-                ${tiposBandeja().map((v) => `<option>${v}</option>`).join("")}
+                ${tiposBandeja().map((v) => `<option${String(v) === "72" ? " selected" : ""}>${v}</option>`).join("")}
               </select>
             </div>
           </div>

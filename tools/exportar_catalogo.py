@@ -23,7 +23,7 @@ DB_PATH = RAIZ / "monagric.sqlite3"
 SALIDA = RAIZ / "docs" / "catalogo.json"
 
 TIPOS_SIEMBRA = ["Siembra directa", "Siembra almácigo", "Trasplante", "Esqueje"]
-TIPOS_BANDEJA = [72, 98, 128, 162]
+TIPOS_BANDEJA = [25, 72, 98, 128, 162]
 TIPOS_RIEGO = ["Aspersión", "Goteo", "Surco", "Superficie"]
 IMPORTANCIAS = ["Alta", "Media", "Baja"]
 

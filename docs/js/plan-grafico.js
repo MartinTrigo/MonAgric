@@ -140,7 +140,9 @@ function planEstrategico() {
   // Cuánto tiene que medir un tramo, en porcentaje del eje, para que le entre
   // una fecha como "16/8". Depende del ancho real del gráfico, no de un número
   // fijo: en el teléfono el mismo tramo es mucho más angosto.
-  const anchoGrafico = Math.max(720, meses.length * 96);
+  // 96 px por mes a zoom 100 %. El zoom solo estira el tiempo: las filas
+  // quedan iguales.
+  const anchoGrafico = Math.max(480, Math.round(meses.length * 96 * zoomPlan));
   const anchoMinimoFecha = (34 / anchoGrafico) * 100;
 
   const todasGens = leer(LS.generaciones, []) || [];
@@ -206,6 +208,13 @@ function planEstrategico() {
         ${[["todas", "Todas"], ["planificadas", "Sin sembrar"], ["sembradas", "Sembradas"]]
           .map(([v, t]) => `<label class="chip"><input type="radio" name="filtro-plan" value="${v}"${
             filtroPlan === v ? " checked" : ""}><span>${t}</span></label>`).join("")}
+      </div>
+      <div class="plan-zoom" title="También con Ctrl + rueda del mouse">
+        <button type="button" class="secundario" data-zoom-plan="-" aria-label="Alejar">−</button>
+        <span>${Math.round(zoomPlan * 100)}%</span>
+        <button type="button" class="secundario" data-zoom-plan="+" aria-label="Acercar">+</button>
+        <button type="button" class="secundario" data-zoom-plan="ajustar"
+                title="Que entre todo el eje en el ancho de la pantalla">Ajustar</button>
       </div>
     </div>
 
@@ -551,4 +560,49 @@ function prepararPlan() {
   prepararGeneraciones();
   prepararMapa();
   prepararEdicionCultivos();
+  prepararZoomPlan();
+}
+
+// ---- Zoom del plan estratégico ----
+// Estira o encoge el tiempo: acercar para leer semanas y fechas, alejar para
+// ver la temporada entera. Queda fuera del render para no perderse al
+// redibujar.
+let zoomPlan = 1;
+const SANGRIA_PLAN = 118 + 8;          // columna de nombres + hueco, en px
+
+function prepararZoomPlan() {
+  const sc = $(".plan-scroll");
+  if (!sc || !$(".plan-grafico")) return;
+
+  // Cambia el zoom dejando quieto el punto del gráfico que está en `x` (px
+  // desde el borde de la vista): lo que se miraba sigue ahí después.
+  const cambiar = (nuevo, x = (sc.clientWidth + SANGRIA_PLAN) / 2) => {
+    nuevo = Math.max(0.4, Math.min(4, nuevo));
+    if (Math.abs(nuevo - zoomPlan) < 0.001) return;
+    const antes = sc.scrollWidth - SANGRIA_PLAN;
+    const frac = (sc.scrollLeft + x - SANGRIA_PLAN) / Math.max(1, antes);
+    zoomPlan = nuevo;
+    render("plan", true);
+    const sc2 = $(".plan-scroll");
+    if (sc2) sc2.scrollLeft = frac * (sc2.scrollWidth - SANGRIA_PLAN) + SANGRIA_PLAN - x;
+  };
+
+  document.querySelectorAll("[data-zoom-plan]").forEach((b) => {
+    b.onclick = () => {
+      const z = b.dataset.zoomPlan;
+      if (z === "ajustar") {
+        const meses = document.querySelectorAll(".plan-meses .mes").length || 12;
+        cambiar((sc.clientWidth - SANGRIA_PLAN - 28) / (meses * 96));
+      } else {
+        cambiar(zoomPlan * (z === "+" ? 1.25 : 1 / 1.25));
+      }
+    };
+  });
+  // Ctrl + rueda (o pellizcar en el touchpad, que el navegador manda igual).
+  // La rueda sola sigue desplazando, que es lo que se espera en una lista.
+  sc.onwheel = (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    cambiar(zoomPlan * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX - sc.getBoundingClientRect().left);
+  };
 }

@@ -1614,3 +1614,6 @@ details.desplegable[open] > summary { margin-bottom: 8px; }
      barra: si no, asoma un pedazo de las barras que pasan por detrás. */
   box-shadow: -16px 0 0 #fff, 8px 0 0 #fff;
 }
+.plan-zoom { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.plan-zoom .secundario { width: auto; margin: 0; padding: 4px 11px; font-size: .95rem; line-height: 1.2; }
+.plan-zoom span { font-size: .82rem; color: var(--tenue); min-width: 2.8rem; text-align: center; }
