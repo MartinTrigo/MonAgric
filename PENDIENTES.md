@@ -6,6 +6,23 @@ que falta hacer.
 
 ---
 
+## Revisión de datos del 29/09 — para Martín
+
+- **Zucchini**: el plan tenía 3 líneas a 50 cm (720 plantas en 4 bancales);
+  el catálogo y el Zapallito dicen 1 línea. Corregido a 1 (240 plantas).
+- **Habas**: el plan dice 4 líneas a 15 cm (3.200 plantas en 4 bancales) y el
+  catálogo 1 línea. No se tocó: decidir cuál es y corregirlo en Cultivos →
+  Marco y rinde, o en el catálogo.
+- **Pak choi**: al catálogo le faltan los días de almácigo y de cosecha (su
+  barra sale estimada, rayada).
+- **Almácigos sin trasplante registrado**: el servicio cuenta 27 esperando,
+  varios sembrados en agosto (Lechuga, Kale, Repollo, Acelga, Brócoli...).
+  Seguro ya están en el campo: registrarlos desde "Para trasplantar" (el
+  formulario se completa solo) para que el plan y la cosecha cierren.
+- La cuenta de bandejas supone una planta por alvéolo. En Puerro y Mix de
+  hojas da muchas bandejas: si se siembran varias semillas por celda, se baja
+  a mano o se ajusta el marco.
+
 ## Proyección en AMA Economía — ACTIVA desde el 28/09
 
 Las dos propiedades de cada lado están cargadas, `probarProyeccion` en
