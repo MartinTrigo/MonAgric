@@ -131,7 +131,7 @@ corregir desde el teléfono cuando haga falta.
    script**, y en la propiedad `CHACRAS` agregar el código y el id de la
    planilla: `{"tica":"1PrP0F…","chacrax":"1AbC…"}`
 3. **Implementar → Administrar implementaciones → lápiz → Nueva versión.**
-4. Agregar la chacra a la lista `CHACRAS` al principio de `app.js` y publicar.
+4. Agregar la chacra a la lista `CHACRAS` al principio de `js/base.js` y publicar.
 
 Para arrancar con una configuración ya cargada en vez de tipearla:
 

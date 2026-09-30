@@ -39,9 +39,13 @@ tan importante como este archivo: leerlo antes de tocar economía.
 PWA en HTML + CSS + JavaScript puro. **Sin frameworks, sin compilación.**
 
 ```
-docs/index.html     las pantallas y la barra de secciones
+docs/index.html     las pantallas, la barra de secciones y los <script> en orden
 docs/styles.css     estilo
-docs/app.js         TODO el frontend, ~2700 líneas, un solo archivo
+docs/js/*.js        el frontend, 17 archivos por tema (antes un app.js de 6.200
+                    líneas; se partió el 30/09 sin cambiar código). Ver
+                    ARQUITECTURA.md: qué hay en cada uno y el orden de carga
+docs/pruebas.html   pruebas de las cuentas (etapas, plantas, bandejas, cola…):
+                    abrirla antes de publicar, tiene que dar todo en verde
 docs/sw.js          service worker: red primero, caché de respaldo
 docs/catalogo.json  cultivos y perfiles, iguales para todas las chacras
 docs/juego/         Pac-Farm, el juego
@@ -57,7 +61,12 @@ planilla se rompe, se cae la app para todos. Mover el script a un proyecto
 propio está pendiente y no es urgente.
 
 **Publicación:** GitHub Pages sirve desde `/docs`. Cada push publica. Al
-cambiar archivos hay que subir `CACHE` en `sw.js` y `VERSION_APP` en `app.js`.
+cambiar archivos hay que subir `CACHE` en `sw.js` y `VERSION_APP` en
+`js/base.js`. Un archivo nuevo en `docs/js/` va en `index.html`, en la lista
+`ARCHIVOS` de `sw.js` y en `pruebas.html`, en el mismo orden.
+
+La revisión de arquitectura del 30/09 (zonas críticas y el plan de
+refactorización en pasos) está en `ARQUITECTURA.md`.
 
 ## Reglas duras (romperlas ya causó problemas reales)
 
@@ -121,7 +130,7 @@ Cuatro de las cinco chacras no tienen nada que ver con la economía de Bioma.
 
 ## Áreas de trabajo
 
-Seis **fijas**, definidas en `AREAS_FIJAS` dentro de `app.js`, iguales para
+Seis **fijas**, definidas en `AREAS_FIJAS` dentro de `js/catalogo.js`, iguales para
 todos los colectivos: Hortícola, Frutícola, Fungis, Comercialización,
 Administración y Mantenimiento. Cada una con su lista de actividades.
 

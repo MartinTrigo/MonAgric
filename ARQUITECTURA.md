@@ -1,0 +1,315 @@
+# Arquitectura de AMA — revisión del 30/09/2026
+
+Revisión hecha como quien entra a un código que no conoce: primero cómo está
+armado y por dónde viajan los datos, después dónde duele, y al final qué se
+cambió ya y qué conviene cambiar, en qué orden. Complementa a `CLAUDE.md`
+(reglas) y `DECISIONES.md` (por qué).
+
+**Lo que se cambió en esta revisión no altera ninguna función:** se partió
+`app.js` en 17 archivos por tema (mismas líneas, verificado), se sumó una
+página de pruebas (`docs/pruebas.html`, 23 pruebas en verde) y `escribir()`
+dejó de romper si el almacenamiento del teléfono se llena. Todo lo demás está
+propuesto abajo, con el código, para hacerlo de a un paso.
+
+---
+
+## 1. El mapa
+
+```
+                        ┌──────────────────────────────┐
+  teléfonos (12)        │  AMA Producción (PWA)        │  GitHub Pages /docs
+  y notebook ──────────►│  docs/js/*.js · sw.js        │  red primero, caché
+                        │  localStorage monagric_*     │  de respaldo
+                        └──────┬───────────────┬───────┘
+             GET ?x=1 (lee)    │               │ POST {registros:[...]}
+             con credencial    │               │ (cola del teléfono)
+                        ┌──────▼───────────────▼───────┐
+                        │  Code.gs (Apps Script)       │  vive dentro de la
+                        │  un servicio, 6 chacras      │  planilla de Tica
+                        └──┬─────────┬─────────┬───────┘
+          SpreadsheetApp   │         │         │ UrlFetchApp (servidor a servidor)
+       ┌───────────────────▼┐  ┌─────▼──────┐  ├──────────────► Cuentas.gs / Economia.gs
+       │ planilla por chacra │  │ Accesos    │  │                (solo lectura, Bioma)
+       │ Config, Siembras,   │  │ Invitac.,  │  └◄────────────── bioma-db Code.gs
+       │ Trasplantes, Cos.,  │  │ Dispositiv.│    ?proyeccion   (AMA Economía pide el plan)
+       │ Tareas, Plan gen.,  │  └────────────┘
+       │ Horas, Cambios      │
+       └─────────────────────┘
+  Horas de Tica ── POST directo ──► Codigo-horas-bioma.gs ──► planilla de horas de Bioma
+                   (sin credencial)    (URL en el código público)
+```
+
+**AMA Economía (bioma-mov)** es otra PWA con el mismo patrón, pero su
+sincronización es distinta: manda y recibe el estado **completo** en cada
+sincronización y el servidor reescribe las hojas enteras (ver 3.7).
+
+### 1.1 El frontend de AMA Producción, archivo por archivo
+
+Se cargan en este orden con `<script>` clásicos (no módulos) y comparten el
+espacio global. El orden importa solo para lo que se evalúa al cargar
+(constantes y el arranque); las funciones se llaman recién después.
+
+| Archivo | Qué tiene | Líneas |
+|---|---|---|
+| `base.js` | constantes, `LS` + `leer`/`escribir`, **estado global**, acceso, fechas y texto | ~280 |
+| `catalogo.js` | catálogo y perfiles, días de almácigo, sectores, áreas, integrantes, plan por cultivo | ~230 |
+| `servicio.js` | cola y `sincronizar`, todos los `traer*`, overlay de la cola sobre el plan | ~420 |
+| `componentes.js` | buscadores, selects, colores por cultivo, tarjetas de estado | ~310 |
+| `pendientes.js` | "Para sembrar" / "Para trasplantar", bandejas del plan | ~270 |
+| `plan-grafico.js` | plan estratégico (`tramosDe`), panel, arrastrar fechas, barra de Plan | ~530 |
+| `plan-mapa.js` | lienzo del mapa, zoom, arrastres | ~575 |
+| `plan-cultivos.js` | alta de series, editor de generaciones, partir, marco y rinde | ~620 |
+| `ficha.js` | ficha del cultivo | ~165 |
+| `registros.js` | últimos movimientos, corregir y borrar | ~300 |
+| `cuentas.js` · `tareas.js` · `configuracion.js` | cada sección | ~230 · 185 · 270 |
+| `formularios.js` | `preparar*` de siembras, trasplantes, cosechas, horas, ajustes | ~630 |
+| `vistas.js` | `plantillas`: el HTML de cada sección | ~960 |
+| `render.js` | `render`, `redibujarConDatos`, enganches comunes | ~290 |
+| `arranque.js` | arranque | ~30 |
+
+### 1.2 El ciclo de una pantalla
+
+```
+render(vista)
+  ├─ plantillas[vista]()  → HTML completo como texto (lee CFG, LS, estado global)
+  ├─ #vista.innerHTML = …   (se tira el DOM anterior entero)
+  ├─ scroll: arriba, o donde estaba si conservarScroll (y los scroll propios)
+  ├─ preparar<Vista>()    → engancha eventos del formulario de esa sección
+  ├─ prepararComunes() / prepararCorrecciones() / enganches sueltos en render
+  └─ traer*() de lo que esa vista necesita (con guardas de 20 s)
+            └─ al volver: guarda en LS; si cambió → redibujarConDatos(vista)
+```
+
+### 1.3 El viaje de un dato (una siembra)
+
+```
+formulario → datos → guardarRegistro("siembras", datos)
+   → pendientes[] (memoria) + LS.pendientes  → aviso → sincronizar()
+sincronizar():
+   1. horas de Tica: POST de a una al script de horas
+   2. el resto: POST {credencial, registros} a Code.gs
+      Code.gs: permitido() → lock → por tipo: upsert/append en la hoja
+      → respuesta {guardados, no_guardados[]}
+   3. lo guardado pasa a `enviados`; lo fallido queda en la cola
+   4. traerUltimos(tipo) + traerAlmacigos/traerGeneraciones según el tipo
+   5. traerResumen, traerDatosHoras, traerTareas, traerConfig, traerCatalogo
+   6. redibujarConDatos(vistaActual)
+```
+
+Lo que se muestra mientras tanto sale de copias locales: `LS.ultimos` (15
+filas por hoja), `LS.generaciones` (el plan entero, con la cola aplicada
+encima por `conPendientesDelPlan`), `LS.config`, `LS.almacigos`.
+
+---
+
+## 2. Zonas críticas (de más a menos grave)
+
+| # | Zona | Por qué es crítica | Estado |
+|---|---|---|---|
+| 1 | **La configuración se guarda entera** (`guardarConfig`) | Cada guardado reescribe la hoja Config completa con la copia del teléfono. Desde que el plan se edita seguido (cada generación rehace el plan del cultivo), dos teléfonos editando a la vez pueden pisarse: gana el último **entero**, no por cultivo. 12 lugares llaman a `guardarConfig`. | propuesta 4.3 |
+| 2 | **Script de horas de Tica abierto** | Su URL está en el código público y escribe filas de horas, de donde salen los sueldos. Ya anotado en PENDIENTES 0 bis. | propuesta 4.6 |
+| 3 | **Normalizadores de nombres distintos** | Cuatro reglas para "¿es el mismo cultivo?": `claveArea` de la app (saca tildes y la "s" final), `claveArea` del servidor (igual, a mano), `claveNombre` del servidor (**no** saca la "s"), `formaComparable` en Economía, `clave()` en cada herramienta. El cruce siembra↔plan del servidor usa `claveNombre`: una siembra de "Choclo" no marcaría sembrada una generación de "Choclos", y la app sí los junta. | propuesta 4.1 |
+| 4 | **El esquema de las hojas está escrito en varios lados** | Los encabezados viven en `HOJAS` (servidor) y se repiten como texto en la app (`DE_LA_HOJA`, `filaEquipo`, `almacigosPendientes`) y en las herramientas. Renombrar una columna rompe la app en silencio. | propuesta 4.2 |
+| 5 | **Redibujar todo con `innerHTML`** | Es la causa de raíz de los saltos de pantalla y los formularios borrados (28/09). Se emparchó bien (`redibujarConDatos`, `campoTocado`, scroll propio), pero cada pantalla nueva con estado propio puede volver a caer. | propuesta 4.5 |
+| 6 | **Estado global suelto** | 35 variables `let` de nivel superior, mezcla de datos (`CFG`, `pendientes`) y de interfaz (`genEditando`, `vistaMapa`…), cualquiera las toca desde cualquier archivo. | propuesta 4.5 |
+| 7 | **El servidor lee hojas enteras por pedido** | `generacionesDelPlan` recorre Siembras en cada pedido; `fichaDeCultivo` tres hojas; `permitido()` abre la planilla de accesos y lee todos los dispositivos **en cada pedido**. | propuesta 4.4 |
+| 8 | **Muchos viajes al arrancar** | `iniciar` pide config y catálogo, y `sincronizar` los vuelve a pedir (duplicados), más resumen, tareas, horas, generaciones, últimos: 8 a 10 ejecuciones de Apps Script, cada una con su `permitido()`. | propuesta 4.4 |
+| 9 | **Sin versión de protocolo en AMA** | Economía usa `api: N` y descarta respuestas viejas; AMA usa banderas sueltas (`cuentas`, `corregir`). Una implementación vieja no se detecta sola. | propuesta 4.7 |
+| 10 | **El servidor vive en la planilla de Tica** | Si esa planilla se rompe o se comparte mal, se caen las seis chacras. | PENDIENTES |
+
+## 3. Duplicaciones y cuellos de botella, con dónde están
+
+**3.1 Plan por cultivo recalculado en cuatro lados.** `prepararGeneraciones`
+(alta, en `plan-cultivos.js`) hace su propia cuenta; `replanearCultivo`
+(`catalogo.js`) la otra; el formulario de Marco y rinde la dispara;
+`tools/plan_desde_generaciones.py` la repite en Python. Las cuatro dan lo
+mismo hoy, pero cualquier cambio de regla hay que hacerlo cuatro veces.
+
+**3.2 Dos funciones de plantas.** `plantasDe` (bancales × líneas × largo/distancia)
+y `plantasPorBancal` (con tresbolillo +15 %). Se usan en lugares distintos y no
+se sabe a simple vista cuál corresponde.
+
+**3.3 Fechas en el servidor.** La misma clausura `texto = v instanceof Date ?
+formatDate(...) : String(v)` está copiada 9 veces en `Code.gs`.
+
+**3.4 Lock de 20 s para todo el POST.** Un lote de 20 registros bloquea a los
+demás teléfonos mientras dura. Con 12 teléfonos no se nota; con la gente del
+verano cargando al mismo tiempo al final de la jornada, puede.
+
+**3.5 Crecimiento sin techo en el teléfono.** `LS.fichas` guarda una ficha por
+cultivo abierto (con todas sus siembras y cosechas) y no se poda nunca. Ahora
+`escribir` ya no rompe si se llena, pero conviene podar.
+
+**3.6 `render()` hace de todo.** Además de dibujar, engancha a mano ~15 cosas
+de secciones distintas (fichas, plan, sembrar, trasplantar, Inicio). Es el
+lugar donde más fácil es romper algo al agregar una pantalla.
+
+**3.7 AMA Economía reescribe todo en cada sincronización.** La app manda todos
+los movimientos, deudas, productos y las últimas 300 ventas; el servidor lee
+todas las hojas, fusiona, y **borra y reescribe** ingresos, egresos, deudas,
+productos, ventas, borrados y conceptos, más el flujo y los gráficos. El costo
+crece con cada venta. (El 28/09 se arregló que además repitiera las
+migraciones en cada pedido.)
+
+---
+
+## 4. Estrategia de refactorización, en pasos que se pueden verificar
+
+Cada paso deja la app igual por fuera y se prueba con `docs/pruebas.html` más
+el recorrido en el navegador. Ninguno depende del siguiente.
+
+### Hecho en esta revisión (paso 0)
+
+- **`app.js` → 17 archivos por tema** (`docs/js/`). Un script movió bloques
+  enteros (declaración + sus comentarios) y verificó que el multiconjunto de
+  líneas fuera idéntico: 6.267 antes y después. Se comprobó que nada de nivel
+  superior se ejecuta al cargar salvo `leer`/`LS` (en `base.js`) y el
+  arranque (último). Probado: las 14 pantallas sin errores y los flujos de
+  sembrar, trasplantar, correr una barra, ubicar en el mapa, partir, corregir,
+  tildar tarea, horas.
+- **`docs/pruebas.html`**: carga el mismo código sin el arranque y comprueba
+  23 cuentas con casos conocidos (etapas de una generación, días por
+  estación, plantas, bandejas, nombres de partes, cola sobre el plan, choques
+  en el mapa, corrección de un registro). No escribe en el teléfono ni sale a
+  la red. **Abrirla antes de publicar.**
+- **`escribir()` resistente**: si el almacenamiento se llena, avisa una vez y
+  sigue, en vez de cortar lo que se estaba guardando.
+
+### 4.1 Una sola regla de "mismo cultivo"
+
+Una función, igual en los tres lados, con prueba. La de la app es la más
+completa (tildes por Unicode, "s" final):
+
+```js
+// app (catalogo.js) — ya es así
+const claveArea = (n) => String(n || "").trim().toLowerCase()
+  .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/s$/, "");
+```
+```js
+// Code.gs — reemplaza a claveArea y claveNombre (hoy distintas)
+function claveCultivo(n) {
+  return String(n || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/s$/, "");
+}
+```
+**Ojo antes de aplicarlo:** `claveNombre` también compara **personas** (Luqui,
+Marto) y tarifas. Para personas no conviene sacar la "s" final ("Andrés" y
+"Andre"). Así que: `claveCultivo` para cultivos, `claveNombre` queda para
+personas, y el cruce de siembras en `generacionesDelPlan` pasa a
+`claveCultivo`. Es el único cambio con efecto visible: siembras cargadas con
+singular/plural distinto del plan empezarían a cruzar bien.
+
+### 4.2 El esquema en un solo lugar
+
+El servidor ya tiene `HOJAS` con los encabezados. Que los mande en la
+configuración y que la app lea por nombre interno, no por texto:
+
+```js
+// Code.gs, en la respuesta de ?config=1
+cfg.esquema = {};
+Object.keys(HOJAS).forEach(function (k) { cfg.esquema[k] = HOJAS[k].encabezados; });
+```
+Y un chequeo en `tools/version_servicio.py` que compare esos encabezados con
+los que usa la app (`DE_LA_HOJA` en `registros.js`): si alguien renombra una
+columna, la herramienta lo dice antes de que se rompa en un teléfono.
+
+### 4.3 Guardar la configuración por partes (la zona crítica #1)
+
+En vez de reescribir toda la hoja Config, operaciones chicas que tocan una
+fila, igual que las generaciones:
+
+```js
+// Code.gs — tipo nuevo en doPost
+else if (r.tipo === "config_plan") { guardarPlanDeCultivo(libro, r.datos); guardados++; }
+
+function guardarPlanDeCultivo(libro, p) {
+  var hoja = hojaConfig(libro);
+  var n = hoja.getLastRow();
+  var filas = n > 1 ? hoja.getRange(2, 1, n - 1, 2).getValues() : [];
+  var fila = [ "plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
+               p.rinde_kg_m2 || 0, p.lineas || 0, p.distancia_cm || 0, p.plantas || 0 ];
+  for (var i = 0; i < filas.length; i++) {
+    if (filas[i][0] === "plan" && claveCultivo(filas[i][1]) === claveCultivo(p.cultivo)) {
+      if (p.borrar) hoja.deleteRow(i + 2); else hoja.getRange(i + 2, 1, 1, CONFIG_COLS).setValues([fila]);
+      return;
+    }
+  }
+  if (!p.borrar) hoja.getRange(n + 1, 1, 1, CONFIG_COLS).setValues([fila]);
+}
+```
+Y en la app, `replanearCultivo` manda `config_plan` con ese cultivo en lugar
+de la configuración entera. Los sectores (el mapa) pueden seguir el mismo
+camino con `config_sector`. Con eso, dos personas editando cultivos distintos
+no se pisan.
+
+### 4.4 Menos viajes y menos lecturas en el servidor
+
+**a) Recordar el acceso unos minutos.** Hoy cada pedido abre la planilla de
+accesos y lee todos los dispositivos:
+
+```js
+function permitido(chacra, credencial, dispositivo) {
+  if (!credencial) return rechazo("Este teléfono todavía no tiene acceso.");
+  var cache = CacheService.getScriptCache();
+  var llave = "acceso_" + huella(credencial) + "_" + String(chacra).toLowerCase();
+  var guardado = cache.get(llave);
+  if (guardado) return JSON.parse(guardado);
+  var r = permitidoSinCache_(chacra, credencial, dispositivo);   // la de hoy
+  if (r.ok) cache.put(llave, JSON.stringify(r), 120);            // solo los sí, 2 minutos
+  return r;
+}
+```
+Consecuencia a aceptar: dar de baja un teléfono tarda hasta 2 minutos en
+aplicarse. Los rechazos no se guardan, así que un teléfono nuevo entra en el
+acto.
+
+**b) Un solo pedido al abrir la app.** `?inicio=1` que devuelva juntos
+config, resumen, tareas, generaciones y almácigos en una ejecución; la app lo
+usa si el servicio lo tiene y si no cae a los pedidos de hoy. Y sacar el
+pedido duplicado de config y catálogo del arranque (`iniciar` y `sincronizar`
+los piden los dos).
+
+**c) Plan en caché.** `generacionesDelPlan` con `CacheService` por chacra (5
+minutos), borrado en `guardarGeneracion`, `borrarGeneracion` y cada siembra
+nueva. Es lo que más se pide (Inicio, Plan, Proyección de Economía).
+
+**d) Fechas.** Un solo `textoFecha_(v, tz)` en lugar de las 9 copias.
+
+### 4.5 Estado y dibujo (lo más grande; hacerlo por sección)
+
+- Agrupar el estado de interfaz en un objeto por sección
+  (`ui.plan = { vista, orden, filtro, genPanel, … }`) en vez de 35 variables
+  sueltas. Es mecánico y se hace de a un archivo.
+- Sacar de `render()` los enganches de cada sección y ponerlos en su
+  `preparar*`. `render` queda en dibujar + scroll + `preparar[vista]()`.
+- Para las listas largas (plan estratégico, historial), redibujar solo la
+  lista y no la sección entera. Es lo que termina con los parches de scroll.
+
+### 4.6 Seguridad e infraestructura (ya en PENDIENTES)
+
+Horas de Tica por el servicio de AMA (y despublicar el script de horas);
+`Code.gs` a un proyecto propio; identificadores por persona en vez del nombre.
+
+### 4.7 Versión de protocolo en AMA
+
+Que el servicio responda `api: N` en cada respuesta (como Economía) y la app
+avise "el servicio corre una versión anterior" en vez de depender de banderas
+sueltas como `corregir`.
+
+### 4.8 AMA Economía: sincronización por cambios
+
+Mandar solo lo modificado desde la última sincronización (por `mod`) y que el
+servidor haga upsert por id en lugar de borrar y reescribir las hojas. La
+fusión por `mod` y las tumbas ya están; falta dejar de reescribir todo.
+
+---
+
+## 5. Cómo trabajar con esto
+
+- Un archivo nuevo en `docs/js/` va en **tres** lugares: `index.html`,
+  `sw.js` (lista `ARCHIVOS`) y `pruebas.html`, en el mismo orden.
+- Una función que se usa al cargar (en el inicializador de una constante) tiene
+  que estar en un archivo anterior. Hoy solo `leer` y `LS` cumplen ese papel.
+- Antes de publicar: `docs/pruebas.html` en verde y el recorrido en el
+  navegador. Si se agrega una cuenta nueva (bandejas, fechas, kilos), sumarle
+  una prueba.

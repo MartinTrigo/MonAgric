@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMA Producción · pruebas</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 20px; color: #2c3a28; background: #fafaf7; }
+  h1 { font-size: 1.2rem; }
+  .res { font-weight: 700; margin: 10px 0 16px; }
+  .ok { color: #3d6b35; } .mal { color: #c0392b; }
+  table { border-collapse: collapse; font-size: .85rem; width: 100%; }
+  td { border-bottom: 1px solid #e6e9e2; padding: 4px 6px; vertical-align: top; }
+  td:first-child { width: 1.4rem; }
+  code { font-size: .8rem; color: #555; }
+</style>
+</head>
+<body>
+<h1>AMA Producción · pruebas de las cuentas</h1>
+<p>Carga el mismo código que la app (menos el arranque) y comprueba sus cálculos
+con casos conocidos. Abrirla antes de publicar un cambio: si algo sale en rojo,
+el cambio rompió algo que antes andaba. No toca ninguna planilla ni el
+almacenamiento del teléfono.</p>
+<div id="resultado" class="res">Corriendo…</div>
+<table id="tabla"></table>
+
+<!-- El mismo orden que index.html, sin arranque.js: no se dibuja la app ni se
+     sincroniza nada. -->
+<div id="vista" hidden></div><div id="aviso" hidden></div><span id="estado-sync" hidden></span>
+<script src="js/base.js"></script>
+<script src="js/catalogo.js"></script>
+<script src="js/servicio.js"></script>
+<script src="js/componentes.js"></script>
+<script src="js/pendientes.js"></script>
+<script src="js/plan-grafico.js"></script>
+<script src="js/plan-mapa.js"></script>
+<script src="js/plan-cultivos.js"></script>
+<script src="js/ficha.js"></script>
+<script src="js/registros.js"></script>
+<script src="js/cuentas.js"></script>
+<script src="js/tareas.js"></script>
+<script src="js/configuracion.js"></script>
+<script src="js/formularios.js"></script>
+<script src="js/vistas.js"></script>
+<script src="js/render.js"></script>
+<script>
+(async () => {
+  // Nada de lo que corre acá puede escribir en el teléfono ni salir a la red.
+  // leer y escribir son constantes: se frena más abajo, en el almacenamiento.
+  const setReal = Storage.prototype.setItem, getReal = Storage.prototype.getItem;
+  Storage.prototype.setItem = function () {};
+  const conGeneraciones = (lista, fn) => {
+    Storage.prototype.getItem = function (k) {
+      return k === LS.generaciones ? JSON.stringify(lista) : getReal.call(this, k);
+    };
+    try { return fn(); } finally { Storage.prototype.getItem = getReal; }
+  };
+  window.fetch = ((f0) => (u, o) => (String(u).includes("script.google.com")
+    ? Promise.reject(new Error("sin red en las pruebas")) : f0(u, o)))(window.fetch);
+
+  CAT = await (await fetch("catalogo.json", { cache: "no-cache" })).json();
+  CFG = {
+    nombre: "Chacra de prueba", temporada: { nombre: "2026-27", inicio: "2026-07-07" },
+    bancal: { largo_m: 30, ancho_m: 0.8, pasillo_m: 0.5, n_bancales: 50 },
+    sectores: [{ sector: "Primavera", bancales: 25 }, { sector: "Verano", bancales: 25 }],
+    integrantes: ["Marto"], areas: [],
+    plan: [{ cultivo: "Repollo bco", superficie_m2: 48, cosecha_esperada_kg: 240,
+             rinde_kg_m2: 5, lineas: 3, distancia_cm: 45, plantas: 396 }],
+  };
+  pendientes = [];
+
+  const casos = [];
+  const igual = (nombre, obtenido, esperado) => casos.push({
+    nombre, ok: JSON.stringify(obtenido) === JSON.stringify(esperado), obtenido, esperado });
+
+  // --- fechas ---
+  igual("sumarDias suma días corridos", sumarDias("2026-09-28", 40), "2026-11-07");
+  igual("diasEntre cuenta días", diasEntre("2026-09-28", "2026-11-07"), 40);
+
+  // --- días de almácigo por estación (catálogo) ---
+  igual("almácigo de repollo en octubre: primavera-verano (30)", diasAlmacigo("Repollo bco", "2026-10-19"), 30);
+  igual("almácigo de repollo en agosto: otoño-invierno (40)", diasAlmacigo("Repollo bco", "2026-08-13"), 40);
+
+  // --- etapas de una generación ---
+  const t1 = tramosDe({ cultivo: "Repollo bco", fecha_almacigo: "2026-10-19", fecha_campo: "" });
+  igual("tramos sin fecha a campo: la calcula el catálogo",
+    [t1.campo, t1.inicioCosecha, t1.fin], ["2026-11-18", "2027-03-03", "2027-04-02"]);
+  const t2 = tramosDe({ cultivo: "Repollo bco", fecha_almacigo: "2026-10-19", fecha_campo: "2026-11-28" });
+  igual("tramos con fecha a campo: manda la del plan",
+    [t2.campo, t2.inicioCosecha, t2.fin], ["2026-11-28", "2027-03-13", "2027-04-12"]);
+  const t3 = tramosDe({ cultivo: "Pak choi", fecha_almacigo: "2026-09-28", fecha_campo: "" });
+  igual("sin días en el catálogo: barra estimada, y dice qué falta",
+    [t3.campo, t3.inicioCosecha, t3.faltan], ["2026-10-26", "2026-12-25", ["días de almácigo", "días en cosecha"]]);
+
+  // --- plantas y bandejas ---
+  igual("plantas: 3 líneas a 45 cm en un bancal de 30 m",
+    plantasDe({ bancales: 1, lineas: 3, distancia_cm: 45 }), 198);
+  const b = bandejasDelPlan("Repollo bco", 1, 128);
+  igual("bandejas del plan: 198 plantas en bandejas de 128", [b.plantas, b.bandejas], [198, 2]);
+  igual("bandejas con 72 alvéolos", bandejasDelPlan("Repollo bco", 1, 72).bandejas, 3);
+
+  // --- generaciones ---
+  const gens = [
+    { id: "gen-tomate-1", cultivo: "Tomate", generacion: 1, camas: 2, sector: "Primavera", bancales: "14, 15" },
+    { id: "gen-tomate-1-b", cultivo: "Tomate", generacion: 1, camas: 2, sector: "Primavera", bancales: "16, 17" },
+    { id: "gen-tomate-2", cultivo: "Tomate", generacion: 2, camas: 1 },
+  ];
+  igual("nombre de una generación partida", gens.map((g) => nombreGen(g, gens)), ["G1a", "G1b", "G2"]);
+  igual("etiqueta de generaciones seguidas", etiquetaGeneraciones([3, 1, 2]), "G1 a G3 <small>(3 juntas)</small>");
+  igual("etiqueta con una salteada no dice «a»", etiquetaGeneraciones([2, 3, 4, 6]),
+    "G2, G3, G4 y G6 <small>(4 juntas)</small>");
+  igual("partes posibles de 4 bancales", partesPosibles({ camas: 4 }), [2, 4]);
+  igual("partes posibles de 3 bancales", partesPosibles({ camas: 3 }), [3]);
+  igual("bancales de una generación planificada (juntando las partes)",
+    conGeneraciones(gens, () => bancalesPlanificados("Tomate", 1).map((x) => x.bancal)),
+    [14, 15, 16, 17]);
+  igual("días en bandeja del plan: el que más se repite",
+    diasBandejaDelCultivo("Repollo bco", [
+      { cultivo: "Repollo bco", fecha_almacigo: "2026-09-01", fecha_campo: "2026-10-11" },
+      { cultivo: "Repollo bco", fecha_almacigo: "2026-09-15", fecha_campo: "2026-10-25" },
+      { cultivo: "Repollo bco", fecha_almacigo: "2026-10-01", fecha_campo: "2026-10-31" }]), 40);
+
+  // --- la cola por enviar se ve igual en el plan ---
+  pendientes = [
+    { tipo: "generaciones", datos: { generacion_id: "gen-tomate-3", cultivo: "Tomate", generacion: 3, camas: 1 } },
+    { tipo: "generacion_borrar", datos: { generacion_id: "gen-tomate-2" } },
+  ];
+  igual("lo que está en la cola se aplica sobre lo del servicio",
+    conPendientesDelPlan(gens).map((g) => g.id), ["gen-tomate-1", "gen-tomate-1-b", "gen-tomate-3"]);
+  pendientes = [{ tipo: "generaciones", datos: { generacion_id: "gen-tomate-1-c", cultivo: "Tomate", generacion: 1, camas: 1 } }];
+  igual("una parte nueva de una generación sembrada queda sembrada",
+    conPendientesDelPlan(gens.map((g) => ({ ...g, sembrada: g.generacion === 1 })))
+      .find((g) => g.id === "gen-tomate-1-c").sembrada, true);
+  pendientes = [];
+
+  // --- mapa ---
+  igual("bancales que ocuparía una de 3 al final del sector", bancalesQueOcuparia({ camas: 3 }, 24, 25), [23, 24, 25]);
+  const puestas = [{ id: "a", cultivo: "Acelga", fecha_almacigo: "2026-08-13", fecha_campo: "2026-09-22",
+                     sector: "Verano", bancales: "6, 7, 8" }];
+  igual("choca si comparte bancal y fechas",
+    chocanCon({ id: "b", cultivo: "Acelga", fecha_almacigo: "2026-08-20", fecha_campo: "2026-09-29" },
+              "Verano", [8, 9], puestas).length, 1);
+  igual("no choca en otro sector",
+    chocanCon({ id: "b", cultivo: "Acelga", fecha_almacigo: "2026-08-20", fecha_campo: "2026-09-29" },
+              "Primavera", [8, 9], puestas).length, 0);
+
+  // --- corregir un registro: se recalcula lo que depende del dato ---
+  const form = document.createElement("div");
+  form.innerHTML = formularioCorreccion("siembras", {
+    Id: "s1", Fecha: "2026-10-19", Cultivo: "Repollo bco", Variedad: "", Tipo: "Siembra almácigo",
+    "Generación": 3, Bandejas: 1, "Alvéolos": 128, Plantines: 128, Operador: "Marto" });
+  form.querySelector("form").elements.bandejas.value = "3";
+  const d = datosCorregidos("siembras", { Id: "s1", Fecha: "2026-10-19", Cultivo: "Repollo bco",
+    Tipo: "Siembra almácigo", "Generación": 3, Bandejas: 1, "Alvéolos": 128, Operador: "Marto" },
+    form.querySelector("form"));
+  igual("corregir bandejas recalcula plantines y trasplante estimado",
+    [d.bandejas, d.plantines, d.trasplante_estimado], [3, 384, "2026-11-18"]);
+
+  Storage.prototype.setItem = setReal;
+  const mal = casos.filter((c) => !c.ok);
+  const res = document.getElementById("resultado");
+  res.textContent = mal.length ? `${mal.length} de ${casos.length} fallaron` : `Las ${casos.length} pruebas dan bien`;
+  res.className = "res " + (mal.length ? "mal" : "ok");
+  document.getElementById("tabla").innerHTML = casos.map((c) => `<tr>
+    <td class="${c.ok ? "ok" : "mal"}">${c.ok ? "✓" : "✗"}</td>
+    <td>${c.nombre}${c.ok ? "" : `<br><code>dio ${esc(JSON.stringify(c.obtenido))} · esperaba ${esc(JSON.stringify(c.esperado))}</code>`}</td>
+  </tr>`).join("");
+  window.__resultado = { total: casos.length, fallaron: mal.map((c) => c.nombre) };
+})().catch((e) => {
+  document.getElementById("resultado").textContent = "Las pruebas no pudieron correr: " + e;
+  document.getElementById("resultado").className = "res mal";
+  window.__resultado = { error: String(e) };
+});
+</script>
+</body>
+</html>

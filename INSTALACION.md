@@ -42,7 +42,7 @@ invisible no da error: hace que el servicio se cuelgue.
 > de la chacra y el id de su planilla, y queda hecho y publicado. Chacra Tica,
 > La Milpa y Foco Verde ya están cargadas.
 
-Si querés hacerlo vos, es en `C:\MARTO\INFORMATICA\MonAgric\docs\app.js`, arriba
+Si querés hacerlo vos, es en `C:\MARTO\INFORMATICA\MonAgric\docs\js\base.js`, arriba
 de todo:
 
 ```js
@@ -196,7 +196,7 @@ activador* → función `actualizarPanel`, origen *según tiempo*, cada día.
 | "Ese código es de otra chacra" | La columna Chacra tiene que decir el **código** (`tica`), no el nombre lindo |
 | "Ese código ya se usó" | Se usó en otro teléfono. Generá uno nuevo con `crear_invitaciones.py` |
 | "Este teléfono fue dado de baja" | Alguien puso `NO` en la columna Activo de la hoja Dispositivos |
-| No aparece la chacra en la lista | Falta agregarla en `docs/app.js` y publicar |
+| No aparece la chacra en la lista | Falta agregarla en `docs/js/base.js` y publicar |
 | Todo se cuelga para una chacra | Un espacio o carácter invisible en su id, dentro de la propiedad `CHACRAS` |
 
 ### Dar de baja un teléfono

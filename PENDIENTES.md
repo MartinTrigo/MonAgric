@@ -213,13 +213,13 @@ sin credencial no entrega config, ni cuentas, ni economía, y no escribe nada.
 La URL de bioma-mov nunca entró al historial de git.
 
 Pero `Codigo-horas-bioma.gs` **no tiene ningún control de acceso**, y su URL
-está en `docs/app.js:43`, que es público. Con esa dirección cualquiera:
+está en `docs/js/base.js` (URL_HORAS_POR_DEFECTO), que es público. Con esa dirección cualquiera:
 
 - **lee** los 12 nombres del equipo y los últimos registros de horas
   (comprobado: devolvió las 7 h de Mili del 17/09);
 - **escribe** filas de horas, y de esas filas bioma-db calcula los sueldos.
 
-**No sirve ponerle una clave**: tendría que viajar en `app.js`. Todo lo que
+**No sirve ponerle una clave**: tendría que viajar en el código de la app. Todo lo que
 sabe el navegador es público — por eso cuentas y economía las pide el servidor
 con `UrlFetchApp`.
 
