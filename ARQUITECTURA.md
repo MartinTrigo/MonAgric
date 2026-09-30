@@ -87,9 +87,7 @@ render(vista)
 formulario → datos → guardarRegistro("siembras", datos)
    → pendientes[] (memoria) + LS.pendientes  → aviso → sincronizar()
 sincronizar():
-   1. horas de Tica, solo contra un servicio anterior al 30/09: POST de a una
-      al script de horas. Con el servicio nuevo van en el paso 2.
-   2. todo: POST {credencial, registros} a Code.gs
+   1. todo, también las horas de Tica: POST {credencial, registros} a Code.gs
       Code.gs: permitido() → lock → por tipo: upsert/append en la hoja
       → respuesta {guardados, no_guardados[]}
    3. lo guardado pasa a `enviados`; lo fallido queda en la cola
@@ -300,8 +298,8 @@ nueva. Es lo que más se pide (Inicio, Plan, Proyección de Economía).
 
 Horas de Tica por el servicio de AMA — **hecho 30/09** (`escribirHorasDeTica`,
 con columna "Cargado por"; la app usa el camino viejo si el servicio no
-anuncia `horas_por_servicio`). Falta archivar la implementación del script de
-horas y sacar `URL_HORAS_POR_DEFECTO` de `base.js`.
+anuncia `horas_por_servicio`). El Web App del script de horas se archivó el
+mismo día y la app ya no tiene su dirección ni el camino viejo.
 `Code.gs` a un proyecto propio; identificadores por persona en vez del nombre.
 
 ### 4.7 Versión de protocolo en AMA

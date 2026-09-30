@@ -1515,7 +1515,8 @@ function espejarHorasDeTica() {
   if (!origen || origen.getLastRow() < 2) return { ok: false, error: "No encontre las horas de Bioma." };
 
   // Bioma: Marca(1) Fecha(2) Trabajador(3) Horas(4) Actividad(5) Obs(6) Area(7)
-  var filas = origen.getRange(2, 1, origen.getLastRow() - 1, 7).getValues();
+  // Cargado por(8), desde el 30/09: las anteriores lo tienen vacio.
+  var filas = origen.getRange(2, 1, origen.getLastRow() - 1, 8).getValues();
   var libro = planillaDe(CHACRA_CON_HORAS_APARTE);
   var cfg = leerConfigDe(libro, CHACRA_CON_HORAS_APARTE);
   var temporada = (cfg.temporada && cfg.temporada.nombre) || "";
@@ -1538,7 +1539,7 @@ function espejarHorasDeTica() {
       (desde && fecha instanceof Date && fecha < desde) ? "" : temporada,
       comoFecha(fecha), quien, horas,
       String(f[4] || ""), String(f[6] || ""), String(f[5] || ""),
-      "planilla de horas", f[0] instanceof Date ? f[0] : ""
+      String(f[7] || "planilla de horas"), f[0] instanceof Date ? f[0] : ""
     ]);
   });
 

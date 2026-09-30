@@ -31,7 +31,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 67 · 30/9/2026";
+const VERSION_APP = "versión 68 · 30/9/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -45,12 +45,10 @@ const CHACRAS = [
 // Los tipos que nacen en bandeja: el formulario pide bandejas en vez de bancal.
 const EN_BANDEJA = new Set(["Siembra almácigo", "Esqueje"]);
 
-// Las horas siguen yendo a la planilla del proyecto donde ya están cargadas
-// desde julio (la que usaba la app bioma-horas), para no partir el historial.
-// Ese servicio recibe un registro por vez, con sus propios nombres de campo.
-const URL_HORAS_POR_DEFECTO =
-  "https://script.google.com/macros/s/AKfycbyHBMsZAyLOACCgWclgHGDB6e6M8tw2VX_zonELRuFobPp3TdakCr4Wkh2b8TqtB7P2bw/exec";
-// La planilla misma, para el enlace "ver todo" de Horas en Tica. Abrirla pide
+// Las horas de Tica van a la planilla de horas de Bioma, donde está el
+// historial desde julio. Hasta el 30/09 el teléfono las mandaba directo a un
+// script de esa planilla, sin credencial; ahora las escribe el servicio de AMA
+// y ese script se archivó. La planilla misma, para el enlace "ver todo" de Horas en Tica. Abrirla pide
 // tener permiso en Drive: la dirección sola no da acceso a nada.
 const PLANILLA_HORAS_BIOMA =
   "https://docs.google.com/spreadsheets/d/1tx8V0VLciiTLFvAmSViAR6KV9LL9hXzvX6-qy30Ubpg/edit";
@@ -72,13 +70,13 @@ const LS = {
   config: "monagric_config",
   configLeida: "monagric_config_leida",
   scriptUrl: "monagric_script_url",
-  urlHoras: "monagric_url_horas",
+  urlHoras: "monagric_url_horas",            // ya no se usa (script de horas archivado)
   resumen: "monagric_resumen",
   nombresPlanilla: "monagric_nombres_planilla",
   cuentas: "monagric_cuentas",
   cuentasError: "monagric_cuentas_error",
   catalogoExtra: "monagric_catalogo_extra",
-  ultimasHoras: "monagric_ultimas_horas",
+  ultimasHoras: "monagric_ultimas_horas",    // ya no se usa (script de horas archivado)
   tareas: "monagric_tareas",
   ultimos: "monagric_ultimos",
   almacigos: "monagric_almacigos",
@@ -147,7 +145,6 @@ let modoCosecha = leer(LS.modoCosecha, "lista");
 // puede seguir editando sin señal.
 let configConfirmada = leer(LS.configLeida, false);
 
-const urlHoras = () => leer(LS.urlHoras, "") || URL_HORAS_POR_DEFECTO;
 const urlServicio = () => leer(LS.scriptUrl, "") || URL_SERVICIO_POR_DEFECTO;
 
 const chacraCodigo = () => leer(LS.chacra, "");
@@ -192,14 +189,10 @@ async function canjearCodigo(codigo, persona) {
   return d;
 }
 const chacraActual = () => CHACRAS.find((c) => c.codigo === chacraCodigo()) || null;
-// Solo Chacra Tica manda las horas a la planilla del proyecto Bioma, donde está
-// el historial desde julio. Las demás las guardan en su propia hoja Horas.
+// Solo Chacra Tica tiene sus horas en la planilla del proyecto Bioma, donde
+// está el historial desde julio. Viajan con todo lo demás al servicio de AMA,
+// que las escribe ahí. Las demás chacras las guardan en su propia hoja Horas.
 const horasVanAparte = () => !!chacraActual()?.horasAparte;
-// Desde el 30/09 esas horas entran por el servicio de AMA, con la credencial
-// del teléfono, y él las escribe en la planilla de Bioma. Antes iban directo
-// al script de la planilla de horas, que no pedía nada. Contra un servicio
-// anterior (sin esta marca en la configuración) se sigue por el camino viejo.
-const horasPorServicio = () => horasVanAparte() && !!CFG?.horas_por_servicio;
 
 // ---- Utilidades ----
 const $ = (sel) => document.querySelector(sel);

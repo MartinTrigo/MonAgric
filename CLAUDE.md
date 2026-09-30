@@ -51,7 +51,7 @@ docs/catalogo.json  cultivos y perfiles, iguales para todas las chacras
 docs/juego/         Pac-Farm, el juego
 apps-script/Code.gs            el "servidor" de las cinco chacras
 apps-script/Codigo-horas-bioma.gs  script aparte, vive en la planilla de horas
-                    (se retira: desde el 30/09 Code.gs escribe esas horas)
+                    (Web App archivado el 30/09: Code.gs escribe esas horas)
 tools/*.py          herramientas de administración (usan clave de admin)
 ```
 
@@ -128,8 +128,7 @@ Cuatro de las cinco chacras no tienen nada que ver con la economía de Bioma.
   planilla de Bioma en vez de a la suya. Las demás usan su hoja `Horas`.
   **Desde el 30/09 esas horas entran por `Code.gs`** (con credencial, columna
   "Cargado por"), no por el script de la planilla de horas, que no pedía
-  nada. La app usa el camino viejo solo si la configuración no trae
-  `horas_por_servicio`. Pasos que faltan: PENDIENTES 0 bis.
+  nada y cuyo Web App se archivó ese día. La app ya no tiene su dirección.
 
 ## La configuración, entera o por partes (30/09)
 

@@ -595,14 +595,10 @@ function prepararAjustes() {
     }
     escribir(LS.nombre, $("#aj-nombre").value);
     const url = $("#aj-url").value.trim();
-    // El de horas solo aparece si esas horas todavía van por el script aparte.
-    const campoH = $("#aj-url-horas");
-    const urlH = campoH ? campoH.value.trim() : leer(LS.urlHoras, "");
-    if (!esScript(url) || !esScript(urlH)) {
-      return aviso("Las direcciones deben ser de Apps Script (script.google.com).", true);
+    if (!esScript(url)) {
+      return aviso("La dirección debe ser de Apps Script (script.google.com).", true);
     }
     escribir(LS.scriptUrl, url);
-    escribir(LS.urlHoras, urlH);
     refrescarEstado();
     aviso("Ajustes guardados ✓");
     sincronizar();
@@ -620,13 +616,6 @@ function prepararAjustes() {
 
   $("#btn-probar").onclick = async () => {
     const partes = [];
-    if (horasVanAparte() && !horasPorServicio()) {
-      try {
-        const d = await (await fetch(urlHoras())).json();
-        partes.push(Array.isArray(d.nombres) ? `horas ✓ (${d.nombres.length} integrantes)` : "horas ✓");
-      } catch { partes.push("horas ✗"); }
-    }
-
     try {
       const d = await (await fetch(urlServicio())).json();
       partes.push(d.ok ? "siembras y tareas ✓" : "siembras y tareas ✗");

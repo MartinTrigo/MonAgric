@@ -318,8 +318,6 @@ const plantillas = {
     if (!chacraActual()) return tarjetaElegirChacra();
     if (!tieneAcceso()) return tarjetaCanje();
     const yo = leer(LS.nombre, "");
-    const equipo = leer(LS.ultimasHoras, []);
-    const pendientesHoras = pendientes.filter((r) => r.tipo === "horas");
     return `
     <div class="tarjeta">
       <h2>&#9201; Registrar horas de trabajo</h2>
@@ -355,25 +353,7 @@ const plantillas = {
       </form>
     </div>
 
-    ${horasVanAparte() && !CFG?.corregir ? `
-    <div class="tarjeta">
-      <h2>Últimos movimientos <small>planilla del proyecto</small></h2>
-      ${pendientesHoras.map((r) => `<div class="registro">
-        <div><div class="detalle">${esc(r.datos.integrante)} — ${r.datos.horas} h</div>
-          <div class="cuando">${fechaCorta(r.datos.fecha)} · ${esc(r.datos.actividad)}</div></div>
-        <span class="etiqueta espera">Por enviar</span>
-      </div>`).join("")}
-      ${equipo.length
-        ? equipo.map((f) => `<div class="registro">
-            <div><div class="detalle">${esc(f.nombre)} — ${esc(String(f.horas))} h</div>
-              <div class="cuando">${esc(f.fecha)} · ${esc(f.actividad)}</div></div>
-          </div>`).join("")
-        : (pendientesHoras.length ? "" : `<p class="nota">Cuando haya conexión se van a ver
-            acá los últimos registros de todo el equipo.</p>`)}
-      <a class="enlace-planilla" target="_blank" rel="noopener"
-         href="${esc(PLANILLA_HORAS_BIOMA)}">
-        Ver la planilla de horas completa</a>
-    </div>` : historialDe("horas")}`;
+    ${historialDe("horas")}`;
   },
 
   tareas() {
@@ -932,17 +912,13 @@ const plantillas = {
       <label>Tu nombre (queda en cada registro que cargues)</label>
       <select id="aj-nombre">${opcionesIntegrante(leer(LS.nombre, ""))}</select>
 
-      <p class="nota">Con elegir tu nombre alcanza: las dos planillas ya vienen
-      conectadas. Los campos de abajo son para cuando cambie algún servicio.</p>
+      <p class="nota">Con elegir tu nombre alcanza: la planilla ya viene
+      conectada. El campo de abajo es para cuando cambie el servicio.</p>
 
       <label>Servicio de siembras, cosechas y tareas <small>(planilla de la chacra)</small></label>
       <input type="url" id="aj-url" value="${esc(leer(LS.scriptUrl, ""))}"
              placeholder="ya viene configurado — dejalo vacío">
 
-      ${horasVanAparte() && !horasPorServicio() ? `
-      <label>Servicio de horas <small>(planilla del proyecto)</small></label>
-      <input type="url" id="aj-url-horas" value="${esc(leer(LS.urlHoras, ""))}"
-             placeholder="ya viene configurado — dejalo vacío">` : ""}
 
       <button class="principal" id="btn-guardar-ajustes">Guardar ajustes</button>
       <button class="secundario" id="btn-probar">Probar conexión</button>

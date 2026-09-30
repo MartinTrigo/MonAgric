@@ -23,10 +23,7 @@ window.addEventListener("online", () => sincronizar());
 
   render(chacraActual() ? "inicio" : "inicio");
   refrescarEstado();
-  // La configuración primero: dice si las horas de Tica ya van por el servicio
-  // (y trae los nombres) o si hay que pedirlos al script de horas aparte.
-  await traerConfig();
-  if (horasVanAparte()) await traerDatosHoras();   // nombres del equipo del proyecto
+  await traerConfig();   // en Tica trae también los nombres de la planilla de horas
   await traerCatalogo();
   if (["inicio", "plan"].includes(vistaActual)) redibujarConDatos(vistaActual);
   sincronizar();

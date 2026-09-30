@@ -30,8 +30,9 @@ function refrescarEstado() {
 }
 
 // ---- Envío a las planillas ----
-// Las horas van a la planilla del proyecto y el resto a la de MonAgric, así que
-// cada grupo se envía por su lado y lo que falle queda en la cola.
+// Todo va en un solo pedido al servicio de AMA, que reparte cada registro a
+// su hoja (las horas de Tica, a la planilla de Bioma). Lo que falle queda en
+// la cola.
 async function sincronizar(silencioso = true) {
   if (!navigator.onLine) { refrescarEstado(); return; }
   // Sin credencial no se manda nada: queda todo en la cola del teléfono hasta
@@ -41,22 +42,7 @@ async function sincronizar(silencioso = true) {
   const enviadosAhora = [];
   const fallaron = [];
 
-  // Las horas de Chacra Tica, contra un servicio anterior, van al script de la
-  // planilla de horas (un registro por vez). Con el servicio nuevo viajan con
-  // todo lo otro y él las pasa a la planilla de Bioma (ver horasPorServicio).
-  const horas = horasVanAparte() && !horasPorServicio()
-    ? pendientes.filter((r) => r.tipo === "horas") : [];
-  for (const r of horas) {
-    try {
-      await enviarHora(r);
-      enviadosAhora.push(r);
-    } catch {
-      fallaron.push(r);
-      break;   // si el servicio no responde, el resto espera al próximo intento
-    }
-  }
-
-  const otros = pendientes.filter((r) => !horas.includes(r));
+  const otros = pendientes;
   if (otros.length) {
     try {
       const resp = await fetch(urlServicio(), {
@@ -123,43 +109,10 @@ async function sincronizar(silencioso = true) {
     aviso("No se pudo enviar. Revisá la señal y los Ajustes.", true);
   }
 
-  await Promise.all([traerResumen(), traerDatosHoras(), traerTareas(),
+  await Promise.all([traerResumen(), traerTareas(),
                      traerConfig(), traerCatalogo()]);
   refrescarEstado();
   if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) redibujarConDatos(vistaActual);
-}
-
-// El servicio de la planilla de horas recibe un registro por vez y con sus
-// propios nombres de campo (los mismos que usaba la app anterior).
-async function enviarHora(r) {
-  const d = r.datos;
-  const resp = await fetch(urlHoras(), {
-    method: "POST",
-    body: JSON.stringify({
-      marca: r.creado_en,
-      fecha: d.fecha,
-      nombre: d.integrante,
-      horas: d.horas,
-      actividad: d.actividad || "",
-      obs: d.observaciones || "",
-      area: d.area || d.proyecto || "",
-    }),
-  });
-  const datos = await resp.json();
-  if (!datos.ok) throw new Error(datos.error || "respuesta inválida");
-}
-
-// Nombres del equipo y últimos registros, de la planilla de horas. Con el
-// servicio nuevo los nombres vienen en la configuración (nombres_horas) y los
-// últimos registros, en la lista de cada sección: no hay nada que pedir acá.
-async function traerDatosHoras() {
-  if (!navigator.onLine || horasPorServicio()) return;
-  try {
-    const r = await fetch(urlHoras());
-    const d = await r.json();
-    if (Array.isArray(d.nombres) && d.nombres.length) escribir(LS.nombresPlanilla, d.nombres);
-    if (Array.isArray(d.ultimas)) escribir(LS.ultimasHoras, d.ultimas);
-  } catch { /* sin conexión: se usa lo último guardado */ }
 }
 
 // Totales de toda la chacra (lo que cargaron todos los teléfonos).

@@ -208,6 +208,15 @@ Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
 
 ### 0 bis. Cerrar el script de horas — es el único secreto a la vista
 
+> **30/09: CERRADO.** Implementado, verificado con una hora real (Marto, con
+> "Cargado por") y el Web App del script de horas **archivado** (la dirección
+> da 404). La app ya no tiene la dirección ni el camino viejo.
+>
+> Ojo: la app vieja **bioma-horas** usaba esa misma dirección; si alguien la
+> seguía usando, ya no le anda. Las horas se cargan solo en AMA.
+>
+> Lo que sigue es cómo se hizo.
+>
 > **30/09: resuelto en el código.** Las horas de Tica viajan con el resto de
 > la cola a `Code.gs`, que con la credencial ya validada las escribe en la
 > misma hoja de respuestas y con el mismo formato (bioma-db las importa igual:
