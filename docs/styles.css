@@ -1591,3 +1591,26 @@ details.desplegable[open] > summary { margin-bottom: 8px; }
   line-height: 1.45;
 }
 .desde-plan .secundario { width: auto; margin: 6px 0 0; padding: 4px 11px; font-size: .8rem; display: block; }
+
+/* Plan estratégico: lo que pasa después del 30 de junio ya es la temporada
+   siguiente. El eje sigue para ver dónde termina cada cosecha, pero sombreado
+   y con una línea en el corte. */
+.fuera-temporada {
+  position: absolute; top: 0; bottom: 0; right: 0;
+  background: repeating-linear-gradient(135deg, rgba(0,0,0,.025) 0 6px, transparent 6px 12px);
+  pointer-events: none;
+}
+.fin-temporada {
+  position: absolute; top: 0; bottom: 0; width: 0;
+  border-left: 2px dashed #b9c2b2;
+  pointer-events: none;
+}
+.plan-meses .mes.fuera { color: #aab3a4; font-style: italic; }
+/* Al desplazarse de costado, el nombre del cultivo queda a la vista. */
+.plan-nombre {
+  position: sticky; left: 0; z-index: 4;
+  background: #fff;
+  /* Tapa también el margen del gráfico a la izquierda y el hueco hasta la
+     barra: si no, asoma un pedazo de las barras que pasan por detrás. */
+  box-shadow: -16px 0 0 #fff, 8px 0 0 #fff;
+}

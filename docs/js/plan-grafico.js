@@ -94,14 +94,22 @@ function planEstrategico() {
     </div>`;
   }
 
-  // El eje es la temporada, de julio a junio, no el rango de los datos. Sin
-  // ese límite una sola generación de acelga —200 días de cosecha— estiraba el
-  // gráfico hasta septiembre del año siguiente y achicaba todo lo demás.
+  // El eje arranca en julio y llega hasta donde termina la última cosecha, no
+  // solo hasta junio. Antes se cortaba en junio para que una acelga de 200 días
+  // no achicara todo; pero así no se podía ver cómo sigue lo que se cosecha
+  // después (30/09). Ahora el ancho es fijo por mes —el gráfico se desplaza de
+  // costado en vez de achicarse— y el fin de la temporada queda marcado con
+  // una línea, con lo de después sombreado.
   //
-  // Lo que sigue después de junio no se borra: la barra llega al borde y se
-  // marca, que es distinto de decir que ahí se termina.
+  // Tope: un año más. Lo que siga todavía después llega al borde y se marca.
   const d0 = inicioDeTemporada();
-  const d1 = new Date(d0); d1.setFullYear(d1.getFullYear() + 1);
+  const finTemporada = new Date(d0); finTemporada.setFullYear(finTemporada.getFullYear() + 1);
+  const ultimaCosecha = gens.reduce((m, g) => (g.tramos.fin > m ? g.tramos.fin : m), isoDe(finTemporada));
+  let d1 = new Date(ultimaCosecha + "T00:00:00");
+  d1.setDate(1); d1.setMonth(d1.getMonth() + 1);               // hasta fin de ese mes
+  const tope = new Date(finTemporada); tope.setFullYear(tope.getFullYear() + 1);
+  if (d1 < finTemporada) d1 = new Date(finTemporada);
+  if (d1 > tope) d1 = tope;
   const ini = Math.floor(d0.getTime() / 86400000);
   const fin = Math.floor(d1.getTime() / 86400000);
   const dias = Math.max(1, fin - ini);
@@ -119,11 +127,15 @@ function planEstrategico() {
       anio: cur.getFullYear(),
       izq: ((desdeMes - ini) / dias) * 100,
       ancho: ((hastaMes - desdeMes) / dias) * 100,
+      fuera: cur >= finTemporada,          // ya es la temporada siguiente
     });
     cur.setMonth(cur.getMonth() + 1);
   }
 
   const hoyPct = pct(hoy());
+  // Dónde termina la temporada, si el eje sigue después.
+  const finPct = pct(isoDe(finTemporada));
+  const posicion = (p) => `calc(var(--sangria) + var(--hueco) + (100% - var(--sangria) - var(--hueco)) * ${p / 100})`;
   const enPantalla = hoyPct >= 0 && hoyPct <= 100;
   // Cuánto tiene que medir un tramo, en porcentaje del eje, para que le entre
   // una fecha como "16/8". Depende del ancho real del gráfico, no de un número
@@ -206,7 +218,7 @@ function planEstrategico() {
         <div class="plan-meses">
           <div class="plan-nombre"></div>
           <div class="plan-pista">
-            ${meses.map((m) => `<div class="mes" style="left:${m.izq}%;width:${m.ancho}%">
+            ${meses.map((m) => `<div class="mes${m.fuera ? " fuera" : ""}" style="left:${m.izq}%;width:${m.ancho}%">
               ${m.nombre}${m.nombre === "ene" ? " " + String(m.anio).slice(2) : ""}</div>`).join("")}
           </div>
         </div>
@@ -215,7 +227,10 @@ function planEstrategico() {
                la vista dónde empieza y termina cada barra. -->
           ${meses.slice(1).map((m) => `<i class="plan-linea-mes" style="left:calc(var(--sangria) + var(--hueco)
               + (100% - var(--sangria) - var(--hueco)) * ${m.izq / 100})"></i>`).join("")}
-          ${enPantalla ? `<div class="linea-hoy" style="left:calc(var(--sangria) + var(--hueco) + (100% - var(--sangria) - var(--hueco)) * ${hoyPct / 100})"></div>` : ""}
+          ${finPct < 99.9 ? `<div class="fuera-temporada" style="left:${posicion(finPct)}"
+              title="Después del 30 de junio: temporada siguiente"></div>
+            <div class="fin-temporada" style="left:${posicion(finPct)}"></div>` : ""}
+          ${enPantalla ? `<div class="linea-hoy" style="left:${posicion(hoyPct)}"></div>` : ""}
           ${filas}
         </div>
       </div>
