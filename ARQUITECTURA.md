@@ -144,7 +144,7 @@ cultivo abierto (con todas sus siembras y cosechas) y no se poda nunca. Ahora
 de secciones distintas (fichas, plan, sembrar, trasplantar, Inicio). Es el
 lugar donde más fácil es romper algo al agregar una pantalla.
 
-**3.7 AMA Economía reescribe todo en cada sincronización.** La app manda todos
+**3.7 AMA Economía reescribía todo en cada sincronización** (resuelto el 01/10, ver 4.8). La app manda todos
 los movimientos, deudas, productos y las últimas 300 ventas; el servidor lee
 todas las hojas, fusiona, y **borra y reescribe** ingresos, egresos, deudas,
 productos, ventas, borrados y conceptos, más el flujo y los gráficos. El costo
@@ -382,7 +382,17 @@ Que el servicio responda `api: N` en cada respuesta (como Economía) y la app
 avise "el servicio corre una versión anterior" en vez de depender de banderas
 sueltas como `corregir`.
 
-### 4.8 AMA Economía: sincronización por cambios
+### 4.8 AMA Economía: sincronización por cambios — HECHO 01/10
+
+Aplicado en bioma-mov (API 11): el servidor escribe por cambios
+(`guardarCambios_`) y nunca vacía una hoja; la app manda solo lo tocado
+(`subidoHasta`) y una vez por día todo. Probado con
+`bioma-mov/apps-script/pruebas-servidor.html` (el Code.gs real contra una
+planilla simulada, comparado con la versión anterior). De paso apareció un
+error viejo: dos renglones cargados a mano podían recibir el mismo id y uno se
+borraba (DECISIONES 15 de bioma-mov).
+
+La propuesta original:
 
 Mandar solo lo modificado desde la última sincronización (por `mod`) y que el
 servidor haga upsert por id en lugar de borrar y reescribir las hojas. La
