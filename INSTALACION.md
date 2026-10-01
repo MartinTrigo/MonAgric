@@ -202,5 +202,6 @@ activador* → función `actualizarPanel`, origen *según tiempo*, cada día.
 ### Dar de baja un teléfono
 
 En *MonAgric · Accesos (privado)*, hoja **Dispositivos**, poné `NO` en la
-columna **Activo** de esa fila. Deja de poder cargar al instante, sin afectar a
-nadie más. Lo que tuviera pendiente le queda guardado en el teléfono.
+columna **Activo** de esa fila. Deja de poder cargar en hasta dos minutos (el
+servicio recuerda los accesos ese tiempo para no leer la planilla en cada
+pedido), sin afectar a nadie más. Lo que tuviera pendiente le queda guardado en el teléfono.

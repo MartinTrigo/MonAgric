@@ -142,6 +142,19 @@ va por partes**, no por `guardarConfig`.
 - Al agregar una función que toque plata o economía, preguntarse siempre si
   vale para una chacra o para todas.
 
+## Nombres y columnas: una sola regla (01/10)
+
+- **¿Es el mismo cultivo?** Sin tildes, sin mayúsculas, sin "s" final:
+  `claveArea` en la app, `claveCultivo` en `Code.gs`, `clave()` en las
+  herramientas. Las tres tienen que dar lo mismo. `claveNombre` (servidor) es
+  para **personas** y no saca la "s".
+- **Las hojas se leen y escriben por posición** según `HOJAS` en `Code.gs`.
+  La app lee las filas por nombre (`DE_LA_HOJA` en `registros.js`). Al cambiar
+  un encabezado, cambiarlo en los dos lados; `python tools/version_servicio.py`
+  avisa si no coinciden y si alguna planilla tiene columnas fuera de lugar.
+- El plan y los almácigos se recuerdan 5 minutos en el servidor, y los accesos
+  2: lo editado a mano en la planilla tarda eso en verse.
+
 ## Áreas de trabajo
 
 Seis **fijas**, definidas en `AREAS_FIJAS` dentro de `js/catalogo.js`, iguales para

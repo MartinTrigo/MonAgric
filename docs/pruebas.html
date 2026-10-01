@@ -170,6 +170,19 @@ almacenamiento del teléfono.</p>
     }
   }
 
+  // --- un solo criterio de "mismo cultivo" (igual en Code.gs: claveCultivo) ---
+  igual("mismo cultivo sin tildes, mayúsculas ni s final",
+    ["Choclos", "choclo", " CHOCLO "].map(claveArea).concat(["Hortícolas", "horticola"].map(claveArea)),
+    ["choclo", "choclo", "choclo", "horticola", "horticola"]);
+
+  // --- columnas que la app lee, contra el esquema del servicio ---
+  const esquemaBien = {};
+  Object.entries(DE_LA_HOJA).forEach(([h, c]) => { esquemaBien[h] = ["Id", ...Object.values(c)]; });
+  igual("esquema completo: no falta nada", columnasQueFaltan(esquemaBien), []);
+  igual("una columna renombrada en el servicio se detecta",
+    columnasQueFaltan({ ...esquemaBien, cosechas: ["Id", "Fecha", "Cultivo", "Kilos", "Cosechó"] }),
+    ["cosechas «Kg»"]);
+
   // --- mapa ---
   igual("bancales que ocuparía una de 3 al final del sector", bancalesQueOcuparia({ camas: 3 }, 24, 25), [23, 24, 25]);
   const puestas = [{ id: "a", cultivo: "Acelga", fecha_almacigo: "2026-08-13", fecha_campo: "2026-09-22",

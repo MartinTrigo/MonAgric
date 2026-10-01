@@ -34,8 +34,12 @@ CLAVE_PATH = RAIZ / "tools" / "clave_admin.txt"
 
 
 def clave(s: str) -> str:
+    # La misma regla que la app (claveArea) y el servicio (claveCultivo): sin
+    # tildes, sin mayusculas y sin la s final. Hasta el 01/10 aca no se sacaba
+    # la s, y "Choclos" y "Choclo" quedaban como dos cultivos.
     s = unicodedata.normalize("NFD", str(s or "").strip().lower())
-    return "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s[:-1] if s.endswith("s") else s
 
 
 def main() -> None:

@@ -158,7 +158,8 @@ const CORRECCION = {
     ["actividad", "Actividad", "texto"], ["observaciones", "Qué se hizo", "texto"]],
 };
 // Todo lo que guarda la hoja de ese tipo: lo que no se corrige viaja como
-// estaba, porque el servicio rearma la fila entera.
+// estaba, porque el servicio rearma la fila entera. Son también los nombres
+// con que la app lee cada fila: ver columnasQueFaltan.
 const DE_LA_HOJA = {
   siembras: { fecha: "Fecha", cultivo: "Cultivo", variedad: "Variedad", tipo: "Tipo",
     generacion: "Generación", bandejas: "Bandejas", tipo_bandeja: "Alvéolos",
@@ -239,6 +240,30 @@ function datosCorregidos(tipo, f, form) {
     d.diferencia_dias = real === null || !d.dias_almacigo_teorico ? "" : real - Number(d.dias_almacigo_teorico);
   }
   return d;
+}
+
+/* Los encabezados viven en el servidor (HOJAS en Code.gs) y la app lee cada
+   fila por esos nombres. Si alguien renombra uno allá y no acá, el dato
+   desaparecía de la pantalla sin ningún error. Desde el 01/10 el servicio
+   manda su esquema con la configuración, y esto compara. */
+function columnasQueFaltan(esquema) {
+  if (!esquema) return [];        // servicio anterior: no lo manda
+  const faltan = [];
+  Object.entries(DE_LA_HOJA).forEach(([hoja, campos]) => {
+    if (!Array.isArray(esquema[hoja])) return;
+    const hay = new Set(esquema[hoja]);
+    ["Id", ...Object.values(campos)].forEach((c) => { if (!hay.has(c)) faltan.push(`${hoja} «${c}»`); });
+  });
+  return faltan;
+}
+let avisoDeColumnasDado = false;
+function avisarSiFaltanColumnas(esquema) {
+  const faltan = columnasQueFaltan(esquema);
+  if (!faltan.length || avisoDeColumnasDado) return;
+  avisoDeColumnasDado = true;
+  console.warn("Columnas que la app usa y el servicio no tiene:", faltan);
+  aviso(`La app y el servicio no coinciden en ${faltan.length} columna(s): ${faltan.slice(0, 2).join(", ")}. `
+    + "Avisá a quien mantiene AMA.", true);
 }
 
 // La copia local de "últimos", corregida o sin la fila, para que la pantalla

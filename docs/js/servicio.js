@@ -7,8 +7,12 @@
 // Los archivos se cargan en orden (ver index.html) y comparten el espacio
 // global: no son módulos. Se partió app.js el 30/09/2026 sin cambiar código.
 
-async function traerCatalogo() {
+// forzar: false lo saltea si se pidió hace menos de 20 s. Al abrir la app,
+// el arranque y la primera sincronización lo pedían los dos (01/10).
+async function traerCatalogo(forzar = true) {
   if (!chacraCodigo() || !tieneAcceso() || !navigator.onLine) return;
+  if (!forzar && Date.now() - (pedidoReciente.catalogo || 0) < 20000) return;
+  pedidoReciente.catalogo = Date.now();
   try {
     const d = await (await fetch(
       `${urlServicio()}?${conCredenciales("catalogo=1")}`)).json();
@@ -78,10 +82,10 @@ async function sincronizar(silencioso = true) {
     }
   }
 
+  const tipos = new Set(enviadosAhora.map((r) => r.tipo));
   if (enviadosAhora.length) {
     // Lo recién enviado ya está en la planilla: se vuelve a pedir para que
     // aparezca en la lista de la chacra y no solo como "por enviar".
-    const tipos = new Set(enviadosAhora.map((r) => r.tipo));
     ["siembras", "cosechas", "horas", "trasplantes", "tareas"]
       .filter((t) => tipos.has(t)).forEach((t) => traerUltimos(t, true));
     // Las generaciones tienen su propio pedido: el plan entero.
@@ -109,8 +113,11 @@ async function sincronizar(silencioso = true) {
     aviso("No se pudo enviar. Revisá la señal y los Ajustes.", true);
   }
 
+  // La configuración y el catálogo, solo si cambiaron desde acá o si hace
+  // más de 20 s que no se piden.
+  const cambioConfig = ["config", "config_plan", "config_sector"].some((t) => tipos.has(t));
   await Promise.all([traerResumen(), traerTareas(),
-                     traerConfig(), traerCatalogo()]);
+                     traerConfig(cambioConfig), traerCatalogo(tipos.has("cultivo"))]);
   refrescarEstado();
   if (["inicio", "plan", "horas", "tareas"].includes(vistaActual)) redibujarConDatos(vistaActual);
 }
@@ -369,13 +376,17 @@ function conPendientesDeConfig(cfg) {
   return cfg;
 }
 
-// Trae del servicio la configuración de esta chacra.
-async function traerConfig() {
+// Trae del servicio la configuración de esta chacra. forzar: como en
+// traerCatalogo.
+async function traerConfig(forzar = true) {
   if (!chacraCodigo() || !navigator.onLine) return;
+  if (!forzar && Date.now() - (pedidoReciente.config || 0) < 20000) return;
+  pedidoReciente.config = Date.now();
   try {
     const d = await (await fetch(
       `${urlServicio()}?${conCredenciales("config=1")}`)).json();
     if (!d.ok || !d.config) return;
+    avisarSiFaltanColumnas(d.config.esquema);
     // Tica: los nombres del equipo, de la planilla de horas (servicio nuevo).
     if (Array.isArray(d.config.nombres_horas) && d.config.nombres_horas.length) {
       escribir(LS.nombresPlanilla, d.config.nombres_horas);

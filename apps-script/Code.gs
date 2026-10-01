@@ -253,9 +253,23 @@ function registrarDispositivo(chacra, dispositivo, persona, credencial) {
 }
 
 // Comprueba que el telefono este registrado, activo y sea de esa chacra.
+//
+// Se recuerda dos minutos: antes cada pedido abria la planilla de accesos y
+// leia todos los dispositivos, y al abrir la app son ocho o diez pedidos. Solo
+// se recuerdan los SI: un telefono recien activado entra en el acto. El costo:
+// dar de baja un telefono tarda hasta dos minutos en aplicarse.
 function permitido(chacra, credencial, dispositivo) {
   if (!credencial) return rechazo("Este teléfono todavía no tiene acceso.");
+  var cache = CacheService.getScriptCache();
+  var llave = "acceso_" + huella(credencial).slice(0, 40) + "_" + String(chacra).toLowerCase();
+  var guardado = cache.get(llave);
+  if (guardado) { try { return JSON.parse(guardado); } catch (e) { /* se vuelve a mirar */ } }
+  var r = permitidoEnLaPlanilla_(chacra, credencial, dispositivo);
+  if (r.ok) cache.put(llave, JSON.stringify(r), 120);
+  return r;
+}
 
+function permitidoEnLaPlanilla_(chacra, credencial, dispositivo) {
   var hoja = SpreadsheetApp.openById(PLANILLA_ACCESOS_ID).getSheetByName("Dispositivos");
   if (!hoja || hoja.getLastRow() < 2) return rechazo("Este teléfono todavía no tiene acceso.");
 
@@ -270,15 +284,18 @@ function permitido(chacra, credencial, dispositivo) {
     if (String(filas[i][3]).toUpperCase().indexOf("S") !== 0) {
       return rechazo("Este teléfono fue dado de baja. Pedí un código nuevo.");
     }
-    return { ok: true, fila: i + 2, persona: String(filas[i][2] || "") };
+    return { ok: true, fila: i + 2, persona: String(filas[i][2] || ""), huella: buscada };
   }
   return rechazo("Credencial desconocida. Pedí un código nuevo.");
 }
 
-// Deja constancia de que ese telefono estuvo activo y cuanto cargo.
-function marcarActividad(fila, cuantos) {
+// Deja constancia de que ese telefono estuvo activo y cuanto cargo. Con el
+// acceso recordado, la fila puede haberse corrido si alguien borro una de
+// arriba: se confirma que sea la de ese telefono antes de escribir.
+function marcarActividad(fila, cuantos, laHuella) {
   try {
     var hoja = SpreadsheetApp.openById(PLANILLA_ACCESOS_ID).getSheetByName("Dispositivos");
+    if (laHuella && String(hoja.getRange(fila, 8).getValue()) !== laHuella) return;
     hoja.getRange(fila, 6).setValue(new Date());
     if (cuantos) {
       var previos = Number(hoja.getRange(fila, 7).getValue()) || 0;
@@ -349,7 +366,7 @@ function atender(p) {
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
-      || p.catalogo || p.almacigos || p.ficha || p.generaciones) {
+      || p.catalogo || p.almacigos || p.ficha || p.generaciones || p.columnas) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -374,7 +391,7 @@ function atender(p) {
     }
 
     if (p.almacigos) {
-      return respuesta({ ok: true, almacigos: almacigosEsperando(chacra) });
+      return respuesta({ ok: true, almacigos: recordado_("almacigos", chacra, almacigosEsperando) });
     }
 
     if (p.ficha) {
@@ -382,7 +399,14 @@ function atender(p) {
     }
 
     if (p.generaciones) {
-      return respuesta({ ok: true, generaciones: generacionesDelPlan(chacra) });
+      return respuesta({ ok: true, generaciones: recordado_("plan", chacra, generacionesDelPlan) });
+    }
+
+    // Diagnostico para las herramientas: las hojas cuyas columnas no estan
+    // donde el codigo las espera (ver revisarColumnas).
+    if (p.columnas) {
+      if (!esAdmin(p.clave)) return respuesta(rechazo("Solo con clave de administración."));
+      return respuesta({ ok: true, chacra: chacra, hojas: revisarColumnas(chacra) });
     }
 
     if (p.config) {
@@ -397,6 +421,11 @@ function atender(p) {
       // Sabe guardar la configuracion de a una parte (config_plan,
       // config_sector). Contra una version anterior la app guarda entera.
       cfg.parcial = true;
+      // Los encabezados de cada hoja, como los escribe este codigo. La app
+      // lee los datos por esos nombres: si alguno que usa no esta, avisa en
+      // vez de mostrar huecos en silencio.
+      cfg.esquema = {};
+      Object.keys(HOJAS).forEach(function (k) { cfg.esquema[k] = HOJAS[k].encabezados; });
       // Tica: sus horas entran por este servicio, y los nombres del equipo
       // salen de la planilla de horas, como antes los daba el script aparte.
       if (String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
@@ -528,7 +557,13 @@ function doPost(e) {
       lock.releaseLock();
     }
     CacheService.getScriptCache().remove("resumen_" + chacra);
-    if (permiso.fila) marcarActividad(permiso.fila, guardados);
+    if (permiso.fila) marcarActividad(permiso.fila, guardados, permiso.huella);
+    // El plan y los almacigos se recuerdan unos minutos (ver recordado_):
+    // cualquier cosa que los cambie los borra para que el proximo pedido los
+    // lea de nuevo.
+    var CAMBIAN_EL_PLAN = { siembras: 1, trasplantes: 1, generaciones: 1, generacion_borrar: 1,
+                            registro_editar: 1, registro_borrar: 1 };
+    if (registros.some(function (r) { return CAMBIAN_EL_PLAN[r.tipo]; })) olvidarPlan_(chacra);
     return respuesta({ ok: true, recibidos: registros.length, guardados: guardados,
                        no_guardados: noGuardados });
   } catch (err) {
@@ -708,15 +743,25 @@ function calcularResumen(chacra) {
   return res;
 }
 
-// "Horticola", "hortícola" y "Hortícolas" son el mismo proyecto escrito por
-// personas distintas. Para agrupar se compara sin tildes, sin mayusculas y sin
-// la s final; para mostrar se usa el nombre tal como esta en la configuracion.
-function claveArea(nombre) {
+// "Choclo" y "choclos", "Hortícola" y "Horticolas": lo mismo escrito por
+// personas distintas. Para comparar cultivos y areas se usa UNA regla, la misma
+// que la app (claveArea en js/catalogo.js) y que las herramientas: sin tildes,
+// sin mayusculas y sin la s final. Para mostrar se usa el nombre como esta.
+//
+// Hasta el 01/10 habia dos: esta, y claveNombre (que no saca la s) en el cruce
+// de siembras con el plan, la ficha y la proyeccion. Una siembra de "Choclos"
+// no marcaba sembrada una generacion de "Choclo", y la app si los juntaba.
+//
+// claveNombre sigue para PERSONAS: ahi la s no se saca ("Andrés", "Andre").
+function claveCultivo(nombre) {
   var s = String(nombre || "").trim().toLowerCase();
   s = s.replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
        .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
+  // Cualquier otra marca sobre una letra, igual que la app.
+  if (s.normalize) s = s.normalize("NFD").replace(/[̀-ͯ]/g, "");
   return s.replace(/s$/, "");
 }
+function claveArea(nombre) { return claveCultivo(nombre); }
 
 // Las seis areas estandar. Viven en la app, que es donde se eligen, pero el
 // servidor necesita la lista para escribir bien el nombre al agrupar: en las
@@ -1118,7 +1163,7 @@ function generacionesDelPlan(chacra) {
     hs.getRange(2, 1, hs.getLastRow() - 1, HOJAS.siembras.encabezados.length)
       .getValues().forEach(function (f) {
         if (!f[0] || !f[3] || !f[2]) return;
-        siembras.push({ id: String(f[0]), cultivo: claveNombre(f[3]),
+        siembras.push({ id: String(f[0]), cultivo: claveCultivo(f[3]),
                         fecha: texto(f[2]), generacion: Number(f[6]) || 0 });
       });
   }
@@ -1129,7 +1174,7 @@ function generacionesDelPlan(chacra) {
   });
 
   var buscarSiembra = function (cultivo, gen, cuando) {
-    var k = claveNombre(cultivo);
+    var k = claveCultivo(cultivo);
     var i;
     // 1) por numero de generacion, que es lo que alguien escribio a proposito
     for (i = 0; i < siembras.length; i++) {
@@ -1184,7 +1229,7 @@ function generacionesDelPlan(chacra) {
    de a un cultivo, asi que lo que viaja es chico aunque la planilla crezca. */
 function fichaDeCultivo(chacra, cultivo) {
   var libro = planillaDe(chacra);
-  var k = claveNombre(cultivo);
+  var k = claveCultivo(cultivo);
   var tz = Session.getScriptTimeZone();
   var texto = function (v) {
     return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
@@ -1195,7 +1240,7 @@ function fichaDeCultivo(chacra, cultivo) {
     if (!hoja || hoja.getLastRow() < 2) return [];
     return hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length)
       .getValues()
-      .filter(function (f) { return f[0] && claveNombre(f[columnaCultivo]) === k; })
+      .filter(function (f) { return f[0] && claveCultivo(f[columnaCultivo]) === k; })
       .map(armar);
   };
 
@@ -1395,6 +1440,62 @@ function corregirHoraDeTica(libro, id, datos, borrar, quien) {
   }
 }
 
+// ---------- Lo que se recuerda unos minutos ----------
+//
+// El plan (generaciones cruzadas con la hoja Siembras) y los almacigos que
+// esperan trasplante releian la hoja Siembras entera en cada pedido, y son lo
+// que mas se pide: Inicio, Plan, Proyeccion de Economia. Se recuerdan cinco
+// minutos por chacra; doPost los olvida apenas llega algo que los cambia.
+// Lo que alguien edite a mano en la planilla tarda hasta cinco minutos en
+// verse. Si no entra en la cache (100 KB por llave), se calcula siempre.
+function recordado_(que, chacra, calcular) {
+  var cache = CacheService.getScriptCache();
+  var llave = que + "_" + String(chacra).toLowerCase();
+  var guardado = cache.get(llave);
+  if (guardado) { try { return JSON.parse(guardado); } catch (e) { /* se recalcula */ } }
+  var valor = calcular(chacra);
+  var texto = JSON.stringify(valor);
+  if (texto.length < 95000) { try { cache.put(llave, texto, 300); } catch (e) { /* no entra */ } }
+  return valor;
+}
+
+function olvidarPlan_(chacra) {
+  var c = String(chacra).toLowerCase();
+  CacheService.getScriptCache().removeAll(["plan_" + c, "almacigos_" + c]);
+}
+
+// ---------- Columnas en su lugar ----------
+//
+// Este codigo lee y escribe las hojas POR POSICION: la columna 4 de Siembras
+// es el cultivo porque asi lo dice HOJAS.siembras. Si alguien inserta o mueve
+// una columna a mano en la planilla, los datos se leen y se escriben corridos,
+// sin ningun error. Esto lo detecta: compara la fila 1 de cada hoja con los
+// encabezados esperados. Lo usa tools/version_servicio.py.
+//
+// Columnas de mas al final no molestan. Que falten al final tampoco: las
+// filas nuevas las completan. Lo grave es un nombre distinto en una posicion.
+function revisarColumnas(chacra) {
+  var libro = planillaDe(chacra);
+  var salida = [];
+  Object.keys(HOJAS).forEach(function (k) {
+    var def = HOJAS[k];
+    var hoja = libro.getSheetByName(def.nombre);
+    if (!hoja || !hoja.getLastColumn()) return;
+    var ancho = Math.min(hoja.getLastColumn(), def.encabezados.length);
+    var reales = hoja.getRange(1, 1, 1, ancho).getValues()[0];
+    var distintas = [];
+    for (var i = 0; i < ancho; i++) {
+      if (claveCultivo(reales[i]) !== claveCultivo(def.encabezados[i])) {
+        distintas.push({ columna: i + 1, espera: def.encabezados[i], hay: String(reales[i]) });
+      }
+    }
+    salida.push({ hoja: def.nombre, filas: Math.max(hoja.getLastRow() - 1, 0),
+                  faltan_al_final: Math.max(def.encabezados.length - hoja.getLastColumn(), 0),
+                  distintas: distintas });
+  });
+  return salida;
+}
+
 // ---------- La configuracion de a una parte ----------
 //
 // Guardar la configuracion reescribe la hoja Config entera con la copia del
@@ -1418,7 +1519,7 @@ function cambiarPlanDeCultivo(libro, p) {
   var fila = ["plan", p.cultivo, p.superficie_m2 || 0, p.cosecha_esperada_kg || 0,
               p.rinde_kg_m2 || 0, p.lineas || 0, p.distancia_cm || 0, p.plantas || 0];
   for (var i = 0; i < c.filas.length; i++) {
-    if (String(c.filas[i][0]) !== "plan" || claveArea(c.filas[i][1]) !== claveArea(p.cultivo)) continue;
+    if (String(c.filas[i][0]) !== "plan" || claveCultivo(c.filas[i][1]) !== claveCultivo(p.cultivo)) continue;
     if (p.borrar) c.hoja.deleteRow(i + 2);
     else c.hoja.getRange(i + 2, 1, 1, CONFIG_COLS).setValues([fila]);
     return;
@@ -1732,7 +1833,7 @@ function proyeccionDe(chacra) {
   var gens = {};
   try {
     generacionesDelPlan(chacra).forEach(function (g) {
-      var k = claveNombre(g.cultivo);
+      var k = claveCultivo(g.cultivo);
       gens[k] = (gens[k] || 0) + 1;
     });
   } catch (e) { /* sin hoja de generaciones la proyeccion igual sirve */ }
@@ -1747,7 +1848,7 @@ function proyeccionDe(chacra) {
       bancales: m2Bancal ? redondo(sup / m2Bancal, 2) : 0,
       rinde_kg_m2: rinde,
       kg: Number(p.cosecha_esperada_kg) || Math.round(sup * rinde),
-      generaciones: gens[claveNombre(p.cultivo)] || 0,
+      generaciones: gens[claveCultivo(p.cultivo)] || 0,
     };
   });
 
@@ -1949,7 +2050,7 @@ function cultivosAgregados(forzar) {
     });
     var vistos = {};
     Object.keys(salida.perfiles).forEach(function (n) {
-      var k = claveNombre(n);
+      var k = claveCultivo(n);
       if (!vistos[k]) { vistos[k] = true; salida.cultivos.push(n); }
     });
     salida.cultivos.sort();
@@ -1980,7 +2081,7 @@ function guardarCultivo(chacra, r, esAdministrador) {
     var ya = hoja.getRange(2, 1, hoja.getLastRow() - 1, CATALOGO_ENCABEZADOS.length)
                  .getValues();
     for (var i = 0; i < ya.length; i++) {
-      if (claveNombre(ya[i][0]) !== claveNombre(nombre)) continue;
+      if (claveCultivo(ya[i][0]) !== claveCultivo(nombre)) continue;
       // Columnas 5 a 9: dias a cosecha, dias en cosecha, lineas, distancia, rinde
       var tieneDatos = false;
       for (var c = 4; c <= 8; c++) if (Number(ya[i][c]) > 0) tieneDatos = true;

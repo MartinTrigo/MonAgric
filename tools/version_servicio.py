@@ -10,6 +10,7 @@ Uso:  python tools/version_servicio.py
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from urllib import error, parse, request
 
@@ -25,6 +26,40 @@ SENALES = [
     ("config", "areas", "proyectos",
      "la configuracion guarda areas propias"),
 ]
+
+
+def columnas_de_la_app() -> dict[str, list[str]]:
+    """Los encabezados que la app lee, sacados de DE_LA_HOJA en registros.js."""
+    js = (RAIZ / "docs" / "js" / "registros.js").read_text(encoding="utf-8")
+    bloque = js[js.index("const DE_LA_HOJA = {"):]
+    bloque = bloque[:bloque.index("\n};")]
+    hojas: dict[str, list[str]] = {}
+    for hoja, cuerpo in re.findall(r"(\w+): \{([^}]*)\}", bloque):
+        hojas[hoja] = re.findall(r'"([^"]+)"', cuerpo)
+    return hojas
+
+
+def revisar_columnas_en_planillas(pedir) -> None:
+    """Que en cada planilla las columnas esten donde el servicio las espera.
+
+    El servicio lee y escribe por posicion: una columna insertada o movida a
+    mano corre todos los datos sin dar error.
+    """
+    chacras = pedir("x=1").get("chacras") or ["tica"]
+    for chacra in chacras:
+        r = pedir(f"columnas=1&chacra={chacra}")
+        if not r.get("ok"):
+            print(f"  [?]        columnas de {chacra}: {r.get('error', 'sin respuesta')}")
+            continue
+        malas = [h for h in r["hojas"] if h["distintas"]]
+        if not malas:
+            print(f"  [al dia]   columnas en su lugar en {chacra}")
+            continue
+        print(f"  [!!]       {chacra}: hay columnas fuera de lugar (los datos se leen corridos)")
+        for h in malas:
+            for d in h["distintas"]:
+                print(f"             - {h['hoja']}, columna {d['columna']}: "
+                      f"espera «{d['espera']}» y hay «{d['hay']}»")
 
 
 def main() -> None:
@@ -92,6 +127,24 @@ def main() -> None:
     else:
         print("  [ANTERIOR] las horas de Tica siguen yendo al script de horas abierto")
         viejas.append("las horas de Tica por el servicio")
+
+    # 01/10: el servicio manda su esquema; la app lee cada fila por esos
+    # nombres (DE_LA_HOJA en docs/js/registros.js). Si no coinciden, el dato
+    # desaparece de la pantalla sin error.
+    esquema = cf.get("esquema")
+    if not esquema:
+        print("  [ANTERIOR] el esquema de las hojas (no viaja con la configuracion)")
+        viejas.append("el esquema de las hojas")
+    else:
+        faltan = [f"{h}: {c}" for h, cols in columnas_de_la_app().items()
+                  if h in esquema for c in ["Id", *cols] if c not in esquema[h]]
+        if faltan:
+            print("  [!!]       la app lee columnas que el servicio no tiene:")
+            for f in faltan:
+                print(f"             - {f}")
+        else:
+            print("  [al dia]   la app y el servicio usan las mismas columnas")
+        revisar_columnas_en_planillas(pedir)
 
     # La proyeccion para AMA Economia: con codigo viejo, "proyeccion" ni se
     # mira y la respuesta es la de un servicio sin nada que decir.
