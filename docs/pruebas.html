@@ -190,9 +190,7 @@ almacenamiento del teléfono.</p>
   igual("parte con varias raíces: se envuelven",
     parte("x", `<div>a</div><div>b</div>`), `<div class="parte" data-parte="x"><div>a</div><div>b</div></div>`);
   {
-    const vista = document.createElement("div");
-    vista.id = "vista";
-    document.body.appendChild(vista);
+    const vista = $("#vista");          // el de la página, oculto
     let lista = ["uno"];
     plantillas.__prueba = () => `<form><input name="campo" value=""></form>
       <select data-parte="op" data-parte-modo="opciones">${lista.map((x) => `<option>${x}</option>`).join("")}</select>
@@ -209,9 +207,71 @@ almacenamiento del teléfono.</p>
        vista.querySelector("[name=campo]").value, vista.querySelector("select").options.length,
        vista.querySelector("select").value],
       [true, "uno, dos", "completado desde el plan", 2, "uno"]);
-    vista.remove();
+    // Parte "contenido": cambia lo de adentro, la caja (con su scroll) queda.
+    plantillas.__prueba = () => `<form><input name="campo"></form>
+      <div class="caja" data-parte="caja" data-parte-modo="contenido">${lista.join("|")}</div>`;
+    vista.innerHTML = plantillas.__prueba();
+    htmlDePartes = new Map([...vista.querySelectorAll("[data-parte]")].map((el) => [el.dataset.parte, el.outerHTML]));
+    const caja = vista.querySelector(".caja");
+    lista = ["uno", "dos", "tres"];
+    actualizarPartes("__prueba");
+    igual("parte de contenido: cambia la lista y la caja es la misma",
+      [vista.querySelector(".caja") === caja, caja.textContent], [true, "uno|dos|tres"]);
+
+    // Sin partes: si lo que llega da lo mismo, la pantalla no se toca.
+    let dato = "a";
+    plantillas.__prueba2 = () => `<p class="dato-prueba">${dato}</p>`;
+    const vistaAntes = vistaActual;
+    render("__prueba2");
+    const p1 = vista.querySelector(".dato-prueba");
+    redibujarConDatos("__prueba2");
+    const igualQueAntes = vista.querySelector(".dato-prueba") === p1;
+    dato = "b";
+    redibujarConDatos("__prueba2");
+    igual("llega lo mismo: no se redibuja; llega algo nuevo: sí",
+      [igualQueAntes, vista.querySelector(".dato-prueba").textContent], [true, "b"]);
+    vistaActual = vistaAntes;
+
+    vista.innerHTML = "";
     delete plantillas.__prueba;
+    delete plantillas.__prueba2;
     htmlDePartes = new Map();
+  }
+
+  // --- la cola: lo que se guarda mientras otra sincronización viaja no se pierde ---
+  {
+    const fetchAntes = window.fetch, getAntes = Storage.prototype.getItem;
+    const enviados_ = [];
+    let soltar = null;
+    // Un servicio simulado: el primer envío tarda hasta que lo soltamos.
+    window.fetch = (u, o) => {
+      if (o && o.method === "POST") {
+        const regs = JSON.parse(o.body).registros;
+        enviados_.push(...regs.map((x) => x.datos.tarea));
+        const respuesta = new Response(JSON.stringify({ ok: true, guardados: regs.length, no_guardados: [] }));
+        return enviados_.length === regs.length ? new Promise((ok) => { soltar = () => ok(respuesta); })
+          : Promise.resolve(respuesta);
+      }
+      return Promise.resolve(new Response(JSON.stringify({ ok: false })));
+    };
+    Storage.prototype.getItem = function (k) {
+      return k === LS.credencial ? JSON.stringify("credencial-de-prueba") : getAntes.call(this, k);
+    };
+    const pendAntes = pendientes, envAntes = enviados;
+    pendientes = []; enviados = [];
+    try {
+      guardarRegistro("tareas", { tarea: "primera" }, "");
+      await new Promise((z) => setTimeout(z, 20));
+      guardarRegistro("tareas", { tarea: "segunda" }, "");   // la primera sigue viajando
+      await new Promise((z) => setTimeout(z, 20));
+      soltar();
+      await sincronizando;
+      igual("lo guardado durante un envío viaja después, una sola vez, y la cola queda vacía",
+        [enviados_, pendientes.length], [["primera", "segunda"], 0]);
+    } finally {
+      window.fetch = fetchAntes; Storage.prototype.getItem = getAntes;
+      pendientes = pendAntes; enviados = envAntes;
+    }
   }
 
   // --- mapa ---

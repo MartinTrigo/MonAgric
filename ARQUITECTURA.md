@@ -335,8 +335,28 @@ como tocarlo, y la lista de últimos movimientos, al llegar segundos después,
 lo dejaba en blanco. Pruebas en `pruebas.html`.
 
 **Regla para pantallas nuevas:** todo lo que muestre datos del servicio va en
-una parte; el formulario, afuera. Falta llevar Plan a este esquema (el gráfico,
-el mapa y el editor de generaciones) y agrupar el estado de interfaz.
+una parte; el formulario, afuera.
+
+**Plan (01/10).** Cultivos (la única de Plan con formulario) va por partes; la
+lista de la derecha es una parte de *contenido* (`data-parte-modo="contenido"`:
+cambia lo de adentro y la caja, con su scroll, queda). El gráfico, el mapa,
+el resumen y la ficha son dibujos hechos con los datos, sin campos de texto:
+se siguen redibujando enteros, pero `redibujarConDatos` no los toca si lo que
+llegó da el mismo HTML, ni mientras hay algo agarrado (`arrastrandoAlgo`), y
+los desplegables se recuerdan con `data-recordar`. Se arreglaron, todos
+reproducidos antes y probados después: el arrastre de una barra se cortaba si
+terminaba una sincronización; "+ Generaciones" quedaba en blanco al llegar
+datos; los grupos de "Sin ubicar" del mapa se cerraban; la primera vez que se
+abría el plan estratégico las barras no respondían (un render anidado
+enganchaba el clic dos veces: ver `numeroDeRender`); y la numeración de una
+serie nueva salía de la copia del momento de dibujar.
+
+**La cola (01/10).** Una sola sincronización a la vez (`sincronizar` anota
+"otra" si hay una en curso). Y se manda una copia de la cola: del 30/09 al
+01/10 se mandó la cola misma, y lo guardado durante un envío salía de la cola
+sin haber viajado. Hay una prueba en `pruebas.html` que lo detecta.
+
+Falta agrupar el estado de interfaz en objetos por sección.
 
 La propuesta original:
 

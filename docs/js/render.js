@@ -32,10 +32,33 @@ let htmlDePartes = new Map();
 
 // Las listas desplegables recuerdan si estaban abiertas. "toggle" no burbujea:
 // se escucha en la captura, así vale también para las que se reemplazan.
+//
+// Un <details data-recordar="clave"> se recuerda solo: la plantilla lo dibuja
+// abierto si estaDesplegado(clave). Antes, abrir un grupo de "Sin ubicar" en
+// el mapa y que terminara una sincronización lo cerraba (01/10).
+const desplegablesAbiertos = new Set();
+const estaDesplegado = (clave) => desplegablesAbiertos.has(clave);
 document.addEventListener("toggle", (e) => {
   if (e.target.id === "lista-para-sembrar") abiertoParaSembrar = e.target.open;
   if (e.target.id === "lista-para-trasplantar") abiertoParaTrasplantar = e.target.open;
+  const clave = e.target.dataset && e.target.dataset.recordar;
+  if (clave) {
+    if (e.target.open) desplegablesAbiertos.add(clave); else desplegablesAbiertos.delete(clave);
+  }
+  // Plan → Cultivos: además, cuál es "el" cultivo con el que se está trabajando.
+  const cultivo = e.target.dataset && e.target.dataset.cultivoLista;
+  if (cultivo) {
+    if (e.target.open) cultivoEditando = cultivo;
+    else if (claveArea(cultivoEditando) === claveArea(cultivo)) cultivoEditando = "";
+  }
 }, true);
+
+// ¿Hay algo agarrado con el puntero? Una barra del plan estratégico, una
+// generación o un sector del mapa. Redibujar a mitad de camino tira el
+// elemento que se está arrastrando y el arrastre se pierde: pasaba en el plan
+// estratégico si en ese momento terminaba una sincronización (01/10).
+const arrastrandoAlgo = () => document.body.classList.contains("lz-arrastrando")
+  || !!document.querySelector("#vista .arrastrando, #vista .levantado");
 
 /* Redibujar porque llegaron datos, no porque la persona hizo algo. Estos
    pedidos terminan solos, segundos después, y antes redibujaban con la
@@ -47,14 +70,19 @@ document.addEventListener("toggle", (e) => {
    próximo cambio de pantalla. */
 function redibujarConDatos(vista) {
   if (vistaActual !== vista) return;
-  if (document.body.classList.contains("lz-arrastrando")) return;
+  if (arrastrandoAlgo()) return;
   // Las secciones con formulario están marcadas por partes: se cambian solo
   // las listas y los números, y el formulario sigue como estaba aunque se lo
   // esté llenando. Así los datos nuevos se ven enseguida (antes, con algo a
   // medio cargar, no aparecían hasta cambiar de pantalla).
   if (actualizarPartes(vista)) return;
   if (formularioEmpezado()) return;
-  render(vista, true);
+  // Lo que llegó no cambia nada de lo que se ve: no se toca la pantalla. Pasa
+  // seguido —cada sincronización vuelve a pedir el plan— y redibujar igual
+  // cerraba lo que estuviera abierto y le hacía perder el lugar al mouse.
+  const html = plantillas[vista]();
+  if (html === ultimoHtml) return;
+  render(vista, true, html);
 }
 
 /* Reemplaza solo las partes que cambiaron (ver parte(), en componentes.js).
@@ -85,6 +113,11 @@ function actualizarPartes(vista) {
       const elegido = viva.value;
       viva.innerHTML = n.innerHTML;
       if ([...viva.options].some((o) => o.value === elegido)) viva.value = elegido;
+    } else if (viva.dataset.parteModo === "contenido") {
+      // Cambia lo de adentro y la caja queda: una lista con scroll propio no
+      // vuelve arriba.
+      if (partesTocadas.has(nombre) || viva.contains(document.activeElement)) return;
+      viva.innerHTML = n.innerHTML;
     } else {
       if (partesTocadas.has(nombre) || viva.contains(document.activeElement)) return;
       viva.replaceWith(n);
@@ -103,9 +136,21 @@ function engancharPartes(vista) {
   engancharFilas();
   if (vista === "tareas") prepararTareas();
   if (vista === "inicio") prepararInicio();
+  if (vista === "plan") { prepararEdicionCultivos(); if (recalcularSerie) recalcularSerie(); }
 }
 
-function render(vista, conservarScroll = false) {
+// Lo último que se dibujó, para no redibujar si lo que llega da lo mismo.
+let ultimoHtml = "";
+// Cuántas veces se dibujó. Un preparar* puede volver a dibujar desde adentro
+// (el plan estratégico, la primera vez, mide su ancho y se redibuja): ese
+// render ya enganchó todo, y si el de afuera seguía, lo enganchaba otra vez.
+// Con el clic de las barras enganchado dos veces, tocar una abría el panel y
+// lo cerraba en el acto: la primera vez que se abría el plan estratégico, las
+// barras no respondían (01/10).
+let numeroDeRender = 0;
+
+function render(vista, conservarScroll = false, htmlListo = null) {
+  const este = ++numeroDeRender;
   if (vista === "configuracion" && vistaActual !== "configuracion") {
     vistaPrevia = vistaActual;
   }
@@ -128,7 +173,8 @@ function render(vista, conservarScroll = false) {
   // la notebook tiene de sobra.
   document.body.classList.toggle("a-lo-ancho",
     vista === "plan" && !cultivoAbierto && (vistaPlan === "grafico" || vistaPlan === "mapa"));
-  $("#vista").innerHTML = plantillas[vista]();
+  ultimoHtml = htmlListo ?? plantillas[vista]();
+  $("#vista").innerHTML = ultimoHtml;
   htmlDePartes = new Map([...document.querySelectorAll("#vista [data-parte]")]
     .map((el) => [el.dataset.parte, el.outerHTML]));
   // Al cambiar de sección se arranca de arriba; al redibujar la misma porque
@@ -145,6 +191,7 @@ function render(vista, conservarScroll = false) {
      configuracion: prepararConfiguracion, plan: prepararPlan,
      trasplantes: prepararTrasplantes, cuentas: prepararCuentas
    }[vista] || (() => {}))();
+  if (este !== numeroDeRender) return;     // ya se volvió a dibujar desde adentro
 
   prepararComunes();
   prepararCorrecciones();

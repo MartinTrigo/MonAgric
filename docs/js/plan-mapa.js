@@ -252,7 +252,8 @@ function mapaDeCultivos() {
         <h3 class="sub">Sin ubicar <small>${sueltas.length}</small></h3>
         <div class="lista-scroll">
     ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
-      <details class="gen-cultivo"${sel && sel.cultivo === cultivo ? " open" : ""}>
+      <details class="gen-cultivo" data-recordar="${esc("mapa:" + cultivo)}"${
+        (sel && sel.cultivo === cultivo) || estaDesplegado("mapa:" + cultivo) ? " open" : ""}>
         <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
           esc(cultivo)} <span>${lista.length}</span></summary>
         ${lista.map((g) => {

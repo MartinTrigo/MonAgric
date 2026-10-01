@@ -364,15 +364,16 @@ function panelGeneracion(g) {
 
 function prepararPanelGeneracion() {
   // Tocar una barra abre su detalle; tocarla de nuevo lo cierra.
+  // Por propiedad y no con addEventListener: enganchar dos veces no duplica.
   document.querySelectorAll("[data-gen]").forEach((fila) => {
-    fila.addEventListener("click", () => {
+    fila.onclick = () => {
       if (fila.dataset.recienMovida) { delete fila.dataset.recienMovida; return; }
       genPanel = genPanel === fila.dataset.gen ? "" : fila.dataset.gen;
       const g = (leer(LS.generaciones, []) || []).find((x) => x.id === genPanel);
       render("plan", true);
       // El estado del trasplante sale de la ficha del cultivo.
       if (g) traerFicha(g.cultivo);
-    });
+    };
   });
 
   const panel = $(".panel-gen");
@@ -454,6 +455,8 @@ function engancharArrastre() {
       x0 = e.clientX;
       corrido = 0;
       try { barra.setPointerCapture(e.pointerId); } catch (_) { /* sin captura igual anda */ }
+      // Con esta clase, lo que llega del servicio espera a que se suelte
+      // (ver arrastrandoAlgo en render.js).
       fila.classList.add("arrastrando");
     };
 
@@ -480,6 +483,14 @@ function engancharArrastre() {
     };
     barra.onpointerup = soltar;
     barra.onpointercancel = soltar;
+    // Si el navegador suelta la captura por su cuenta, que no quede marcada
+    // como arrastrando: si no, la pantalla no se actualizaría más.
+    barra.onlostpointercapture = () => {
+      if (!arrastrando) return;
+      arrastrando = false;
+      fila.classList.remove("arrastrando");
+      barra.style.transform = "";
+    };
   });
 }
 

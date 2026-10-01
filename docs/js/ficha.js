@@ -77,7 +77,7 @@ function fichaCultivo(cultivo) {
   // cultivo esta temporada, no a leer sobre la especie. Lo de leer queda a un
   // toque de distancia para cuando sí se lo busca.
   const bloqueRef = ref ? `
-    <details class="saber-mas">
+    <details class="saber-mas" data-recordar="saber-mas"${estaDesplegado("saber-mas") ? " open" : ""}>
     <summary>Saber más sobre ${esc(cultivo)}</summary>
     <div class="ficha-ref">
       <div class="ficha-titulo">

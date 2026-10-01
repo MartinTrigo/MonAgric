@@ -95,8 +95,9 @@ function cultivoEditable(cultivo, lista, todas) {
   const bancales = lista.reduce((a, g) => a + (Number(g.camas) || 0), 0);
   const ya = enPlan(cultivo) || {};
   const p = perfil(cultivo) || {};
-  const abierto = claveArea(cultivoEditando) === claveArea(cultivo);
-  return `<details class="gen-cultivo" data-cultivo-lista="${esc(cultivo)}"${abierto ? " open" : ""}>
+  const abierto = claveArea(cultivoEditando) === claveArea(cultivo) || estaDesplegado("cultivo:" + claveArea(cultivo));
+  return `<details class="gen-cultivo" data-cultivo-lista="${esc(cultivo)}"
+    data-recordar="${esc("cultivo:" + claveArea(cultivo))}"${abierto ? " open" : ""}>
     <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
       esc(cultivo)} <span>${lista.length} generación(es) · ${num(bancales, 1)} bancales${
       ya.cosecha_esperada_kg ? ` · ${num(ya.cosecha_esperada_kg)} kg` : ""}</span></summary>
@@ -229,7 +230,7 @@ function pantallaPlanificar() {
       </div>
 
       <label>Sector <small>(opcional, se ubica después en el mapa)</small></label>
-      <select name="sector">
+      <select name="sector" data-parte="plan-op-sector" data-parte-modo="opciones">
         <option value="">Sin asignar</option>
         ${sectores().map((s) => `<option>${esc(s.sector)}</option>`).join("")}
       </select>
@@ -241,8 +242,10 @@ function pantallaPlanificar() {
     </div>
 
     <div class="planificar-lista">
-    <h3 class="sub">En el plan <small>${gens.length} generaciones</small></h3>
-    <div class="lista-scroll">
+    <h3 class="sub">En el plan <small data-parte="plan-cuenta">${gens.length} generaciones</small></h3>
+    <!-- Parte de contenido: al llegar datos cambia la lista y la caja queda, con
+         su scroll. El formulario de la izquierda no se toca (ver actualizarPartes). -->
+    <div class="lista-scroll" data-parte="plan-lista" data-parte-modo="contenido">
     ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) =>
         cultivoEditable(cultivo, lista, gens)).join("")
       : `<p class="nota">Todavía no hay generaciones planificadas.</p>`}
@@ -294,13 +297,8 @@ function prepararEdicionCultivos() {
     b.onclick = () => irAEditar(b.dataset.editarCultivo);
   });
 
-  // Qué cultivo queda desplegado: se recuerda para el próximo redibujado.
-  document.querySelectorAll("[data-cultivo-lista]").forEach((d) => {
-    d.addEventListener("toggle", () => {
-      if (d.open) cultivoEditando = d.dataset.cultivoLista;
-      else if (claveArea(cultivoEditando) === claveArea(d.dataset.cultivoLista)) cultivoEditando = "";
-    });
-  });
+  // Qué cultivos quedan desplegados: lo recuerda el escucha de "toggle" de
+  // render.js (data-recordar y data-cultivo-lista), una sola vez para todos.
 
   // "+ Generaciones": el formulario de arriba, con el cultivo ya elegido.
   document.querySelectorAll("[data-sumar-a]").forEach((b) => {
@@ -363,6 +361,23 @@ function prepararEdicionCultivos() {
       }
       marcoEditando = "";
       aviso(`${cultivo}: guardado ✓${corridas ? ` · ${corridas} generación(es) con ${bandeja} días en almácigo` : ""}`);
+      render("plan", true);
+    };
+  });
+
+  // Sacar una del plan. Va acá y no con el formulario: está dentro de la
+  // lista, que se reemplaza por partes y se vuelve a enganchar con esto.
+  document.querySelectorAll("[data-borrar-gen]").forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.borrarGen;
+      if (!confirm("¿Sacar esta generación del plan?")) return;
+      guardarRegistro("generacion_borrar", { generacion_id: id }, "Sacada del plan ✓");
+      // Se saca de la copia local para que no siga a la vista hasta sincronizar.
+      const todas = leer(LS.generaciones, []) || [];
+      const sacada = todas.find((g) => g.id === id);
+      const quedan = todas.filter((g) => g.id !== id);
+      escribir(LS.generaciones, quedan);
+      if (sacada) replanearCultivo(sacada.cultivo, quedan);
       render("plan", true);
     };
   });
@@ -449,12 +464,22 @@ function prepararEdicionCultivos() {
   });
 }
 
+// La cuenta que se ve debajo del formulario de series. Se vuelve a hacer
+// cuando llegan generaciones nuevas (engancharPartes), sin tocar el formulario:
+// si otro teléfono agregó una, la numeración que se anuncia tiene que seguirla.
+let recalcularSerie = null;
+
 function prepararGeneraciones() {
   const f = $("#form-generaciones");
+  recalcularSerie = null;
   if (!f) return;
   enlazarBuscadores(f);
   const calculo = $("#calculo-generaciones");
-  const existentes = leer(LS.generaciones, []) || [];
+  // Se lee cada vez, no al dibujar: la lista de la derecha se actualiza por
+  // partes sin volver a preparar el formulario, y con la copia del momento de
+  // dibujar la numeración de una serie nueva podía repetir una generación que
+  // llegó después —y pisarla, porque el id sale del cultivo y el número—.
+  const existentes = () => leer(LS.generaciones, []) || [];
 
   // Las fechas de la serie: la primera, y después cada tantos días.
   const fechas = () => {
@@ -513,7 +538,7 @@ function prepararGeneraciones() {
     }
     // La numeración sigue donde quedó: si ya hay tres generaciones de brócoli,
     // la próxima serie empieza en la cuatro.
-    const ya = existentes.filter((g) => claveArea(g.cultivo) === claveArea(cultivo));
+    const ya = existentes().filter((g) => claveArea(g.cultivo) === claveArea(cultivo));
     const desdeN = ya.length ? Math.max(...ya.map((g) => g.generacion)) + 1 : 1;
     const directa = f.metodo.value === "Siembra directa";
     const p = perfil(cultivo) || {};
@@ -523,7 +548,7 @@ function prepararGeneraciones() {
     // Cuándo estaría cosechándose la última, que es lo que dice si la serie
     // entra en la temporada o se va de largo.
     const campoUlt = directa ? ultima : sumarDias(ultima,
-      diasBandejaDelCultivo(cultivo, existentes) || diasAlmacigo(cultivo, ultima));
+      diasBandejaDelCultivo(cultivo, existentes()) || diasAlmacigo(cultivo, ultima));
     const cosechaUlt = aCosecha ? sumarDias(campoUlt, aCosecha) : "";
 
     const c = cuentas();
@@ -543,6 +568,7 @@ function prepararGeneraciones() {
     .forEach((n) => f[n].addEventListener("input", actualizar));
   f.addEventListener("change", () => { alElegirCultivo(); actualizar(); });
   actualizar();
+  recalcularSerie = actualizar;
 
   f.onsubmit = (e) => {
     e.preventDefault();
@@ -551,7 +577,7 @@ function prepararGeneraciones() {
     const fs = fechas();
     if (!fs.length) return aviso("Falta la fecha de la primera siembra.", true);
 
-    const ya = existentes.filter((g) => claveArea(g.cultivo) === claveArea(cultivo));
+    const ya = existentes().filter((g) => claveArea(g.cultivo) === claveArea(cultivo));
     const desdeN = ya.length ? Math.max(...ya.map((g) => g.generacion)) + 1 : 1;
     const directa = f.metodo.value === "Siembra directa";
     const camas = aNumero(f.camas.value) || "";
@@ -582,7 +608,7 @@ function prepararGeneraciones() {
     }
 
     // Las nuevas trasplantan igual que las que ya hay de este cultivo.
-    const bandeja = directa ? 0 : diasBandejaDelCultivo(cultivo, existentes);
+    const bandeja = directa ? 0 : diasBandejaDelCultivo(cultivo, existentes());
     fs.forEach((fecha, i) => {
       const n = desdeN + i;
       guardarGeneracion({
@@ -606,19 +632,4 @@ function prepararGeneraciones() {
     if (nuevo) nuevo.scrollIntoView({ block: "nearest" });
   };
 
-  // Sacar una del plan.
-  document.querySelectorAll("[data-borrar-gen]").forEach((b) => {
-    b.onclick = () => {
-      const id = b.dataset.borrarGen;
-      if (!confirm("¿Sacar esta generación del plan?")) return;
-      guardarRegistro("generacion_borrar", { generacion_id: id }, "Sacada del plan ✓");
-      // Se saca de la copia local para que no siga a la vista hasta sincronizar.
-      const todas = leer(LS.generaciones, []) || [];
-      const sacada = todas.find((g) => g.id === id);
-      const quedan = todas.filter((g) => g.id !== id);
-      escribir(LS.generaciones, quedan);
-      if (sacada) replanearCultivo(sacada.cultivo, quedan);
-      render("plan", true);
-    };
-  });
 }

@@ -37,7 +37,41 @@ function refrescarEstado() {
 // Todo va en un solo pedido al servicio de AMA, que reparte cada registro a
 // su hoja (las horas de Tica, a la planilla de Bioma). Lo que falle queda en
 // la cola.
-async function sincronizar(silencioso = true) {
+//
+// Una sola sincronización a la vez. Cada guardado pide una, y si la anterior
+// no había terminado las dos mandaban la misma cola: partir una generación en
+// tres viajaba seis veces (01/10). El servicio no duplicaba —reconoce cada
+// registro por su id— pero era el doble de pedidos. Ahora, si hay una en
+// curso, se anota que hace falta otra y corre una sola al terminar. Si una
+// quedó colgada más de un minuto (una red que no contesta), no traba a las
+// siguientes.
+let sincronizando = null, sincronizandoDesde = 0;
+let otraSincronizacion = false, otraEsSilenciosa = true;
+function sincronizar(silencioso = true) {
+  if (sincronizando && Date.now() - sincronizandoDesde < 60000) {
+    otraSincronizacion = true;
+    otraEsSilenciosa = otraEsSilenciosa && silencioso;
+    return sincronizando;
+  }
+  sincronizandoDesde = Date.now();
+  const esta = (async () => {
+    let s = silencioso;
+    try {
+      do {
+        otraSincronizacion = false;
+        await sincronizarUnaVez(s);
+        s = otraEsSilenciosa;
+        otraEsSilenciosa = true;
+      } while (otraSincronizacion);
+    } finally {
+      if (sincronizando === esta) sincronizando = null;
+    }
+  })();
+  sincronizando = esta;
+  return esta;
+}
+
+async function sincronizarUnaVez(silencioso) {
   if (!navigator.onLine) { refrescarEstado(); return; }
   // Sin credencial no se manda nada: queda todo en la cola del teléfono hasta
   // que se active con un código.
@@ -46,7 +80,11 @@ async function sincronizar(silencioso = true) {
   const enviadosAhora = [];
   const fallaron = [];
 
-  const otros = pendientes;
+  // Una COPIA de la cola, no la cola: lo que se guarde mientras este pedido
+  // está en viaje no va en él, y no puede darse por enviado al volver. Del
+  // 30/09 al 01/10 fue la cola misma, y un registro guardado en ese momento
+  // salía de la cola sin haber viajado.
+  const otros = pendientes.slice();
   if (otros.length) {
     try {
       const resp = await fetch(urlServicio(), {
@@ -184,8 +222,10 @@ async function traerGeneraciones(forzar = false) {
     const cambio = JSON.stringify(leer(LS.generaciones, null)) !== JSON.stringify(lista);
     escribir(LS.generaciones, lista);
     if (!cambio) return;
+    // También Resumen: sus croquis muestran qué bancales ocupa el plan. Si lo
+    // que llegó no cambia nada en pantalla, redibujarConDatos no la toca.
     if (vistaActual === "inicio") redibujarConDatos("inicio");
-    else if (vistaActual === "plan" && vistaPlan !== "lista") redibujarConDatos("plan");
+    else if (vistaActual === "plan") redibujarConDatos("plan");
   } catch { /* sin señal: se usa lo último que se bajó */ }
 }
 
