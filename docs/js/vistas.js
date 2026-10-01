@@ -24,7 +24,7 @@ const plantillas = {
     const pct = kgPlan ? (kgLogrado / kgPlan) * 100 : 0;
 
     return `
-    <div class="tarjeta temporada-cab">
+    ${parte("inicio-temporada", `<div class="tarjeta temporada-cab">
       <h2>Temporada ${esc(t.nombre || "sin nombre")}</h2>
       <div class="chacra">${esc(CFG.nombre || chacraActual().nombre)}</div>
       <div class="rango">${t.inicio ? "Inicio " + fechaCorta(t.inicio) : "Sin fecha de inicio"}${t.fin ? " · fin " + fechaCorta(t.fin) : ""}
@@ -39,11 +39,11 @@ const plantillas = {
         ${num(pct, 1)}% de lo esperado ·
         ${resumen ? "datos de toda la chacra" : "solo este teléfono"}
       </div>
-    </div>
+    </div>`)}
 
-    ${tarjetaParaHacer()}
+    ${parte("para-hacer", tarjetaParaHacer())}
 
-    <div class="tarjeta">
+    ${parte("inicio-cargado", `<div class="tarjeta">
       <h2>Lo cargado ${resumen ? "desde la chacra" : "<small>(solo este teléfono)</small>"}</h2>
       <div class="cifras">
         ${cifraClara(num(resumen ? resumen.siembras : local.siembras), "siembras")}
@@ -53,7 +53,7 @@ const plantillas = {
       ${pendientes.length
         ? `<button class="secundario" id="btn-enviar">Enviar ${pendientes.length} registro(s) ahora</button>`
         : ""}
-    </div>
+    </div>`)}
 
     <div class="tarjeta">
       <h2>&#128172; ¿Qué mejorarías de la app?</h2>
@@ -78,7 +78,7 @@ const plantillas = {
     if (!hayConfig()) return tarjetaSinConfig();
     const yo = leer(LS.nombre, "");
     return `
-    ${tarjetaParaSembrar()}
+    ${parte("para-sembrar", tarjetaParaSembrar())}
     <div class="tarjeta" id="tarjeta-form-siembra">
       <h2>&#127793; Registrar siembra</h2>
       <div id="desde-el-plan"></div>
@@ -125,7 +125,7 @@ const plantillas = {
         <div class="calculo" id="calculo-siembra"></div>
 
         <label>Operador</label>
-        <select name="operador" required>${opcionesIntegrante(yo)}</select>
+        <select name="operador" required data-parte="op-operador" data-parte-modo="opciones">${opcionesIntegrante(yo)}</select>
 
         <label>Observaciones</label>
         <textarea name="observaciones" rows="2" placeholder="Opcional"></textarea>
@@ -133,7 +133,7 @@ const plantillas = {
         <button class="principal">Guardar siembra</button>
       </form>
     </div>
-    ${historialDe("siembras")}`;
+    ${parte("historial", historialDe("siembras"))}`;
   },
 
   // El trasplante parte SIEMPRE de una siembra de almácigo ya cargada: así el
@@ -165,12 +165,12 @@ const plantillas = {
     });
 
     return `
-    ${tarjetaParaTrasplantar(pend, listos, pronto)}
+    ${parte("para-trasplantar", tarjetaParaTrasplantar(pend, listos, pronto))}
 
     <div class="tarjeta" id="tarjeta-form-trasplante">
-      <h2>&#127807; Registrar trasplante${
-        pend.length ? ` <small>${pend.length} almácigos esperando</small>` : ""}</h2>
-      ${origen}
+      <h2>&#127807; Registrar trasplante <small data-parte="cuenta-almacigos">${
+        pend.length ? `${pend.length} almácigos esperando` : ""}</small></h2>
+      ${parte("aviso-almacigos", origen)}
       <div id="desde-el-plan"></div>
       <form id="form-trasplantes">
         <label>¿Qué cultivo?</label>
@@ -195,7 +195,7 @@ const plantillas = {
              teóricos, que es el dato con el que después se corrige el
              catálogo. Sin él el trasplante se registra igual. -->
         <label>¿Viene de un almácigo cargado? <small>(opcional)</small></label>
-        <select name="siembra_id">
+        <select name="siembra_id" data-parte="op-almacigos" data-parte-modo="opciones">
           <option value="">No, o no está en la lista</option>
           ${pend.map((s) => `<option value="${esc(s.id)}">${esc(s.etiqueta)}</option>`).join("")}
         </select>
@@ -233,7 +233,7 @@ const plantillas = {
         <div class="calculo" id="calculo-trasplante"></div>
 
         <label>Operador</label>
-        <select name="operador" required>${opcionesIntegrante(yo)}</select>
+        <select name="operador" required data-parte="op-operador" data-parte-modo="opciones">${opcionesIntegrante(yo)}</select>
 
         <label>Observaciones</label>
         <textarea name="observaciones" rows="2" placeholder="Opcional"></textarea>
@@ -241,7 +241,7 @@ const plantillas = {
         <button class="principal">Guardar trasplante</button>
       </form>
     </div>
-    ${historialDe("trasplantes")}`;
+    ${parte("historial", historialDe("trasplantes"))}`;
   },
 
   // Cada uno ve su cuenta; quien esté habilitado ve la de todo el equipo. Eso
@@ -326,7 +326,7 @@ const plantillas = {
         <input type="date" name="fecha" value="${hoy()}" required>
 
         <label>¿Quién trabajó?</label>
-        <select name="integrante" required>${opcionesIntegrante(yo)}</select>
+        <select name="integrante" required data-parte="op-integrante" data-parte-modo="opciones">${opcionesIntegrante(yo)}</select>
 
         <label>¿En qué área?</label>
         <select name="area" required>
@@ -353,7 +353,7 @@ const plantillas = {
       </form>
     </div>
 
-    ${historialDe("horas")}`;
+    ${parte("historial", historialDe("horas"))}`;
   },
 
   tareas() {
@@ -377,13 +377,13 @@ const plantillas = {
       <button class="pestana${porArea ? " activa" : ""}" data-vista-tareas="areas">Por área</button>
     </div>
 
-    ${porArea ? tarjetasDeAreas(lista) : `
+    ${parte("tareas-lista", porArea ? tarjetasDeAreas(lista) : `
     <div class="tarjeta">
       <h2>&#9745; Tareas pendientes <small>${pendientes_.length}</small></h2>
       ${pendientes_.length
         ? pendientes_.map(filaTarea).join("")
         : `<p class="nota">No hay tareas pendientes. Agregá una acá abajo.</p>`}
-    </div>`}
+    </div>`)}
 
     <div class="tarjeta">
       <h2>Anotar una tarea</h2>
@@ -417,11 +417,11 @@ const plantillas = {
         <div class="fila">
           <div>
             <label>Quién la anota</label>
-            <select name="creada_por" required>${opcionesIntegrante(yo)}</select>
+            <select name="creada_por" required data-parte="op-creada-por" data-parte-modo="opciones">${opcionesIntegrante(yo)}</select>
           </div>
           <div>
             <label>Quién la toma <small>(opcional)</small></label>
-            <select name="asignada">
+            <select name="asignada" data-parte="op-asignada" data-parte-modo="opciones">
               <option value="">Cualquiera</option>
               ${integrantes().map((n) => `<option>${esc(n)}</option>`).join("")}
             </select>
@@ -432,12 +432,12 @@ const plantillas = {
       </form>
     </div>
 
-    ${hechas.length ? `<div class="tarjeta">
+    ${parte("tareas-hechas", hechas.length ? `<div class="tarjeta">
       <h2>Hechas hace poco <small>lo último arriba</small></h2>
       ${hechas.map(filaTarea).join("")}
       <a class="enlace-planilla" href="${esc(enlacePlanilla())}" target="_blank" rel="noopener">
         Ver el historial completo en la planilla</a>
-    </div>` : ""}`;
+    </div>` : "")}`;
   },
 
   cosechas() {
@@ -489,12 +489,12 @@ const plantillas = {
         <div class="calculo" id="calculo-cosecha"></div>
 
         <label>Cosechó</label>
-        <select name="operador">${opcionesIntegrante(yo)}</select>
+        <select name="operador" data-parte="op-operador" data-parte-modo="opciones">${opcionesIntegrante(yo)}</select>
 
         <button class="principal">Guardar cosecha</button>
       </form>
     </div>
-    ${historialDe("cosechas")}`;
+    ${parte("historial", historialDe("cosechas"))}`;
   },
 
   plan() {

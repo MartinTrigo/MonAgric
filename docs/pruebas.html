@@ -183,6 +183,37 @@ almacenamiento del teléfono.</p>
     columnasQueFaltan({ ...esquemaBien, cosechas: ["Id", "Fecha", "Cultivo", "Kilos", "Cosechó"] }),
     ["cosechas «Kg»"]);
 
+  // --- redibujar por partes: el formulario no se toca al llegar datos ---
+  igual("parte con una raíz: la marca va en ella",
+    parte("x", `<div class="tarjeta">a</div>`), `<div data-parte="x" class="tarjeta">a</div>`);
+  igual("parte vacía: queda un lugar oculto", parte("x", ""), `<div data-parte="x" hidden></div>`);
+  igual("parte con varias raíces: se envuelven",
+    parte("x", `<div>a</div><div>b</div>`), `<div class="parte" data-parte="x"><div>a</div><div>b</div></div>`);
+  {
+    const vista = document.createElement("div");
+    vista.id = "vista";
+    document.body.appendChild(vista);
+    let lista = ["uno"];
+    plantillas.__prueba = () => `<form><input name="campo" value=""></form>
+      <select data-parte="op" data-parte-modo="opciones">${lista.map((x) => `<option>${x}</option>`).join("")}</select>
+      ${parte("lista", `<div>${lista.join(", ")}</div>`)}`;
+    vista.innerHTML = plantillas.__prueba();
+    htmlDePartes = new Map([...vista.querySelectorAll("[data-parte]")].map((el) => [el.dataset.parte, el.outerHTML]));
+    partesTocadas = new Set();
+    vista.querySelector("[name=campo]").value = "completado desde el plan";
+    vista.querySelector("select").value = "uno";
+    lista = ["uno", "dos"];
+    const fueronPorPartes = actualizarPartes("__prueba");
+    igual("llegan datos: cambia la lista, el formulario queda como estaba",
+      [fueronPorPartes, vista.querySelector("[data-parte=lista]").textContent,
+       vista.querySelector("[name=campo]").value, vista.querySelector("select").options.length,
+       vista.querySelector("select").value],
+      [true, "uno, dos", "completado desde el plan", 2, "uno"]);
+    vista.remove();
+    delete plantillas.__prueba;
+    htmlDePartes = new Map();
+  }
+
   // --- mapa ---
   igual("bancales que ocuparía una de 3 al final del sector", bancalesQueOcuparia({ camas: 3 }, 24, 25), [23, 24, 25]);
   const puestas = [{ id: "a", cultivo: "Acelga", fecha_almacigo: "2026-08-13", fecha_campo: "2026-09-22",

@@ -20,6 +20,23 @@ let campoTocado = false;
 document.addEventListener("submit", () => { campoTocado = false; }, true);
 const formularioEmpezado = () => campoTocado;
 
+// Las partes donde la persona escribió algo (un formulario de corrección
+// dentro de la lista, por ejemplo): esas no se reemplazan al llegar datos.
+let partesTocadas = new Set();
+["input", "change"].forEach((tipo) => document.addEventListener(tipo, (e) => {
+  const p = e.isTrusted && e.target.closest && e.target.closest("#vista [data-parte]");
+  if (p && p.dataset.parteModo !== "opciones") partesTocadas.add(p.dataset.parte);
+}, true));
+// Cómo era cada parte al dibujarla: si lo que llega da lo mismo, no se toca.
+let htmlDePartes = new Map();
+
+// Las listas desplegables recuerdan si estaban abiertas. "toggle" no burbujea:
+// se escucha en la captura, así vale también para las que se reemplazan.
+document.addEventListener("toggle", (e) => {
+  if (e.target.id === "lista-para-sembrar") abiertoParaSembrar = e.target.open;
+  if (e.target.id === "lista-para-trasplantar") abiertoParaTrasplantar = e.target.open;
+}, true);
+
 /* Redibujar porque llegaron datos, no porque la persona hizo algo. Estos
    pedidos terminan solos, segundos después, y antes redibujaban con la
    pantalla vuelta arriba y el formulario en blanco: al terminar cada
@@ -31,8 +48,61 @@ const formularioEmpezado = () => campoTocado;
 function redibujarConDatos(vista) {
   if (vistaActual !== vista) return;
   if (document.body.classList.contains("lz-arrastrando")) return;
+  // Las secciones con formulario están marcadas por partes: se cambian solo
+  // las listas y los números, y el formulario sigue como estaba aunque se lo
+  // esté llenando. Así los datos nuevos se ven enseguida (antes, con algo a
+  // medio cargar, no aparecían hasta cambiar de pantalla).
+  if (actualizarPartes(vista)) return;
   if (formularioEmpezado()) return;
   render(vista, true);
+}
+
+/* Reemplaza solo las partes que cambiaron (ver parte(), en componentes.js).
+   Devuelve false si la sección no tiene partes o cambió de forma —por
+   ejemplo, el teléfono perdió el acceso y ahora va la tarjeta del código—:
+   ahí corresponde redibujarla entera.
+
+   Por qué no redibujar todo: render() tira el DOM y lo arma de nuevo. Un
+   formulario que se completó solo desde el plan ("Para sembrar") no cuenta
+   como tocado, así que la lista de últimos movimientos, al llegar segundos
+   después, lo dejaba en blanco (01/10). */
+function actualizarPartes(vista) {
+  const vivas = [...document.querySelectorAll("#vista [data-parte]")];
+  if (!vivas.length) return false;
+  const nuevo = document.createElement("div");
+  nuevo.innerHTML = plantillas[vista]();
+  const nuevas = new Map([...nuevo.querySelectorAll("[data-parte]")].map((el) => [el.dataset.parte, el]));
+  if (nuevas.size !== vivas.length || vivas.some((el) => !nuevas.has(el.dataset.parte))) return false;
+
+  let cambio = false;
+  vivas.forEach((viva) => {
+    const nombre = viva.dataset.parte;
+    const n = nuevas.get(nombre);
+    const html = n.outerHTML;
+    if (htmlDePartes.get(nombre) === html) return;
+    // Un desplegable de un formulario: cambian sus opciones, no lo elegido.
+    if (viva.dataset.parteModo === "opciones") {
+      const elegido = viva.value;
+      viva.innerHTML = n.innerHTML;
+      if ([...viva.options].some((o) => o.value === elegido)) viva.value = elegido;
+    } else {
+      if (partesTocadas.has(nombre) || viva.contains(document.activeElement)) return;
+      viva.replaceWith(n);
+    }
+    htmlDePartes.set(nombre, html);
+    cambio = true;
+  });
+  if (cambio) engancharPartes(vista);
+  return true;
+}
+
+// Lo que hay que volver a enganchar dentro de las partes. Todo es por
+// propiedad (onclick = …), así que repetirlo no duplica nada.
+function engancharPartes(vista) {
+  prepararCorrecciones();
+  engancharFilas();
+  if (vista === "tareas") prepararTareas();
+  if (vista === "inicio") prepararInicio();
 }
 
 function render(vista, conservarScroll = false) {
@@ -42,6 +112,7 @@ function render(vista, conservarScroll = false) {
   if (vista !== "cuentas") cuentaAbierta = "";
   vistaActual = vista;
   campoTocado = false;           // la pantalla nueva arranca sin nada cargado
+  partesTocadas = new Set();
   const scroll = window.scrollY;
   // Lo que tiene scroll propio —el plan estratégico, las listas de Cultivos y
   // del mapa— también se queda donde estaba. Redibujar crea todo de nuevo, y
@@ -58,6 +129,8 @@ function render(vista, conservarScroll = false) {
   document.body.classList.toggle("a-lo-ancho",
     vista === "plan" && !cultivoAbierto && (vistaPlan === "grafico" || vistaPlan === "mapa"));
   $("#vista").innerHTML = plantillas[vista]();
+  htmlDePartes = new Map([...document.querySelectorAll("#vista [data-parte]")]
+    .map((el) => [el.dataset.parte, el.outerHTML]));
   // Al cambiar de sección se arranca de arriba; al redibujar la misma porque
   // llegaron datos, se deja donde estaba.
   window.scrollTo(0, conservarScroll ? scroll : 0);
@@ -82,18 +155,7 @@ function render(vista, conservarScroll = false) {
   // aunque la sección que se está mirando sea Trasplantes.
   if (vista === "trasplantes") { traerUltimos("siembras"); traerAlmacigos(); }
 
-  // Plan: abrir un cultivo muestra su ficha, y con ella se pide su historial.
-  document.querySelectorAll("[data-ficha]").forEach((fila) => {
-    const abrir = () => {
-      cultivoAbierto = fila.dataset.ficha;
-      render("plan");
-      window.scrollTo(0, 0);
-    };
-    fila.onclick = abrir;
-    fila.onkeydown = (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(); }
-    };
-  });
+  engancharFilas();
   const volver = $("#volver-plan");
   if (volver) volver.onclick = () => { cultivoAbierto = ""; render("plan"); };
   if (vista === "plan" && cultivoAbierto) { traerFicha(cultivoAbierto); traerFichasTexto(); }
@@ -126,6 +188,39 @@ function render(vista, conservarScroll = false) {
   // El plan también lo necesita Inicio, para avisar qué toca sembrar.
   if (vista === "plan" || vista === "inicio") traerGeneraciones();
 
+  // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
+  // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
+  if (vista === "cuentas") traerCuentas().then((cambio) => {
+    if (cambio && vistaActual === "cuentas") redibujarConDatos("cuentas");
+  });
+
+  // La pestaña de Cuentas solo existe para las chacras que tienen economía
+  // compartida. Hoy es solo Chacra Tica: las demás ni la ven.
+  const tabCuentas = document.querySelector('[data-vista="cuentas"]');
+  if (tabCuentas) tabCuentas.hidden = !hayCuentas();
+
+  // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
+  const activa = document.querySelector(".tabs-medio .tab.activa");
+  if (activa) activa.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+}
+
+// Las filas que llevan a otro lado: abrir la ficha de un cultivo, completar el
+// formulario desde "Para sembrar" o "Para trasplantar", ir desde Inicio a la
+// lista. Van aparte de render porque también se enganchan al reemplazar una
+// parte (actualizarPartes); son todas por propiedad, se pueden repetir.
+function engancharFilas() {
+  // Plan: abrir un cultivo muestra su ficha, y con ella se pide su historial.
+  document.querySelectorAll("[data-ficha]").forEach((fila) => {
+    const abrir = () => {
+      cultivoAbierto = fila.dataset.ficha;
+      render("plan");
+      window.scrollTo(0, 0);
+    };
+    fila.onclick = abrir;
+    fila.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(); }
+    };
+  });
   // Tocar algo de "Para sembrar" completa el formulario con lo que dice el
   // plan de esas generaciones: cuántos bancales, la variedad, dónde van.
   // "Para trasplantar": el almácigo elegido, y con él el plan de esa generación.
@@ -144,11 +239,6 @@ function render(vista, conservarScroll = false) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); }
     };
   });
-  // Las listas recuerdan si estaban abiertas.
-  const listaS = $("#lista-para-sembrar");
-  if (listaS) listaS.addEventListener("toggle", () => { abiertoParaSembrar = listaS.open; });
-  const listaT = $("#lista-para-trasplantar");
-  if (listaT) listaT.addEventListener("toggle", () => { abiertoParaTrasplantar = listaT.open; });
   // Inicio: los botones llevan a la sección con la lista abierta.
   document.querySelectorAll("[data-ir-pendientes]").forEach((b) => {
     b.onclick = () => {
@@ -181,20 +271,6 @@ function render(vista, conservarScroll = false) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); }
     };
   });
-  // Solo se redibuja si de verdad cambio algo, y sin mover la pantalla: quien
-  // estaba leyendo el detalle de su cuenta no tiene por que volver arriba.
-  if (vista === "cuentas") traerCuentas().then((cambio) => {
-    if (cambio && vistaActual === "cuentas") redibujarConDatos("cuentas");
-  });
-
-  // La pestaña de Cuentas solo existe para las chacras que tienen economía
-  // compartida. Hoy es solo Chacra Tica: las demás ni la ven.
-  const tabCuentas = document.querySelector('[data-vista="cuentas"]');
-  if (tabCuentas) tabCuentas.hidden = !hayCuentas();
-
-  // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
-  const activa = document.querySelector(".tabs-medio .tab.activa");
-  if (activa) activa.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
 }
 
 // Botones que pueden aparecer en cualquier vista.

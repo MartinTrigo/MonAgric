@@ -153,6 +153,27 @@ function enlazarBuscadores(form) {
   });
 }
 
+/* Una PARTE de una sección: lo que depende de datos que llegan del servicio
+   (una lista, un contador, las opciones de un desplegable). Cuando llegan
+   datos nuevos se reemplazan solo las partes (actualizarPartes, en render.js)
+   y el resto de la pantalla —los formularios, sobre todo— no se toca.
+
+   Si el HTML tiene un solo elemento de raíz, la marca va en él; si tiene
+   varios, se envuelven en un div que no ocupa lugar (.parte). Si está vacío,
+   queda un lugar oculto: la parte tiene que existir siempre, aparezca o no,
+   para que la sección conserve su forma cuando llegan datos. */
+function parte(nombre, html) {
+  const h = String(html || "").trim();
+  if (!h) return `<div data-parte="${nombre}" hidden></div>`;
+  const t = document.createElement("template");
+  t.innerHTML = h;
+  const unaRaiz = t.content.children.length === 1
+    && [...t.content.childNodes].every((n) => n.nodeType === 1 || !n.textContent.trim());
+  return unaRaiz
+    ? h.replace(/^<([a-z][a-z0-9-]*)/i, `<$1 data-parte="${nombre}"`)
+    : `<div class="parte" data-parte="${nombre}">${h}</div>`;
+}
+
 function opcionesIntegrante(seleccionado = "") {
   const lista = integrantes();
   return `<option value="" disabled${seleccionado ? "" : " selected"}>Elegí…</option>

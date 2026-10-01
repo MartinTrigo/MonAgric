@@ -1324,7 +1324,8 @@ h3.sub {
     columns: 2;
     column-gap: 18px;
   }
-  #vista > .tarjeta {
+  #vista > .tarjeta,
+  #vista > .parte > .tarjeta {
     /* Una tarjeta partida al medio entre dos columnas es ilegible. */
     break-inside: avoid;
     -webkit-column-break-inside: avoid;
@@ -1617,3 +1618,7 @@ details.desplegable[open] > summary { margin-bottom: 8px; }
 .plan-zoom { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .plan-zoom .secundario { width: auto; margin: 0; padding: 4px 11px; font-size: .95rem; line-height: 1.2; }
 .plan-zoom span { font-size: .82rem; color: var(--tenue); min-width: 2.8rem; text-align: center; }
+
+/* Una parte de varias tarjetas (ver parte() en js/componentes.js): el
+   envoltorio no ocupa lugar, las tarjetas se acomodan como si no estuviera. */
+.parte { display: contents; }

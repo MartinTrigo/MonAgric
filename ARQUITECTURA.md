@@ -110,7 +110,7 @@ encima por `conPendientesDelPlan`), `LS.config`, `LS.almacigos`.
 | 2 | **Script de horas de Tica abierto** | Su URL está en el código público y escribe filas de horas, de donde salen los sueldos. Ya anotado en PENDIENTES 0 bis. | **resuelto en código 30/09**: entran por `Code.gs` con credencial; falta archivar la implementación del script |
 | 3 | **Normalizadores de nombres distintos** | Cuatro reglas para "¿es el mismo cultivo?": `claveArea` de la app (saca tildes y la "s" final), `claveArea` del servidor (igual, a mano), `claveNombre` del servidor (**no** saca la "s"), `formaComparable` en Economía, `clave()` en cada herramienta. El cruce siembra↔plan del servidor usa `claveNombre`: una siembra de "Choclo" no marcaría sembrada una generación de "Choclos", y la app sí los junta. | **resuelto 01/10** (4.1): `claveCultivo` en el servidor, igual a la app |
 | 4 | **El esquema de las hojas está escrito en varios lados** | Los encabezados viven en `HOJAS` (servidor) y se repiten como texto en la app (`DE_LA_HOJA`, `filaEquipo`, `almacigosPendientes`) y en las herramientas. Renombrar una columna rompe la app en silencio. | **resuelto 01/10** (4.2): el esquema viaja con la config; la app avisa, la herramienta revisa las planillas |
-| 5 | **Redibujar todo con `innerHTML`** | Es la causa de raíz de los saltos de pantalla y los formularios borrados (28/09). Se emparchó bien (`redibujarConDatos`, `campoTocado`, scroll propio), pero cada pantalla nueva con estado propio puede volver a caer. | propuesta 4.5 |
+| 5 | **Redibujar todo con `innerHTML`** | Es la causa de raíz de los saltos de pantalla y los formularios borrados (28/09). Se emparchó bien (`redibujarConDatos`, `campoTocado`, scroll propio), pero cada pantalla nueva con estado propio puede volver a caer. | **resuelto 01/10 en las secciones con formulario**: se actualizan por partes; Plan sigue entero (4.5) |
 | 6 | **Estado global suelto** | 35 variables `let` de nivel superior, mezcla de datos (`CFG`, `pendientes`) y de interfaz (`genEditando`, `vistaMapa`…), cualquiera las toca desde cualquier archivo. | propuesta 4.5 |
 | 7 | **El servidor lee hojas enteras por pedido** | `generacionesDelPlan` recorre Siembras en cada pedido; `fichaDeCultivo` tres hojas; `permitido()` abre la planilla de accesos y lee todos los dispositivos **en cada pedido**. | **mejorado 01/10**: acceso 2 min y plan/almácigos 5 min en caché; la ficha sigue leyendo |
 | 8 | **Muchos viajes al arrancar** | `iniciar` pide config y catálogo, y `sincronizar` los vuelve a pedir (duplicados), más resumen, tareas, horas, generaciones, últimos: 8 a 10 ejecuciones de Apps Script, cada una con su `permitido()`. | **mejorado 01/10**: sin duplicados (5 pedidos al abrir); falta `?inicio=1` |
@@ -316,7 +316,29 @@ nueva. Es lo que más se pide (Inicio, Plan, Proyección de Economía).
 
 **d) Fechas.** Un solo `textoFecha_(v, tz)` en lugar de las 9 copias.
 
-### 4.5 Estado y dibujo (lo más grande; hacerlo por sección)
+### 4.5 Estado y dibujo (lo más grande; hacerlo por sección) — primer paso HECHO 01/10
+
+Aplicado: **partes**. En las plantillas de Inicio, Siembras, Trasplantes,
+Cosechas, Horas y Tareas, lo que depende de datos del servicio (listas,
+contadores, opciones de un desplegable) se marca con `parte(nombre, html)`
+(componentes.js) o `data-parte`. Cuando llegan datos, `redibujarConDatos` va
+a `actualizarPartes` (render.js): arma la plantilla aparte, reemplaza solo las
+partes que cambiaron y vuelve a enganchar sus botones (`engancharPartes`, todo
+por propiedad, repetible). Los formularios no se tocan nunca, se estén
+llenando o no. Un desplegable marcado `data-parte-modo="opciones"` cambia sus
+opciones y conserva lo elegido. Una parte con foco o donde se escribió no se
+reemplaza. Si la sección cambió de forma (otra cantidad de partes), se
+redibuja entera como antes.
+
+Arregló un error real: completar el formulario desde "Para sembrar" no cuenta
+como tocarlo, y la lista de últimos movimientos, al llegar segundos después,
+lo dejaba en blanco. Pruebas en `pruebas.html`.
+
+**Regla para pantallas nuevas:** todo lo que muestre datos del servicio va en
+una parte; el formulario, afuera. Falta llevar Plan a este esquema (el gráfico,
+el mapa y el editor de generaciones) y agrupar el estado de interfaz.
+
+La propuesta original:
 
 - Agrupar el estado de interfaz en un objeto por sección
   (`ui.plan = { vista, orden, filtro, genPanel, … }`) en vez de 35 variables

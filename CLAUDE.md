@@ -97,6 +97,10 @@ refactorización en pasos) está en `ARQUITECTURA.md`.
    saltar la pantalla después de cada cosa guardada (28/09, "no me deja
    trabajar"). `redibujarConDatos` conserva el scroll y no redibuja si la
    persona tocó un campo o está arrastrando en el mapa.
+9. **En una pantalla nueva, lo que muestra datos del servicio va en una
+   parte** (`parte()` o `data-parte`, ver ARQUITECTURA 4.5) y el formulario
+   afuera: así al llegar datos se cambia la lista y no se borra lo que la
+   persona está cargando.
 
 ## El plan y la carga de datos, juntos (29/09)
 
