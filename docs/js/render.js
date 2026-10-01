@@ -68,7 +68,8 @@ const arrastrandoAlgo = () => document.body.classList.contains("lz-arrastrando")
    trabajar"). Ahora se queda donde estaba, y si hay algo a medio cargar o un
    arrastre en el mapa, no se redibuja: los datos nuevos aparecen en el
    próximo cambio de pantalla. */
-function redibujarConDatos(vista) {
+function redibujarConDatos(vista) { return enMemoria(() => redibujarConDatos_(vista)); }
+function redibujarConDatos_(vista) {
   if (vistaActual !== vista) return;
   if (arrastrandoAlgo()) return;
   // Las secciones con formulario están marcadas por partes: se cambian solo
@@ -150,6 +151,9 @@ let ultimoHtml = "";
 let numeroDeRender = 0;
 
 function render(vista, conservarScroll = false, htmlListo = null) {
+  return enMemoria(() => render_(vista, conservarScroll, htmlListo));
+}
+function render_(vista, conservarScroll, htmlListo) {
   const este = ++numeroDeRender;
   if (vista === "configuracion" && vistaActual !== "configuracion") {
     vistaPrevia = vistaActual;

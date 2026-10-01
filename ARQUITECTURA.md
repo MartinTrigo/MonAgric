@@ -153,7 +153,32 @@ migraciones en cada pedido.)
 
 ---
 
-## 4. Estrategia de refactorización, en pasos que se pueden verificar
+## 3 bis. Rendimiento medido (01/10)
+
+Con volumen de fin de temporada (30 cultivos, 240 generaciones, fichas de
+todos, 120 tareas), en una notebook; un teléfono de gama media es 4 a 8 veces
+más lento:
+
+| Pantalla | Antes | Después | Lecturas del almacenamiento |
+|---|---|---|---|
+| Plan → Mapa | 116 ms | 9 ms | 903 (25 MB de texto) → 5 |
+| Plan → Plan estratégico | 60 ms | 20 ms | 425 → 5 |
+| Plan → Cultivos | 47 ms | 14 ms | 37 → 5 |
+
+- **Causa:** `nombreGen()` y `diasBandejaDelCultivo()` leen el plan entero por
+  defecto y se llaman una vez por generación; cada `leer()` sacaba el texto del
+  almacenamiento y lo interpretaba. **Arreglo:** mientras se dibuja, lo leído
+  queda en memoria (`enMemoria` en base.js, envuelve `render` y
+  `redibujarConDatos`) y se vacía si algo escribe. `claveArea` recuerda sus
+  resultados. `VIGILAR_LECTURAS` (pruebas) bloquea lo leído: ningún dibujo lo
+  modifica, comprobado en todas las pantallas.
+- **Arranque:** el service worker esperaba a la red sin plazo. Con señal
+  débil, pantalla en blanco. Ahora la apertura espera 3 s como máximo y, si no
+  llega, toda la página sale de la copia guardada (sin mezclar versiones); la
+  red termina por detrás. Probado en `pruebas.html` con red simulada.
+- **Memoria:** estable tras cientos de dibujos; no se acumulan escuchas.
+
+
 
 Cada paso deja la app igual por fuera y se prueba con `docs/pruebas.html` más
 el recorrido en el navegador. Ninguno depende del siguiente.

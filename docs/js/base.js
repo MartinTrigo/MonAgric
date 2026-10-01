@@ -31,7 +31,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 71 · 1/10/2026";
+const VERSION_APP = "versión 72 · 1/10/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -86,15 +86,60 @@ const LS = {
   generaciones: "monagric_generaciones",
 };
 
+/* Lo leído mientras se dibuja una pantalla queda en memoria hasta que el
+   dibujo termina (enMemoria, más abajo). Antes cada leer() volvía a sacar el
+   texto del almacenamiento y a interpretarlo: el mapa, con 240 generaciones,
+   leía el plan ~480 veces por dibujo —25 MB de texto, 116 ms en una
+   notebook, varias veces eso en un teléfono— porque nombreGen() lo lee por
+   defecto y se llama una vez por generación (01/10).
+
+   Solo durante un dibujo, y se vacía si algo escribe: fuera de eso cada
+   leer() devuelve una copia nueva, como siempre, y quien la modifica antes
+   de guardarla (fichas, últimos) no le cambia nada a nadie. Que dibujar no
+   modifique lo leído lo comprueba pruebas.html (VIGILAR_LECTURAS). */
+let lecturasEnMemoria = null;
+let VIGILAR_LECTURAS = false;
+const AUSENTE = Symbol("ausente");
 const leer = (k, def) => {
-  try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); }
-  catch { return def; }
+  if (lecturasEnMemoria && lecturasEnMemoria.has(k)) {
+    const v = lecturasEnMemoria.get(k);
+    return v === AUSENTE ? def : v;
+  }
+  let v;
+  try { const crudo = localStorage.getItem(k); v = crudo === null ? AUSENTE : JSON.parse(crudo); }
+  catch { v = AUSENTE; }
+  if (lecturasEnMemoria) {
+    if (VIGILAR_LECTURAS && v && typeof v === "object") v = vigilado(v, k);
+    lecturasEnMemoria.set(k, v);
+  }
+  return v === AUSENTE ? def : v;
 };
+// Hace fn() con las lecturas en memoria. Si ya se estaba dentro de una, la
+// comparte (un render que vuelve a dibujar desde adentro).
+const enMemoria = (fn) => {
+  if (lecturasEnMemoria) return fn();
+  lecturasEnMemoria = new Map();
+  try { return fn(); } finally { lecturasEnMemoria = null; }
+};
+// Solo para las pruebas: lo leído en memoria no se puede modificar. Si algún
+// dibujo lo hiciera, la copia en memoria dejaría de ser igual a la guardada.
+const vigilados = new WeakMap();
+function vigilado(obj, k) {
+  if (vigilados.has(obj)) return vigilados.get(obj);
+  const error = () => { throw new Error(`Se modificó lo leído de ${k} mientras se dibujaba`); };
+  const p = new Proxy(obj, {
+    get: (t, prop) => { const x = t[prop]; return x && typeof x === "object" ? vigilado(x, k) : x; },
+    set: error, deleteProperty: error, defineProperty: error,
+  });
+  vigilados.set(obj, p);
+  return p;
+}
 // Si el almacenamiento del teléfono se llena (las fichas y el plan crecen), el
 // error cortaba a mitad de camino lo que se estaba guardando. Ahora se avisa
 // una vez y la app sigue: lo que no entra se vuelve a bajar del servicio.
 let avisoLleno = false;
 const escribir = (k, v) => {
+  if (lecturasEnMemoria) lecturasEnMemoria.delete(k);
   try {
     localStorage.setItem(k, JSON.stringify(v));
   } catch (e) {

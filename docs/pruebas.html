@@ -238,6 +238,77 @@ almacenamiento del teléfono.</p>
     htmlDePartes = new Map();
   }
 
+  // --- el service worker: abrir con señal buena, débil o nula ---
+  {
+    const codigo = (await (await fetch("sw.js", { cache: "no-store" })).text())
+      .replace("const ESPERA_RED_MS = 3000;", "const ESPERA_RED_MS = 60;");   // la prueba no espera 3 s
+    const guardado = new Map();
+    let red = { demora: 0, cae: false, version: "nueva" };
+    const resp = (txt) => new Response(txt);
+    const fetchFalso = (p) => new Promise((ok, mal) => setTimeout(() => (red.cae ? mal(new Error("sin red"))
+      : ok(resp(`${red.version}:${new URL(p.url).pathname}`))), red.demora));
+    const cachesFalso = {
+      open: async () => ({ put: async (p, r) => { guardado.set(new URL(p.url).pathname, r); }, addAll: async () => {} }),
+      match: async (p) => { const r = guardado.get(new URL(typeof p === "string" ? new URL(p, location.href) : p.url).pathname); return r ? r.clone() : undefined; },
+      keys: async () => [], delete: async () => true,
+    };
+    const manejadores = {};
+    const selfFalso = { addEventListener: (t, fn) => { manejadores[t] = fn; }, location: { origin: location.origin },
+                        skipWaiting() {}, clients: { claim() {} } };
+    new Function("self", "caches", "fetch", codigo)(selfFalso, cachesFalso, fetchFalso);
+    const pedir = async (ruta, navegar) => {
+      let respuesta;
+      manejadores.fetch({ request: { method: "GET", url: new URL(ruta, location.href).href, mode: navegar ? "navigate" : "no-cors" },
+                          respondWith: (p) => { respuesta = p; } });
+      return (await respuesta).text();
+    };
+    const espera = (ms) => new Promise((z) => setTimeout(z, ms));
+    // Señal buena: todo de la red, y queda guardado.
+    red = { demora: 0, cae: false, version: "v1" };
+    // (en la app real, todos los archivos quedan guardados al instalar)
+    const buena = [await pedir("index.html", true), await pedir("js/base.js"), await pedir("js/render.js")];
+    await espera(10);
+    // Señal débil (la red tarda más que el plazo) y una versión nueva publicada:
+    // la apertura y lo que pide la página salen de la copia, todo de v1.
+    red = { demora: 300, cae: false, version: "v2" };
+    const debil = [await pedir("index.html", true), await pedir("js/base.js"), await pedir("js/render.js")];
+    await espera(400);                       // la red termina por detrás y deja guardada la v2
+    red = { demora: 0, cae: false, version: "v3" };
+    const despues = [await pedir("index.html", true), await pedir("js/base.js")];
+    red = { demora: 0, cae: true, version: "" };
+    const sinRed = [await pedir("index.html", true), await pedir("js/base.js")];
+    igual("service worker: con señal buena, la red",
+      buena.map((x) => x.split(":")[0]), ["v1", "v1", "v1"]);
+    igual("service worker: con señal débil abre en el plazo con la copia, sin mezclar versiones",
+      debil.map((x) => x.split(":")[0]), ["v1", "v1", "v1"]);
+    igual("service worker: lo que llegó por detrás queda para la próxima; con señal vuelve a la red",
+      despues.map((x) => x.split(":")[0]), ["v3", "v3"]);
+    igual("service worker: sin red, la copia", sinRed.map((x) => x.split(":")[0]), ["v3", "v3"]);
+  }
+
+  // --- lecturas en memoria mientras se dibuja ---
+  {
+    const getAntes = Storage.prototype.getItem;
+    let lecturas = 0;
+    const guardado = { [LS.generaciones]: JSON.stringify([{ id: "g1", cultivo: "Acelga" }]) };
+    Storage.prototype.getItem = function (k) { lecturas++; return k in guardado ? guardado[k] : getAntes.call(this, k); };
+    try {
+      const fuera = [leer(LS.generaciones, []), leer(LS.generaciones, [])];
+      const lecturasFuera = lecturas; lecturas = 0;
+      const dentro = enMemoria(() => [leer(LS.generaciones, []), leer(LS.generaciones, []), leer(LS.generaciones, [])]);
+      igual("fuera de un dibujo cada lectura es nueva; dentro, una sola",
+        [lecturasFuera, fuera[0] !== fuera[1], lecturas, dentro[0] === dentro[2]], [2, true, 1, true]);
+      lecturas = 0;
+      enMemoria(() => { leer(LS.generaciones, []); escribir(LS.generaciones, []); leer(LS.generaciones, []); });
+      igual("si algo escribe durante el dibujo, la próxima lectura vuelve al almacenamiento", lecturas, 2);
+      VIGILAR_LECTURAS = true;
+      let atrapado = "";
+      try { enMemoria(() => { leer(LS.generaciones, [])[0].cultivo = "otro"; }); } catch (e) { atrapado = e.message; }
+      igual("la vigilancia atrapa a quien modifica lo leído mientras se dibuja",
+        atrapado.startsWith("Se modificó lo leído"), true);
+    } finally { VIGILAR_LECTURAS = false; Storage.prototype.getItem = getAntes; }
+  }
+
   // --- la cola: lo que se guarda mientras otra sincronización viaja no se pierde ---
   {
     const fetchAntes = window.fetch, getAntes = Storage.prototype.getItem;

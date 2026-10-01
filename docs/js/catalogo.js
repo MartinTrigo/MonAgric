@@ -143,8 +143,21 @@ const esAreaFija = (nombre) =>
 
 // "Horticola", "hortícola" y "Hortícolas" son la misma área escrita por
 // personas distintas. Se compara sin tildes, sin mayúsculas y sin la s final.
-const claveArea = (nombre) => String(nombre || "").trim().toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/s$/, "");
+//
+// Se recuerda cada resultado: es la comparación más usada de la app (el
+// gráfico y el mapa la hacen decenas de miles de veces por dibujo) y siempre
+// da lo mismo para el mismo texto.
+const clavesHechas = new Map();
+const claveArea = (nombre) => {
+  const s = String(nombre || "");
+  let k = clavesHechas.get(s);
+  if (k === undefined) {
+    k = s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/s$/, "");
+    if (clavesHechas.size > 5000) clavesHechas.clear();
+    clavesHechas.set(s, k);
+  }
+  return k;
+};
 
 const areas = () => AREAS_FIJAS.concat(areasPropias());
 const areasActivas = () => areas().filter((a) => (a.estado || "activo") !== "terminado");
