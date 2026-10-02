@@ -1373,25 +1373,46 @@ function corregirRegistro(chacra, libro, r, borrar) {
   var hoja = libro.getSheetByName(def.nombre);
   if (!hoja || hoja.getLastRow() < 2) throw new Error("No encontré la hoja " + def.nombre + ".");
   var n = def.encabezados.length;
+
+  /* TODAS las filas con ese id, no solo la primera. Hasta el 01/10 se
+     corregía o borraba la primera y se paraba: en Tica había dos cosechas de
+     prueba cargadas dos veces con el mismo id (del 24/09), y al borrarlas se
+     iba una copia y la otra quedaba. En la app parecía que el borrado no
+     andaba: "intenté borrarlos pero regresan". Ahora borrar saca todas las
+     copias, y corregir arregla la primera y saca las sobrantes. Cada fila que
+     se toca queda anotada en Cambios, como estaba. */
   var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+  var filas = [];
   for (var i = 0; i < ids.length; i++) {
-    if (String(ids[i][0]) !== id) continue;
-    var fila = i + 2;
-    var antes = hoja.getRange(fila, 1, 1, n).getValues()[0];
-    var obj = {};
-    def.encabezados.forEach(function (c, j) { obj[c] = antes[j]; });
-    anotarCambio(libro, def.nombre, id, borrar ? "borrado" : "corregido", r.dispositivo, obj);
-    if (borrar) { hoja.deleteRow(fila); return; }
-    // La fila se rearma con la misma receta que al cargarla. Se conservan el
-    // id, la temporada y quien la cargo: corregir no es cargar de nuevo.
-    var iCargado = def.encabezados.indexOf("Cargado por");
-    var nueva = def.fila({ id: id, temporada: antes[1], datos: d.datos || {},
-                           dispositivo: iCargado >= 0 ? antes[iCargado] : "" });
-    hoja.getRange(fila, 1, 1, n).setValues([nueva]);
-    return;
+    if (String(ids[i][0]) === id) filas.push(i + 2);
   }
   // Ya no esta: otro telefono lo borro antes. No es un error que haya que
   // reintentar para siempre.
+  if (!filas.length) return;
+
+  var comoEstaba = function (fila) {
+    var antes = hoja.getRange(fila, 1, 1, n).getValues()[0];
+    var obj = {};
+    def.encabezados.forEach(function (c, j) { obj[c] = antes[j]; });
+    return { valores: antes, obj: obj };
+  };
+  var sobran = borrar ? filas : filas.slice(1);
+  if (!borrar) {
+    var primera = comoEstaba(filas[0]);
+    anotarCambio(libro, def.nombre, id, "corregido", r.dispositivo, primera.obj);
+    // La fila se rearma con la misma receta que al cargarla. Se conservan el
+    // id, la temporada y quien la cargo: corregir no es cargar de nuevo.
+    var iCargado = def.encabezados.indexOf("Cargado por");
+    var nueva = def.fila({ id: id, temporada: primera.valores[1], datos: d.datos || {},
+                           dispositivo: iCargado >= 0 ? primera.valores[iCargado] : "" });
+    hoja.getRange(filas[0], 1, 1, n).setValues([nueva]);
+  }
+  // De abajo hacia arriba, así los números de fila no se corren.
+  sobran.slice().reverse().forEach(function (fila) {
+    anotarCambio(libro, def.nombre, id, borrar ? "borrado" : "borrado (copia repetida)",
+                 r.dispositivo, comoEstaba(fila).obj);
+    hoja.deleteRow(fila);
+  });
 }
 
 // Las horas de Tica estan en la planilla de Bioma, en la hoja de respuestas:
@@ -1489,9 +1510,21 @@ function revisarColumnas(chacra) {
         distintas.push({ columna: i + 1, espera: def.encabezados[i], hay: String(reales[i]) });
       }
     }
+    // Ids repetidos: una misma fila cargada dos veces. Corregir y borrar ya
+    // tocan todas las copias, pero conviene saber si aparecen, y de dónde.
+    var repetidos = [];
+    if (hoja.getLastRow() > 1) {
+      var vistos = {};
+      hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues().forEach(function (f) {
+        var id = String(f[0] || "");
+        if (!id) return;
+        if (vistos[id] === 1) repetidos.push(id);
+        vistos[id] = (vistos[id] || 0) + 1;
+      });
+    }
     salida.push({ hoja: def.nombre, filas: Math.max(hoja.getLastRow() - 1, 0),
                   faltan_al_final: Math.max(def.encabezados.length - hoja.getLastColumn(), 0),
-                  distintas: distintas });
+                  distintas: distintas, repetidos: repetidos });
   });
   return salida;
 }

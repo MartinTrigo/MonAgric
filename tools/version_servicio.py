@@ -51,6 +51,10 @@ def revisar_columnas_en_planillas(pedir) -> None:
         if not r.get("ok"):
             print(f"  [?]        columnas de {chacra}: {r.get('error', 'sin respuesta')}")
             continue
+        for h in r["hojas"]:
+            if h.get("repetidos"):
+                print(f"  [!!]       {chacra}, {h['hoja']}: ids cargados mas de una vez: "
+                      + ", ".join(h["repetidos"][:5]))
         malas = [h for h in r["hojas"] if h["distintas"]]
         if not malas:
             print(f"  [al dia]   columnas en su lugar en {chacra}")

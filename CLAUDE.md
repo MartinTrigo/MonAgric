@@ -116,7 +116,9 @@ refactorización en pasos) está en `ARQUITECTURA.md`.
   trasplantes, cosechas, horas; las de Tica en la planilla de Bioma). El
   servicio rearma la fila con la misma receta que al cargarla y deja copia de
   cómo estaba en la hoja **Cambios** de la chacra: un borrado por error se
-  recupera de ahí. Los botones aparecen solo si la configuración trae
+  recupera de ahí. Borrar y corregir tocan **todas** las filas con ese id
+  (01/10: dos cosechas repetidas "volvían" porque se borraba solo la primera
+  copia). Los botones aparecen solo si la configuración trae
   `corregir: true` (servicio nuevo); contra uno viejo quedarían en la cola.
 - La generación del plan tiene **Variedad** (columna al final de la hoja).
 
