@@ -40,7 +40,16 @@ function fichaCultivo(cultivo) {
 
   const generaciones = siembras.map((s) => {
     const suyos = porSiembra[s.id] || [];
-    const inicio = s.cosecha_estimada || "";
+    // Las fechas, de lo más firme a lo menos: lo que pasó (el trasplante
+    // registrado), lo que dice hoy el plan, y lo que se estimó el día de la
+    // siembra. Las estimadas de la hoja Siembras son una foto de ese día: si
+    // el plan se corrió después, mostrarlas contradecía al Plan estratégico.
+    // Una siembra directa no tiene trasplante: su cosecha sale de la siembra.
+    const plan = EN_BANDEJA.has(s.tipo)
+      ? trasplanteDelPlan({ cultivo, generacion: s.generacion, id: s.id }) : "";
+    const aCampo = suyos.length ? suyos[0].fecha : plan;
+    const inicio = aCampo && p.dias_trasplante_cosecha
+      ? sumarDias(aCampo, p.dias_trasplante_cosecha) : (s.cosecha_estimada || "");
     const dura = p.dias_en_cosecha_max || p.dias_en_cosecha || 0;
     const fin = inicio && dura ? sumarDias(inicio, dura) : "";
     const real = suyos.length
@@ -48,6 +57,7 @@ function fichaCultivo(cultivo) {
         + (suyos[0].diferencia
             ? ` <b>(${suyos[0].diferencia > 0 ? "+" : ""}${suyos[0].diferencia} vs. lo teórico)</b>`
             : "")
+      : plan ? `el plan lo trasplanta el ${fechaCorta(plan)}`
       : (s.trasplante_estimado ? `trasplante estimado ${fechaCorta(s.trasplante_estimado)}` : "");
     const donde = suyos.length
       ? suyos.map((t) => `${t.sector} ${t.bancal}`).join(", ")

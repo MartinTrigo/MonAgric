@@ -218,6 +218,11 @@ Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
   chacras. Borrar la fila en la planilla del catálogo.
 - Cebolla de verdeo sin rinde medido (2,5 kg/m² provisorio) y Frutilla con
   datos de bibliografía (INTA / Pro Huerta): corregir con lo que se mida.
+- **Berenjena y morrón: 21 a 30 días de almácigo** en el catálogo, cuando en
+  la zona suelen pasar 50 a 70 (Tica planifica la berenjena con 60). Desde el
+  03/10 el plan manda sobre ese dato en cuanto la generación está planificada,
+  pero sigue usándose para lo que no está en el plan y para comparar los días
+  reales en bandeja.
 
 ### 0 bis. Cerrar el script de horas — es el único secreto a la vista
 

@@ -49,9 +49,12 @@ function almacigosPendientes() {
     .filter((s) => /almácigo|almacigo/i.test(s.tipo || ""))
     .filter((s) => !yaHechos.has(s.id))
     .filter((s) => (vistos.has(s.id) ? false : vistos.add(s.id)))
+    // Cuándo va al bancal: lo que dice HOY el plan, no lo que se estimó al
+    // sembrar (ver trasplanteDelPlan).
+    .map((s) => Object.assign(s, { objetivo: trasplanteDelPlan(s) || s.estimado }))
     // Primero lo que hace más tiempo que espera: es lo que corre riesgo de
     // pasarse de punto en la bandeja.
-    .sort((a, b) => String(a.estimado || a.fecha).localeCompare(String(b.estimado || b.fecha)))
+    .sort((a, b) => String(a.objetivo || a.fecha).localeCompare(String(b.objetivo || b.fecha)))
     .map((s) => Object.assign(s, { etiqueta: etiquetaAlmacigo(s) }));
   // De dónde salió la lista, para que se vea en pantalla. Cuando faltaba un
   // almácigo de agosto no había ningún error: simplemente no estaba, y desde
@@ -62,16 +65,51 @@ function almacigosPendientes() {
   return lista;
 }
 
-// Cuánto le falta o hace cuánto se pasó, según la fecha estimada. Es lo que
-// convierte la lista en una sugerencia y no en un archivo: se ve de un vistazo
-// qué hay que sacar de la bandeja esta semana.
+/* La generación del plan a la que pertenece una siembra: la que el servicio
+   cruzó con ella o, si no, la del mismo cultivo y número (la generación que
+   anotó quien sembró manda, igual que en el servidor). Si se partió en varias
+   partes, la primera que va a campo. */
+function generacionDeSiembra(cultivo, generacion, id = "") {
+  const k = claveArea(cultivo);
+  const mismas = (leer(LS.generaciones, []) || [])
+    .filter((g) => claveArea(g.cultivo) === k && Number(g.generacion) === Number(generacion));
+  return mismas.find((g) => id && g.siembra_id === id && g.fecha_campo)
+    || mismas.filter((g) => g.fecha_campo)
+         .sort((a, b) => String(a.fecha_campo).localeCompare(String(b.fecha_campo)))[0]
+    || null;
+}
+
+/* Cuándo va al bancal un almácigo ya sembrado: la fecha a campo del plan.
+   La columna "Trasplante estimado" de Siembras es una foto del día en que se
+   sembró (fecha + días del catálogo) y no se entera si después se corre el
+   plan: la berenjena sembrada el 3/8 figuraba "atrasada 31 días" con el
+   trasplante planeado para el 16/10 (03/10). Si la generación no está en el
+   plan, o el plan no dice cuándo va a campo, vale lo estimado al sembrar. */
+function trasplanteDelPlan(s) {
+  return generacionDeSiembra(s.cultivo, s.generacion, s.id)?.fecha_campo || "";
+}
+
+// Cuánto le falta o hace cuánto se pasó, según el plan (o lo estimado). Es lo
+// que convierte la lista en una sugerencia y no en un archivo: se ve de un
+// vistazo qué hay que sacar de la bandeja esta semana.
 function estadoAlmacigo(s) {
-  const dias = diasEntre(hoy(), s.estimado);
+  const cuando = s.objetivo ?? s.estimado;
+  const dias = diasEntre(hoy(), cuando);
   if (dias === null) return { texto: "sin fecha estimada", orden: 3, dias: null };
   if (dias < 0) return { texto: `atrasado ${Math.abs(dias)} días`, orden: 0, dias };
   if (dias === 0) return { texto: "es hoy", orden: 0, dias };
   if (dias <= DIAS_AVISO) return { texto: `en ${dias} días`, orden: 1, dias };
-  return { texto: `para ${fechaCorta(s.estimado)}`, orden: 2, dias };
+  return { texto: `para ${fechaCorta(cuando)}`, orden: 2, dias };
+}
+
+/* Una generación sembrada en bandeja que todavía no se trasplantó: su siembra
+   es un hecho, pero el día que va al bancal sigue siendo una decisión, y se
+   tiene que poder correr desde el plan. */
+function esperaTrasplante(g, pend = almacigosPendientes()) {
+  if (!g.fecha_almacigo) return false;
+  const k = claveArea(g.cultivo);
+  return pend.some((s) => (g.siembra_id && s.id === g.siembra_id)
+    || (claveArea(s.cultivo) === k && Number(s.generacion) === Number(g.generacion)));
 }
 
 function etiquetaAlmacigo(s) {
@@ -243,7 +281,9 @@ function tarjetaParaTrasplantar(pend, listos, pronto) {
       data-trasplantar="${esc(s.id)}">
     <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? ` <span class="gen">${esc(s.variedad)}</span>` : ""}
       <span class="gen">G${s.generacion}</span></div>
-      <div class="cuando">sembrado el ${fechaCorta(s.fecha)}${s.plantines ? ` · ${num(s.plantines)} plantines` : ""}${
+      <div class="cuando">sembrado el ${fechaCorta(s.fecha)}${
+        diasEntre(s.fecha, hoy()) > 0 ? ` <small>(${diasEntre(s.fecha, hoy())} días en bandeja)</small>` : ""}${
+        s.plantines ? ` · ${num(s.plantines)} plantines` : ""}${
         (() => {
           const bs = bancalesPlanificados(s.cultivo, s.generacion);
           return bs.length ? ` · ${esc(bs[0].sector)} ${bs.map((x) => x.bancal).join(", ")}` : "";
@@ -257,9 +297,11 @@ function tarjetaParaTrasplantar(pend, listos, pronto) {
         listos.length ? `<span class="etiqueta alerta">${listos.length} listo${listos.length === 1 ? "" : "s"}</span>` : ""}${
         pronto.length ? `<span class="etiqueta ok">${pronto.length} esta semana</span>` : ""}</span>
     </summary>
-    <p class="nota">Los almácigos que esperan, según sus días en bandeja: es una
-    guía, manda lo que se ve en la bandeja. Tocá uno y el formulario se completa
-    con el plan —bancales, marco, generación—.</p>
+    <p class="nota">Los almácigos que esperan, según la fecha a campo del plan
+    (si no están en el plan, según los días en bandeja del catálogo). Para
+    cambiar la fecha, corré la generación en el Plan estratégico o editala en
+    Plan → Cultivos. Es una guía: manda lo que se ve en la bandeja. Tocá uno y
+    el formulario se completa con el plan —bancales, marco, generación—.</p>
     ${listos.map((s) => fila(s, true)).join("")}
     ${pronto.map((s) => fila(s, false)).join("")}
     ${despues.map((s) => fila(s, false)).join("")}

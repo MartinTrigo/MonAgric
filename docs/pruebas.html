@@ -138,6 +138,46 @@ almacenamiento del teléfono.</p>
       { cultivo: "Repollo bco", fecha_almacigo: "2026-09-15", fecha_campo: "2026-10-25" },
       { cultivo: "Repollo bco", fecha_almacigo: "2026-10-01", fecha_campo: "2026-10-31" }]), 40);
 
+  // --- el plan manda sobre la fecha estimada al sembrar (03/10: la berenjena
+  //     sembrada el 3/8 figuraba atrasada con el trasplante planeado al 16/10) ---
+  {
+    const getAntes = Storage.prototype.getItem;
+    const datos = {
+      [LS.generaciones]: [{ id: "gen-berenjena-1", cultivo: "Berenjena", generacion: 1, metodo: "Trasplante",
+        fecha_almacigo: "2026-08-17", fecha_campo: "2026-10-16", camas: 1, sembrada: true,
+        sembrada_el: "2026-08-03", siembra_id: "s-ber" }],
+      [LS.almacigos]: [
+        { Id: "s-ber", Fecha: "2026-08-03", Cultivo: "Berenjena", Tipo: "Siembra almácigo", "Generación": 1,
+          Plantines: 144, "Trasplante estimado": "2026-09-02" },
+        { Id: "s-alb", Fecha: "2026-09-05", Cultivo: "Albahaca", Tipo: "Siembra almácigo", "Generación": 1,
+          Plantines: 384, "Trasplante estimado": "2026-10-15" }],
+    };
+    Storage.prototype.getItem = function (k) { return k in datos ? JSON.stringify(datos[k]) : getAntes.call(this, k); };
+    const frenar = { guardarRegistro, render };
+    let guardada = null;
+    guardarRegistro = (tipo, d) => { guardada = d; };
+    render = () => {};
+    try {
+      const pend = almacigosPendientes();
+      const ber = pend.find((s) => s.id === "s-ber"), alb = pend.find((s) => s.id === "s-alb");
+      igual("para trasplantar: vale la fecha a campo del plan, no la estimada al sembrar", ber.objetivo, "2026-10-16");
+      igual("sin generación en el plan, vale la estimada al sembrar", alb.objetivo, "2026-10-15");
+      igual("lo atrasado se cuenta contra el plan", estadoAlmacigo(ber).dias, diasEntre(hoy(), "2026-10-16"));
+      const g = datos[LS.generaciones][0];
+      const t = tramosDe(g);
+      igual("sembrada: la barra arranca el día que se sembró y va a campo cuando dice el plan",
+        [t.inicio, t.campo], ["2026-08-03", "2026-10-16"]);
+      igual("en bandeja y sin trasplantar: se puede correr", esperaTrasplante(g, pend), true);
+      igual("ya trasplantada: no se corre", esperaTrasplante(g, pend.filter((s) => s.id !== "s-ber")), false);
+      correrGeneracion("gen-berenjena-1", 7);
+      igual("correr una sembrada mueve solo el trasplante",
+        [guardada?.fecha_almacigo, guardada?.fecha_campo], ["2026-08-17", "2026-10-23"]);
+      guardada = null;
+      correrGeneracion("gen-berenjena-1", -80);
+      igual("no se puede llevar al bancal antes de la siembra", guardada, null);
+    } finally { Storage.prototype.getItem = getAntes; ({ guardarRegistro, render } = frenar); }
+  }
+
   // --- la cola por enviar se ve igual en el plan ---
   pendientes = [
     { tipo: "generaciones", datos: { generacion_id: "gen-tomate-3", cultivo: "Tomate", generacion: 3, camas: 1 } },

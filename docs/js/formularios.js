@@ -80,12 +80,23 @@ function prepararSiembras() {
         ${b.lineas} líneas a ${b.distancia} cm) = ${b.bandejas} bandeja(s) de ${b.alveolos}`);
       // Los días dependen de la estación: se cuentan desde la fecha de siembra.
       const alm = diasAlmacigo(f.cultivo.value, f.fecha.value);
-      if (alm) {
+      // Si la generación está en el plan, su fecha a campo es la que vale: es
+      // la que después usan "Para trasplantar" y el Plan estratégico.
+      const g = generacionDeSiembra(f.cultivo.value, parseInt(f.generacion.value, 10) || 1);
+      if (g?.fecha_campo) {
+        const d = diasEntre(f.fecha.value, g.fecha_campo);
+        partes.push(`el plan la trasplanta el <b>${fechaCorta(g.fecha_campo)}</b>`
+          + (d > 0 ? ` <small>(${d} días en bandeja)</small>`
+             : ` <small class="alerta">(antes de esta siembra: corregí el plan)</small>`));
+      } else if (alm) {
         const r = rangoAlmacigo(f.cultivo.value);
         partes.push(`trasplante estimado: <b>${fechaCorta(sumarDias(f.fecha.value, alm))}</b>`
           + (r ? ` <small>(${alm} días; entre ${r.min} y ${r.max} según la estación)</small>` : ""));
       }
-      if (p.dias_a_cosecha) partes.push(`cosecha estimada: <b>${fechaCorta(sumarDias(f.fecha.value, p.dias_a_cosecha))}</b>`);
+      const cosecha = g?.fecha_campo && p.dias_trasplante_cosecha
+        ? sumarDias(g.fecha_campo, p.dias_trasplante_cosecha)
+        : (p.dias_a_cosecha ? sumarDias(f.fecha.value, p.dias_a_cosecha) : "");
+      if (cosecha) partes.push(`cosecha estimada: <b>${fechaCorta(cosecha)}</b>`);
     } else {
       const dias = tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha;
       if (dias) partes.push(`cosecha estimada: <b>${fechaCorta(sumarDias(f.fecha.value, dias))}</b>`);
@@ -190,7 +201,9 @@ function prepararTrasplantes() {
     f.generacion.value = s.generacion || 1;
     sugerirMarco(s.cultivo);
     const sembrada = s.fecha ? `sembrado el ${fechaCorta(s.fecha)}` : "";
-    const espera = s.estimado ? ` · estimado para ${fechaCorta(s.estimado)}` : "";
+    const plan = trasplanteDelPlan(s);
+    const espera = plan ? ` · el plan lo trasplanta el ${fechaCorta(plan)}`
+      : (s.estimado ? ` · estimado para ${fechaCorta(s.estimado)}` : "");
     nota.innerHTML = `${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""}
       · G${s.generacion} · ${sembrada}${espera}`;
     recalcular();

@@ -121,6 +121,15 @@ refactorización en pasos) está en `ARQUITECTURA.md`.
   copia). Los botones aparecen solo si la configuración trae
   `corregir: true` (servicio nuevo); contra uno viejo quedarían en la cola.
 - La generación del plan tiene **Variedad** (columna al final de la hoja).
+- **El día de trasplante lo dice el plan, en todas las secciones** (03/10).
+  "Trasplante estimado" y "Cosecha estimada" de la hoja Siembras son una foto
+  del día de la siembra (fecha + días del catálogo) y no se enteran si el plan
+  se corre: la berenjena figuraba "atrasada 31 días" con el trasplante
+  planeado al 16/10. Para Trasplantes, Inicio, la ficha y el formulario se usa
+  `trasplanteDelPlan()` (pendientes.js); la columna queda solo para lo que no
+  está en el plan. Una generación **sembrada y todavía en bandeja** se puede
+  correr en el Plan estratégico o editar en Cultivos, pero solo su fecha a
+  campo (`esperaTrasplante`); la barra de una sembrada arranca el día real.
 
 ## Multi-chacra: lo que no hay que romper
 
