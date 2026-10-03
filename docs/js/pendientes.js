@@ -141,12 +141,12 @@ let abiertoParaTrasplantar = false;
 // Cuántas plantas pide el plan para esa cantidad de bancales, y en cuántas
 // bandejas entran. Sin esta cuenta había que salir a buscar el marco de
 // plantación y hacerla a mano antes de sembrar.
-function bandejasDelPlan(cultivo, bancales, alveolos) {
+function bandejasDelPlan(cultivo, bancales, alveolos, sector = "") {
   const plan = enPlan(cultivo) || {};
   const p = perfil(cultivo) || {};
   const lineas = plan.lineas || p.lineas_bancal || 0;
   const distancia = plan.distancia_cm || p.distancia_cm || 0;
-  const plantas = plantasDe({ bancales, lineas, distancia_cm: distancia });
+  const plantas = plantasDe({ bancales, lineas, distancia_cm: distancia, sector });
   if (!plantas || !alveolos) return null;
   return { plantas, lineas, distancia, bancales, alveolos,
            bandejas: Math.ceil(plantas / alveolos) };
@@ -218,7 +218,7 @@ function tarjetaParaSembrar() {
     con lo que dice el plan: revisá, cambiá lo que haga falta y guardá.</p>
     ${pend.map((g) => {
       const d = diasEntre(hoy(), g.cuando);
-      const b = g.fecha_almacigo ? bandejasDelPlan(g.cultivo, g.camasTotal || 1, 128) : null;
+      const b = g.fecha_almacigo ? bandejasDelPlan(g.cultivo, g.camasTotal || 1, 128, g.sector) : null;
       const etiqueta = etiquetaGeneraciones(g.generaciones);
       return `<div class="registro abre-siembra" role="button" tabindex="0"
                    data-sembrar="${esc(JSON.stringify({ cultivo: g.cultivo, cuando: g.cuando }))}">

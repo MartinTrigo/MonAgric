@@ -125,6 +125,11 @@ def main() -> None:
     else:
         print("  [ANTERIOR] la configuracion se guarda por partes (sigue entera)")
         viejas.append("la configuracion por partes")
+    if cf.get("largo_por_sector"):
+        print("  [al dia]   cada sector puede tener su largo de bancal")
+    else:
+        print("  [ANTERIOR] cada sector puede tener su largo de bancal (la app no ofrece el campo)")
+        viejas.append("el largo de bancal por sector")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")

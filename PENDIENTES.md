@@ -206,6 +206,19 @@ Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
    todos en `Config`, así que borrarlas no cambia ninguna tarifa — pero
    conviene confirmarlo antes, que es justo el agujero por el que se coló Mili.
 
+### 0 cuater. Revisar en el catálogo (03/10)
+
+- **"Ajo de verdeo" tiene los datos y la ficha de la cebolla de verdeo**
+  (*Allium fistulosum*; días y marco de la fila "Verdeo" de la planilla de
+  referencia). Lo usan Foco Verde, Huerma y Tierra Linda. Preguntarles si
+  plantan ajo o cebolla de verdeo: si es cebolla, pasar sus generaciones a
+  "Cebolla de verdeo" (agregada el 03/10); si es ajo, corregir sus datos (el
+  ajo no va en almácigo).
+- **"ZZ Prueba"** quedó en el catálogo compartido y le aparece a las seis
+  chacras. Borrar la fila en la planilla del catálogo.
+- Cebolla de verdeo sin rinde medido (2,5 kg/m² provisorio) y Frutilla con
+  datos de bibliografía (INTA / Pro Huerta): corregir con lo que se mida.
+
 ### 0 bis. Cerrar el script de horas — es el único secreto a la vista
 
 > **30/09: CERRADO.** Implementado, verificado con una hora real (Marto, con

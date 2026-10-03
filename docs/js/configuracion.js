@@ -73,11 +73,15 @@ function prepararConfiguracion() {
     }
 
     const datos = { sector: nombre, bancales: parseInt(fSector.bancales.value, 10) || 1,
-                    tipo_riego: fSector.tipo_riego.value };
+                    tipo_riego: fSector.tipo_riego.value,
+                    // Vacío = el largo de la chacra (ver largoDe en catalogo.js).
+                    largo_m: fSector.largo_m ? (aNumero(fSector.largo_m.value) || "") : "" };
     let mensaje;
     if (editandoSector >= 0) {
       const antes = secs[editandoSector].sector;
-      secs[editandoSector] = datos;
+      // Se conserva lo que el formulario no muestra: dónde está en el mapa.
+      // Antes se reemplazaba el sector entero y editarlo lo mandaba al rincón.
+      secs[editandoSector] = Object.assign({}, secs[editandoSector], datos);
       mensaje = `${antes === nombre ? nombre : `${antes} → ${nombre}`} actualizado ✓`;
     } else {
       secs.push(datos);
@@ -97,6 +101,7 @@ function prepararConfiguracion() {
       fSector.sector.value = s.sector;
       fSector.bancales.value = s.bancales;
       fSector.tipo_riego.value = s.tipo_riego || tiposRiego()[0];
+      if (fSector.largo_m) fSector.largo_m.value = s.largo_m || "";
       $("#titulo-sector").innerHTML = `<div class="editando">Editando <b>${esc(s.sector)}</b></div>`;
       $("#btn-sector").textContent = "Guardar cambios";
       $("#btn-cancelar-sector").hidden = false;
@@ -140,114 +145,7 @@ function prepararConfiguracion() {
   };
 
   // ---- un cultivo nuevo para el catálogo de todas las chacras
-  const fCult = $("#form-cultivo");
-  if (fCult) {
-    // Qué se pregunta depende de cómo se siembra. Un cultivo de siembra
-    // directa no tiene días en almácigo, y obligar a llenarlo empuja a poner
-    // un cero inventado, que es peor que un vacío: después no se distingue de
-    // un dato medido.
-    const conAlmacigo = () => /almácigo|almacigo/i.test(fCult.tipo_siembra.value);
-    const yaPlantado = () => /trasplante|esqueje/i.test(fCult.tipo_siembra.value);
-    const blAlm = $("#bloque-almacigo"), blDir = $("#bloque-directa");
-    const suma = $("#suma-cosecha");
-
-    const acomodar = () => {
-      const alm = conAlmacigo();
-      blAlm.hidden = !(alm || yaPlantado());
-      // Los días a cosecha nunca se preguntan cuando se pueden deducir: con
-      // almácigo son la suma de las dos etapas, y con un plantín ya hecho son
-      // los del trasplante a la cosecha. Preguntarlos igual abriría la puerta
-      // a que dos números de la misma fila se contradigan.
-      blDir.hidden = alm || yaPlantado();
-      fCult.dias_almacigo.parentElement.hidden = !alm;
-      // Los estacionales solo tienen sentido si el cultivo pasa por bandeja.
-      $("#bloque-estacion").hidden = !alm;
-      recalcular();
-    };
-
-    const recalcular = () => {
-      const b = aNumero(fCult.dias_trasplante_cosecha.value) || 0;
-      if (conAlmacigo()) {
-        const a = aNumero(fCult.dias_almacigo.value) || 0;
-        suma.textContent = (a && b)
-          ? `Días a cosecha: ${a + b}, contando desde la siembra.` : "";
-      } else if (yaPlantado()) {
-        suma.textContent = b
-          ? `Días a cosecha: ${b}, contando desde que se planta.` : "";
-      } else {
-        suma.textContent = "";
-      }
-    };
-
-    fCult.tipo_siembra.addEventListener("change", acomodar);
-    ["dias_almacigo", "dias_trasplante_cosecha"].forEach((n) =>
-      fCult[n].addEventListener("input", recalcular));
-    acomodar();
-
-  fCult.onsubmit = (e) => {
-    e.preventDefault();
-    const nombre = fCult.cultivo.value.trim();
-    if (!nombre) return aviso("Escribí el nombre del cultivo.", true);
-    // Se compara sin tildes ni mayúsculas: "Ají" y "aji" son el mismo. Un
-    // cultivo que ya tiene datos no se puede pisar desde el teléfono; uno que
-    // está sin datos sí se completa, que es el caso de los cinco que vinieron
-    // del catálogo viejo.
-    const yaEsta = cultivosDisponibles().find((c) => claveArea(c) === claveArea(nombre));
-    if (yaEsta && !cultivoSinDatos(yaEsta)) {
-      return aviso(`${yaEsta} ya está cargado con sus datos.`, true);
-    }
-    // Todo lo que se pregunta es obligatorio: un cultivo a medio cargar en el
-    // catálogo de seis chacras sirve menos que no tenerlo, porque nadie sabe
-    // si el hueco es un olvido o un dato que no aplica.
-    const alm = conAlmacigo();
-    const pedidos = [
-      ["dias_en_cosecha", "cuántos días dura la cosecha"],
-      ["lineas_bancal", "cuántas líneas por bancal"],
-      ["distancia_cm", "la distancia entre plantas"],
-      ["rinde_ref_kg_m2", "el rinde de referencia"],
-    ];
-    if (alm) pedidos.unshift(["dias_almacigo", "cuántos días lleva el almácigo"]);
-    if (alm || yaPlantado()) {
-      pedidos.push(["dias_trasplante_cosecha", "cuántos días del trasplante a la cosecha"]);
-    } else {
-      pedidos.push(["dias_a_cosecha", "cuántos días hasta la cosecha"]);
-    }
-    for (const [campo, comoSeLlama] of pedidos) {
-      if (!(aNumero(fCult[campo].value) > 0)) {
-        return aviso(`Falta ${comoSeLlama}.`, true);
-      }
-    }
-
-    const aCosecha = alm
-      ? (aNumero(fCult.dias_almacigo.value) || 0) + (aNumero(fCult.dias_trasplante_cosecha.value) || 0)
-      : yaPlantado()
-        ? aNumero(fCult.dias_trasplante_cosecha.value) || 0
-        : aNumero(fCult.dias_a_cosecha.value) || 0;
-
-    guardarRegistro("cultivo", {
-      cultivo: yaEsta || nombre,
-      tipo_siembra: fCult.tipo_siembra.value,
-      dias_almacigo: alm ? aNumero(fCult.dias_almacigo.value) : "",
-      // Opcionales: si vienen vacíos se usa el de arriba en las dos estaciones.
-      dias_almacigo_oi: alm ? aNumero(fCult.dias_almacigo_oi.value) : "",
-      dias_almacigo_pv: alm ? aNumero(fCult.dias_almacigo_pv.value) : "",
-      dias_trasplante_cosecha: (alm || yaPlantado())
-        ? aNumero(fCult.dias_trasplante_cosecha.value) : "",
-      dias_a_cosecha: aCosecha,
-      dias_en_cosecha: aNumero(fCult.dias_en_cosecha.value),
-      lineas_bancal: aNumero(fCult.lineas_bancal.value),
-      distancia_cm: aNumero(fCult.distancia_cm.value),
-      rinde_ref_kg_m2: aNumero(fCult.rinde_ref_kg_m2.value),
-      observaciones: fCult.observaciones.value.trim(),
-    }, yaEsta ? `${yaEsta} completado ✓` : `${nombre} agregado al catálogo ✓`);
-    // Se muestra ya, sin esperar a que vuelva del servicio: quien lo carga
-    // suele querer usarlo en el mismo momento.
-    const extra = catalogoExtra();
-    extra.cultivos = [...new Set([...(extra.cultivos || []), yaEsta || nombre])];
-    escribir(LS.catalogoExtra, extra);
-    render("configuracion");
-  };
-  }
+  prepararFormularioCultivo();
 
   // El formulario del plan por cultivo se mudo a Plan → Planificar, donde se
   // carga junto con sus generaciones. Editar el total por separado ya no tiene
@@ -271,4 +169,134 @@ function prepararConfiguracion() {
       }
     };
   });
+}
+
+/* El formulario para sumar un cultivo a la lista (tarjetaCultivoNuevo, en
+   componentes.js). Está en Configuración y en Plan → Cultivos. */
+function prepararFormularioCultivo() {
+  const fCult = $("#form-cultivo");
+  if (!fCult) return;
+  // Qué se pregunta depende de cómo se siembra. Un cultivo de siembra
+  // directa no tiene días en almácigo, y obligar a llenarlo empuja a poner
+  // un cero inventado, que es peor que un vacío: después no se distingue de
+  // un dato medido.
+  const conAlmacigo = () => /almácigo|almacigo/i.test(fCult.tipo_siembra.value);
+  const yaPlantado = () => /trasplante|esqueje/i.test(fCult.tipo_siembra.value);
+  const blAlm = $("#bloque-almacigo"), blDir = $("#bloque-directa");
+  const suma = $("#suma-cosecha");
+
+  const acomodar = () => {
+    const alm = conAlmacigo();
+    blAlm.hidden = !(alm || yaPlantado());
+    // Los días a cosecha nunca se preguntan cuando se pueden deducir: con
+    // almácigo son la suma de las dos etapas, y con un plantín ya hecho son
+    // los del trasplante a la cosecha. Preguntarlos igual abriría la puerta
+    // a que dos números de la misma fila se contradigan.
+    blDir.hidden = alm || yaPlantado();
+    fCult.dias_almacigo.parentElement.hidden = !alm;
+    // Los estacionales solo tienen sentido si el cultivo pasa por bandeja.
+    $("#bloque-estacion").hidden = !alm;
+    recalcular();
+  };
+
+  const recalcular = () => {
+    const b = aNumero(fCult.dias_trasplante_cosecha.value) || 0;
+    if (conAlmacigo()) {
+      const a = aNumero(fCult.dias_almacigo.value) || 0;
+      suma.textContent = (a && b)
+        ? `Días a cosecha: ${a + b}, contando desde la siembra.` : "";
+    } else if (yaPlantado()) {
+      suma.textContent = b
+        ? `Días a cosecha: ${b}, contando desde que se planta.` : "";
+    } else {
+      suma.textContent = "";
+    }
+  };
+
+  fCult.tipo_siembra.addEventListener("change", acomodar);
+  ["dias_almacigo", "dias_trasplante_cosecha"].forEach((n) =>
+    fCult[n].addEventListener("input", recalcular));
+  acomodar();
+
+  fCult.onsubmit = (e) => {
+  e.preventDefault();
+  const nombre = fCult.cultivo.value.trim();
+  if (!nombre) return aviso("Escribí el nombre del cultivo.", true);
+  // Se compara sin tildes ni mayúsculas: "Ají" y "aji" son el mismo. Un
+  // cultivo que ya tiene datos no se puede pisar desde el teléfono; uno que
+  // está sin datos sí se completa, que es el caso de los cinco que vinieron
+  // del catálogo viejo.
+  const yaEsta = cultivosDisponibles().find((c) => claveArea(c) === claveArea(nombre));
+  if (yaEsta && !cultivoSinDatos(yaEsta)) {
+    return aviso(`${yaEsta} ya está cargado con sus datos.`, true);
+  }
+  // Todo lo que se pregunta es obligatorio: un cultivo a medio cargar en el
+  // catálogo de seis chacras sirve menos que no tenerlo, porque nadie sabe
+  // si el hueco es un olvido o un dato que no aplica.
+  const alm = conAlmacigo();
+  const pedidos = [
+    ["dias_en_cosecha", "cuántos días dura la cosecha"],
+    ["lineas_bancal", "cuántas líneas por bancal"],
+    ["distancia_cm", "la distancia entre plantas"],
+    ["rinde_ref_kg_m2", "el rinde de referencia"],
+  ];
+  if (alm) pedidos.unshift(["dias_almacigo", "cuántos días lleva el almácigo"]);
+  if (alm || yaPlantado()) {
+    pedidos.push(["dias_trasplante_cosecha", "cuántos días del trasplante a la cosecha"]);
+  } else {
+    pedidos.push(["dias_a_cosecha", "cuántos días hasta la cosecha"]);
+  }
+  for (const [campo, comoSeLlama] of pedidos) {
+    if (!(aNumero(fCult[campo].value) > 0)) {
+      return aviso(`Falta ${comoSeLlama}.`, true);
+    }
+  }
+
+  const aCosecha = alm
+    ? (aNumero(fCult.dias_almacigo.value) || 0) + (aNumero(fCult.dias_trasplante_cosecha.value) || 0)
+    : yaPlantado()
+      ? aNumero(fCult.dias_trasplante_cosecha.value) || 0
+      : aNumero(fCult.dias_a_cosecha.value) || 0;
+
+  const datosCultivo = {
+    cultivo: yaEsta || nombre,
+    tipo_siembra: fCult.tipo_siembra.value,
+    dias_almacigo: alm ? aNumero(fCult.dias_almacigo.value) : "",
+    // Opcionales: si vienen vacíos se usa el de arriba en las dos estaciones.
+    dias_almacigo_oi: alm ? aNumero(fCult.dias_almacigo_oi.value) : "",
+    dias_almacigo_pv: alm ? aNumero(fCult.dias_almacigo_pv.value) : "",
+    dias_trasplante_cosecha: (alm || yaPlantado())
+      ? aNumero(fCult.dias_trasplante_cosecha.value) : "",
+    dias_a_cosecha: aCosecha,
+    dias_en_cosecha: aNumero(fCult.dias_en_cosecha.value),
+    lineas_bancal: aNumero(fCult.lineas_bancal.value),
+    distancia_cm: aNumero(fCult.distancia_cm.value),
+    rinde_ref_kg_m2: aNumero(fCult.rinde_ref_kg_m2.value),
+    observaciones: fCult.observaciones.value.trim(),
+  };
+  guardarRegistro("cultivo", datosCultivo,
+    yaEsta ? `${yaEsta} completado ✓` : `${nombre} agregado a la lista ✓`);
+  // Se muestra ya, sin esperar a que vuelva del servicio: quien lo carga
+  // suele querer usarlo en el mismo momento.
+  const extra = catalogoExtra();
+  extra.cultivos = [...new Set([...(extra.cultivos || []), yaEsta || nombre])];
+  // Y sus datos, para que el plan ya pueda usar sus días y su marco.
+  extra.perfiles = Object.assign({}, extra.perfiles, { [yaEsta || nombre]: datosCultivo });
+  escribir(LS.catalogoExtra, extra);
+  // En Configuración se queda ahí; en Plan → Cultivos, el cultivo nuevo
+  // queda elegido en el formulario de series: es lo que se iba a hacer.
+  if (vistaActual === "plan") {
+    render("plan", true);
+    const f = $("#form-generaciones");
+    const caja = f && f.querySelector('[data-buscador="cultivo"]');
+    if (caja) {
+      caja.querySelector(".buscador-texto").value = yaEsta || nombre;
+      caja.querySelector('input[type="hidden"]').value = yaEsta || nombre;
+      f.dispatchEvent(new Event("change"));
+      f.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  } else {
+    render("configuracion");
+  }
+  };
 }

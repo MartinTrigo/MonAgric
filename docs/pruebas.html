@@ -99,6 +99,24 @@ almacenamiento del teléfono.</p>
   igual("bandejas del plan: 198 plantas en bandejas de 128", [b.plantas, b.bandejas], [198, 2]);
   igual("bandejas con 72 alvéolos", bandejasDelPlan("Repollo bco", 1, 72).bandejas, 3);
 
+  // --- largo de bancal por sector (un macrotúnel de 40 m en una chacra de 30) ---
+  {
+    const cfgAntes = CFG;
+    CFG = { ...CFG, sectores: [{ sector: "Primavera", bancales: 25 }, { sector: "Macro", bancales: 4, largo_m: 40 }] };
+    try {
+      igual("largo por sector: el suyo, o el de la chacra", [largoDe("Primavera"), largoDe("Macro"), largoDe(""), largoDe("macro")], [30, 40, 30, 40]);
+      igual("m² y plantas de un bancal del macrotúnel", [bancalM2("Macro"), plantasDe({ bancales: 1, lineas: 3, distancia_cm: 45, sector: "Macro" })], [32, 3 * 88]);
+      const fila = filaDelPlan("Repollo bco", [
+        { cultivo: "Repollo bco", camas: 2, sector: "Primavera" },
+        { cultivo: "Repollo bco", camas: 1, sector: "Macro" },
+        { cultivo: "Lechuga", camas: 5, sector: "Primavera" }], { rinde: 5, lineas: 3, distancia: 45 });
+      igual("plan de un cultivo con generaciones en sectores de distinto largo",
+        [fila.superficie_m2, fila.cosecha_esperada_kg, fila.plantas], [2 * 24 + 32, 400, 2 * 198 + 264]);
+    } finally { CFG = cfgAntes; }
+  }
+  igual("los tiempos del catálogo de un cultivo, en una línea",
+    /almácigo.*del trasplante a la cosecha.*cosechando/.test(tiemposDelCultivo("Repollo bco")), true);
+
   // --- generaciones ---
   const gens = [
     { id: "gen-tomate-1", cultivo: "Tomate", generacion: 1, camas: 2, sector: "Primavera", bancales: "14, 15" },

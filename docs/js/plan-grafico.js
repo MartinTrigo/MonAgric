@@ -576,6 +576,7 @@ function prepararPlan() {
   prepararGeneraciones();
   prepararMapa();
   prepararEdicionCultivos();
+  prepararFormularioCultivo();
   prepararZoomPlan();
 }
 

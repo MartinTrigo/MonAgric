@@ -12,6 +12,12 @@
    "autores": "INTA",
    "url": "https://repositoriosdigitales.mincyt.gob.ar/vufind/Record/INTADig_b60670596352c09d959ab598c5d96993",
    "sirve": "plagas y enfermedades de la región"
+  },
+  {
+   "titulo": "Frutillas: implantación del cultivo en Patagonia",
+   "autores": "Miserendino, E. — INTA EEA Alto Valle",
+   "url": "https://repositorio.inta.gob.ar/handle/20.500.12123/17772",
+   "sirve": "marco de plantación, plantines y época para la región (frutilla)"
   }
  ],
  "fichas": {
@@ -183,6 +189,24 @@
    ],
    "presentacion": "Por kilo."
   },
+  "Cebolla de verdeo": {
+   "familia": "Amarilidáceas",
+   "especie": "Allium fistulosum",
+   "emoji": "🧅",
+   "resumen": "Cebolla de verdeo: no forma bulbo y se cosecha entera, por la hoja y el tallo blanco. Es rústica, rebrota después del corte y puede quedar en el bancal como cultivo semipermanente, dando cortes durante meses.\n\nSe multiplica por semilla o por división de mata, que es más rápido y no pierde tiempo en almácigo.",
+   "manejo": [
+    "Se puede dividir la mata y replantar, en vez de sembrar.",
+    "Aporcar para alargar el blanco, igual que el puerro.",
+    "Cortar dejando la base: rebrota varias veces.",
+    "Aguanta heladas y sigue dando en invierno."
+   ],
+   "problemas": [
+    "Trips en la hoja, sobre todo en seco.",
+    "Roya con otoños húmedos.",
+    "Blanco corto por falta de aporque."
+   ],
+   "presentacion": "Atado de 5 a 8 plantas."
+  },
   "Cherry": {
    "familia": "Solanáceas",
    "especie": "Solanum lycopersicum var. cerasiforme",
@@ -275,6 +299,25 @@
     "Pulgones en el envés."
    ],
    "presentacion": "Atado de 300 a 500 g."
+  },
+  "Frutilla": {
+   "familia": "Rosáceas",
+   "especie": "Fragaria × ananassa",
+   "emoji": "🍓",
+   "resumen": "Perenne: una misma plantación produce dos o tres temporadas, así que ocupa el bancal mucho más que una hortaliza. No se siembra: se planta con plantines, sean estolones enraizados o plantas frigo (guardadas en frío, que arrancan con más reservas).\n\nEn la Comarca se planta en primavera y se cosecha de diciembre a febrero; las variedades de día neutro (reflorecientes) siguen dando hasta el otoño.",
+   "manejo": [
+    "Lomo o camellón elevado con mulching: la fruta no toca la tierra y se cuida la humedad.",
+    "Doble hilera a tresbolillo: unos 30 cm entre hileras y 35 cm entre plantas.",
+    "Sacar los estolones que no se van a usar: debilitan la planta y bajan la producción.",
+    "Riego frecuente y localizado, mejor por goteo; túnel bajo en primavera contra las heladas tardías."
+   ],
+   "problemas": [
+    "Oídio: manchas blanquecinas en el envés y hojas que se enrulan.",
+    "Podredumbre de la fruta con tiempo húmedo: cosechar seguido y no mojar la fruta.",
+    "Mancha angular (bacteria) en la hoja.",
+    "Pulgones y trips, que además transmiten virus."
+   ],
+   "presentacion": "Cajita o bandeja de 250 a 500 g. Se cosecha a la mañana, casi toda roja, con el cáliz y un trozo de cabito."
   },
   "Habas": {
    "familia": "Fabáceas",

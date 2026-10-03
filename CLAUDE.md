@@ -161,6 +161,16 @@ va por partes**, no por `guardarConfig`.
 - El plan y los almácigos se recuerdan 5 minutos en el servidor, y los accesos
   2: lo editado a mano en la planilla tarda eso en verse.
 
+## Sectores con bancales de otro largo (03/10)
+
+Cada sector puede tener su propio largo de bancal (Configuración → Sectores;
+vacío = el de la chacra). Superficie, plantas, kilos, bandejas y plantines
+salen de `largoDe(sector)` / `bancalM2(sector)` en catalogo.js, y el plan de
+un cultivo suma cada generación con el largo de su sector (`filaDelPlan`). Una
+cuenta nueva de m² o de plantas va por ahí, nunca por `CFG.bancal.largo_m`.
+El sector y el bancal de una generación se cambian también desde el editor de
+Plan → Cultivos, no solo en el mapa (que en el teléfono no está).
+
 ## Áreas de trabajo
 
 Seis **fijas**, definidas en `AREAS_FIJAS` dentro de `js/catalogo.js`, iguales para

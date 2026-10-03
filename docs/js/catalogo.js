@@ -100,14 +100,24 @@ const DIAS_AVISO = 10;
 
 // Cuántas plantas entran en un bancal con ese marco. En tresbolillo las filas
 // se intercalan y entra unas 15% más de plantas en la misma superficie.
-function plantasPorBancal(lineas, distanciaCm, disposicion) {
-  const largoCm = (CFG?.bancal?.largo_m || 0) * 100;
+function plantasPorBancal(lineas, distanciaCm, disposicion, sector = "") {
+  const largoCm = largoDe(sector) * 100;
   if (!largoCm || !lineas || !distanciaCm) return 0;
   const porLinea = Math.floor(largoCm / distanciaCm);
   const total = porLinea * lineas;
   return disposicion === "Tresbolillo" ? Math.round(total * 1.15) : total;
 }
 const sectores = () => CFG?.sectores || [];
+
+/* El largo de los bancales de un sector: el suyo si lo tiene cargado, si no
+   el de la chacra. Hasta el 03/10 había uno solo para toda la chacra, y en
+   algunas los bancales de un sector miden 30 m y los de otro 40 (un
+   macrotúnel, un invernadero): la superficie, las plantas y los kilos de lo
+   que iba en el sector distinto salían mal. */
+const largoDe = (sector) => {
+  const s = sector ? sectores().find((x) => claveArea(x.sector) === claveArea(sector)) : null;
+  return Number(s?.largo_m) || Number(CFG?.bancal?.largo_m) || 0;
+};
 
 // ---- Áreas de trabajo ----
 // Un área es la clasificación del trabajo, no un emprendimiento: agrupa las
@@ -175,10 +185,25 @@ function opcionesArea(seleccionado = "", conVacio = true) {
     ${lista.map((a) => `<option${claveArea(a.nombre) === claveArea(seleccionado) ? " selected" : ""}>${esc(a.nombre)}</option>`).join("")}`;
 }
 const hayConfig = () => !!(CFG && CFG.sectores?.length);
-const bancalM2 = () => {
-  const b = CFG?.bancal || {};
-  return (b.largo_m || 0) * (b.ancho_m || 0);
-};
+// Los m² de un bancal de ese sector (sin sector: el largo de la chacra).
+const bancalM2 = (sector = "") => largoDe(sector) * (Number(CFG?.bancal?.ancho_m) || 0);
+
+/* La fila del plan de un cultivo, sumando sus generaciones. Cada una con el
+   largo de bancal de su sector, que puede no ser el de las demás. */
+function filaDelPlan(cultivo, generaciones, { rinde, lineas, distancia }) {
+  const k = claveArea(cultivo);
+  const suyas = generaciones.filter((g) => claveArea(g.cultivo) === k && Number(g.camas) > 0);
+  if (!suyas.length) return null;
+  let superficie = 0, plantas = 0;
+  suyas.forEach((g) => {
+    const camas = Number(g.camas) || 0;
+    superficie += camas * bancalM2(g.sector);
+    plantas += plantasDe({ bancales: camas, lineas, distancia_cm: distancia, sector: g.sector });
+  });
+  superficie = Math.round(superficie * 100) / 100;
+  return { cultivo, superficie_m2: superficie, cosecha_esperada_kg: Math.round(superficie * rinde),
+           rinde_kg_m2: rinde, lineas, distancia_cm: distancia, plantas };
+}
 
 // El plan por cultivo de la configuración sale de sus generaciones (decidido el
 // 28/09): superficie = camas × m² del bancal, kilos = superficie × rinde. Se
@@ -187,29 +212,18 @@ const bancalM2 = () => {
 // El rinde, las líneas y la distancia son decisiones del cultivo: se conservan.
 // Sin generaciones, el cultivo sale del plan.
 function replanearCultivo(cultivo, generaciones) {
-  const m2 = bancalM2();
-  if (!m2 || !CFG) return;
+  if (!bancalM2() || !CFG) return;
   const k = claveArea(cultivo);
   const ya = (CFG.plan || []).find((p) => claveArea(p.cultivo) === k);
   const plan = (CFG.plan || []).filter((p) => claveArea(p.cultivo) !== k);
-  const bancales = generaciones.filter((g) => claveArea(g.cultivo) === k)
-    .reduce((a, g) => a + (Number(g.camas) || 0), 0);
-  let fila = null;
-  if (bancales) {
-    const p = perfil(cultivo) || {};
-    const antes = ya || {};
-    const superficie = Math.round(bancales * m2 * 100) / 100;
-    const rinde = antes.rinde_kg_m2 || p.rinde_ref_kg_m2 || 0;
-    const lineas = antes.lineas || p.lineas_bancal || 0;
-    const distancia = antes.distancia_cm || p.distancia_cm || 0;
-    fila = {
-      cultivo: antes.cultivo || cultivo, superficie_m2: superficie,
-      cosecha_esperada_kg: Math.round(superficie * rinde),
-      rinde_kg_m2: rinde, lineas, distancia_cm: distancia,
-      plantas: plantasDe({ bancales, lineas, distancia_cm: distancia }),
-    };
-    plan.push(fila);
-  }
+  const p = perfil(cultivo) || {};
+  const antes = ya || {};
+  const fila = filaDelPlan(antes.cultivo || cultivo, generaciones, {
+    rinde: antes.rinde_kg_m2 || p.rinde_ref_kg_m2 || 0,
+    lineas: antes.lineas || p.lineas_bancal || 0,
+    distancia: antes.distancia_cm || p.distancia_cm || 0,
+  });
+  if (fila) plan.push(fila);
   // Sin generaciones y sin fila en el plan: no hay nada que cambiar.
   if (!fila && !ya) return;
   plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
@@ -247,8 +261,8 @@ const cultivosDelPlan = () => (CFG?.plan || [])
 
 // Cuántas plantas entran: las líneas del bancal por lo que da la distancia a lo
 // largo, por la cantidad de bancales.
-function plantasDe({ bancales, lineas, distancia_cm }) {
-  const largoCm = (CFG?.bancal?.largo_m || 0) * 100;
+function plantasDe({ bancales, lineas, distancia_cm, sector = "" }) {
+  const largoCm = largoDe(sector) * 100;
   if (!largoCm || !lineas || !distancia_cm) return 0;
   return Math.round(lineas * Math.floor(largoCm / distancia_cm) * bancales);
 }

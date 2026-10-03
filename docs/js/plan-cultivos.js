@@ -78,6 +78,22 @@ function formularioGeneracion(g) {
         <input type="date" name="campo" value="${esc(g.fecha_campo || "")}"${bloqueo}>
       </div>
     </div>
+    <!-- Dónde va. Antes solo se podía elegir en el mapa, que en el teléfono no
+         está: una generación cargada sin sector no tenía cómo recibirlo y había
+         que borrarla y cargarla de nuevo (03/10, un productor). -->
+    <div class="fila">
+      <div>
+        <label>Sector</label>
+        <select name="sector">
+          <option value="">Sin asignar</option>
+          ${sectores().map((s) => `<option${claveArea(s.sector) === claveArea(g.sector) ? " selected" : ""}>${esc(s.sector)}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label>Desde el bancal <small>(opcional)</small></label>
+        <input type="text" name="desde" inputmode="numeric" value="${bancalesDe(g).length ? Math.min(...bancalesDe(g)) : ""}">
+      </div>
+    </div>
     ${sembrada ? `<p class="nota">Ya se sembró: las fechas y el método son un hecho y no se cambian.</p>` : ""}
     <div class="editar-gen-botones">
       <button class="principal">Guardar</button>
@@ -179,6 +195,7 @@ function pantallaPlanificar() {
     <form id="form-generaciones">
       <label>Cultivo</label>
       ${buscadorCultivo("", "cultivo")}
+      <p class="nota" id="tiempos-cultivo"></p>
       <label>Variedad <small>(opcional)</small></label>
       <input type="text" name="variedad" maxlength="40" autocomplete="off" placeholder="Ej: Corazón de buey">
 
@@ -239,6 +256,7 @@ function pantallaPlanificar() {
 
       <button class="principal">Agregar al plan</button>
     </form>
+    ${tarjetaCultivoNuevo()}
     </div>
 
     <div class="planificar-lista">
@@ -410,14 +428,27 @@ function prepararEdicionCultivos() {
         if (directa && !campo) return aviso("Falta la fecha de siembra en el bancal.", true);
         if (!directa && !almacigo) return aviso("Falta la fecha de siembra en bandeja.", true);
       }
-      // Si estaba ubicada en el mapa y cambian los bancales, se acomoda desde
-      // el primero que tenía. Si no entra en el sector, queda sin ubicar.
-      let bancales = bancalesDe(g);
-      let sector = g.sector || "";
-      if (bancales.length && camas !== Number(g.camas)) {
-        const n = Number((sectores().find((s) => claveArea(s.sector) === claveArea(sector)) || {}).bancales) || 0;
-        bancales = n ? bancalesQueOcuparia({ camas }, Math.min(...bancales), n) : [];
-        if (!bancales.length) sector = "";
+      // Dónde va: el sector elegido y, si se dice, desde qué bancal. Si sigue
+      // en el mismo sector sin decir bancal, conserva los suyos (corridos si
+      // cambió la cantidad). Un sector sin bancal es válido: se ubica después.
+      const sector = f.sector.value;
+      const desde = parseInt(f.desde.value, 10) || 0;
+      if (desde && !sector) return aviso("Elegí el sector de ese bancal.", true);
+      const antes = bancalesDe(g);
+      const n = Number((sectores().find((s) => claveArea(s.sector) === claveArea(sector)) || {}).bancales) || 0;
+      const mismoSector = claveArea(sector) === claveArea(g.sector || "");
+      let bancales = [];
+      if (sector && n) {
+        if (desde) bancales = bancalesQueOcuparia({ camas }, desde, n);
+        else if (mismoSector && antes.length) {
+          bancales = camas === Number(g.camas) ? antes : bancalesQueOcuparia({ camas }, Math.min(...antes), n);
+        }
+      }
+      if (sector && bancales.length) {
+        const choques = chocanCon({ ...g, camas, fecha_almacigo: almacigo, fecha_campo: campo },
+          sector, bancales, todas());
+        if (choques.length && !confirm(`En ${sector} ${bancales.join(", ")} se superpone con ${
+          choques.slice(0, 3).map((x) => `${x.cultivo} G${x.generacion}`).join(", ")}.\n¿Ponerla igual?`)) return;
       }
       guardarGeneracion({ ...g, metodo, fecha_almacigo: almacigo, fecha_campo: campo,
                           camas, sector, bancales: bancales.join(", "),
@@ -509,6 +540,7 @@ function prepararGeneraciones() {
     const tipo = /almácigo|almacigo/i.test(p.tipo_siembra || "")
       ? "Trasplante" : "Siembra directa";
     f.metodo.value = tipo;
+    $("#tiempos-cultivo").innerHTML = tiemposDelCultivo(c);
     actualizar();
   };
 
@@ -517,13 +549,14 @@ function prepararGeneraciones() {
   const cuentas = () => {
     const bancales = (aNumero(f.camas.value) || 0)
       * Math.max(1, parseInt(f.cuantas.value, 10) || 1);
-    const m2 = bancalM2();
+    // Con el largo de bancal del sector elegido (o el de la chacra).
+    const m2 = bancalM2(f.sector.value);
     const superficie = bancales * m2;
     const rinde = aNumero(f.rinde.value) || 0;
     return {
       bancales, superficie,
       kg: Math.round(superficie * rinde),
-      plantas: plantasDe({ bancales,
+      plantas: plantasDe({ bancales, sector: f.sector.value,
         lineas: parseInt(f.lineas.value, 10) || 0,
         distancia_cm: aNumero(f.distancia.value) || 0 }),
     };
@@ -582,30 +615,9 @@ function prepararGeneraciones() {
     const directa = f.metodo.value === "Siembra directa";
     const camas = aNumero(f.camas.value) || "";
 
-    // El plan por cultivo se recalcula con TODAS sus generaciones, las que ya
-    // había y las nuevas. Antes ese total se cargaba aparte en Configuración y
-    // podía quedar diciendo una cosa mientras las generaciones decían otra.
-    const c = cuentas();
-    const bancalesPrevios = ya.reduce((a, g) => a + (Number(g.camas) || 0), 0);
-    const bancalesTotal = bancalesPrevios + c.bancales;
-    const m2 = bancalM2();
-    const superficie = bancalesTotal * m2;
     const rinde = aNumero(f.rinde.value) || 0;
     const lineas = parseInt(f.lineas.value, 10) || 0;
     const distancia = aNumero(f.distancia.value) || 0;
-    if (m2 && bancalesTotal) {
-      const plan = [...(CFG?.plan || [])].filter((p) => claveArea(p.cultivo) !== claveArea(cultivo));
-      const fila = {
-        cultivo,
-        superficie_m2: Math.round(superficie * 100) / 100,
-        cosecha_esperada_kg: Math.round(superficie * rinde),
-        rinde_kg_m2: rinde, lineas, distancia_cm: distancia,
-        plantas: plantasDe({ bancales: bancalesTotal, lineas, distancia_cm: distancia }),
-      };
-      plan.push(fila);
-      plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
-      guardarPartesDeConfig({ plan }, [["config_plan", fila]], "", "");
-    }
 
     // Las nuevas trasplantan igual que las que ya hay de este cultivo.
     const bandeja = directa ? 0 : diasBandejaDelCultivo(cultivo, existentes());
@@ -624,6 +636,18 @@ function prepararGeneraciones() {
         estado: "Planificado",
       }, `${fs.length} generación(es) de ${cultivo} al plan ✓`);
     });
+    // El plan por cultivo se recalcula con TODAS sus generaciones, las que ya
+    // había y las nuevas, cada una con el largo de bancal de su sector. Antes
+    // ese total se cargaba aparte en Configuración y podía quedar diciendo una
+    // cosa mientras las generaciones decían otra.
+    const fila = bancalM2() ? filaDelPlan(cultivo, existentes(), { rinde, lineas, distancia }) : null;
+    if (fila) {
+      const plan = [...(CFG?.plan || [])].filter((p) => claveArea(p.cultivo) !== claveArea(cultivo));
+      plan.push(fila);
+      plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo));
+      guardarPartesDeConfig({ plan }, [["config_plan", fila]], "", "");
+    }
+
     // Aparece ya en la lista y en el gráfico: sale de la copia local, que
     // incluye lo que todavía está en camino a la planilla.
     cultivoEditando = cultivo;

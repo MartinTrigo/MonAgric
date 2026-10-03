@@ -421,6 +421,9 @@ function atender(p) {
       // Sabe guardar la configuracion de a una parte (config_plan,
       // config_sector). Contra una version anterior la app guarda entera.
       cfg.parcial = true;
+      // Guarda el largo de bancal de cada sector (03/10). Contra una versión
+      // anterior la app no ofrece el campo: se perdería al guardar.
+      cfg.largo_por_sector = true;
       // Los encabezados de cada hoja, como los escribe este codigo. La app
       // lee los datos por esos nombres: si alguno que usa no esta, avisa en
       // vez de mostrar huecos en silencio.
@@ -578,7 +581,7 @@ function doPost(e) {
 //   chacra     | nombre    | Chacra Tica
 //   temporada  | nombre    | 2026-27
 //   bancal     | largo_m   | 30
-//   sector     | A         | 10      | Aspersión
+//   sector     | A         | 10      | Aspersión | fila | columna | largo m
 //   integrante | Marto     |
 //   plan       | Lechuga   | 150     | 720
 
@@ -629,9 +632,11 @@ function leerConfigDe(libro, chacra) {
          pasos de 25 px: columna = x / 25 + 1, fila = y / 25 + 1 (desde el
          28/09; antes eran fila y columna de una grilla, que nadie llego a
          usar). 0 = nunca se acomodo: el mapa lo pone solo. */
+      // Valor 5: el largo de sus bancales, si no es el de la chacra (03/10).
       cfg.sectores.push({ sector: clave, bancales: Number(f[2]) || 0,
                           tipo_riego: String(f[3] || ""),
-                          fila: Number(f[4]) || 0, columna: Number(f[5]) || 0 });
+                          fila: Number(f[4]) || 0, columna: Number(f[5]) || 0,
+                          largo_m: Number(f[6]) || "" });
     } else if (seccion === "integrante") cfg.integrantes.push(clave);
     // "proyecto" es como se llamaba antes: las filas viejas se siguen leyendo.
     else if (seccion === "area" || seccion === "proyecto") {
@@ -684,7 +689,7 @@ function guardarConfig(libro, cfg) {
   });
   (cfg.sectores || []).forEach(function (s) {
     filas.push(vacios(["sector", s.sector, s.bancales || 0, s.tipo_riego || "",
-                       s.fila || 0, s.columna || 0]));
+                       s.fila || 0, s.columna || 0, Number(s.largo_m) || ""]));
   });
   (cfg.integrantes || []).forEach(function (n) {
     filas.push(vacios(["integrante", n]));

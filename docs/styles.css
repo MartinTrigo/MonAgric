@@ -1622,3 +1622,9 @@ details.desplegable[open] > summary { margin-bottom: 8px; }
 /* Una parte de varias tarjetas (ver parte() en js/componentes.js): el
    envoltorio no ocupa lugar, las tarjetas se acomodan como si no estuviera. */
 .parte { display: contents; }
+
+/* Un botón que se ve como enlace: "Agregar «X» a la lista" en el buscador. */
+button.enlace {
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; color: var(--sage-dark); text-decoration: underline; cursor: pointer;
+}

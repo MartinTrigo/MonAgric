@@ -27,7 +27,7 @@ function prepararSiembras() {
   f.bandejas.addEventListener("input", (e) => { if (e.isTrusted) bandejasTocadas = true; });
   const sugerirBandejas = () => {
     if (!delPlan || bandejasTocadas || !EN_BANDEJA.has(f.tipo.value)) return;
-    const b = bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0);
+    const b = bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0, delPlan.sector);
     if (b) f.bandejas.value = b.bandejas;
   };
   if (siembraSugerida) {
@@ -75,7 +75,7 @@ function prepararSiembras() {
       partes.push(`<b>${num(total)}</b> plantines`);
       // Lo que pide el plan, para que la cuenta de las bandejas se vea.
       const b = delPlan && claveArea(delPlan.cultivo) === claveArea(f.cultivo.value)
-        ? bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0) : null;
+        ? bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0, delPlan.sector) : null;
       if (b) partes.push(`el plan pide <b>${num(b.plantas)} plantas</b> (${num(b.bancales, 1)} bancal(es),
         ${b.lineas} líneas a ${b.distancia} cm) = ${b.bandejas} bandeja(s) de ${b.alveolos}`);
       // Los días dependen de la estación: se cuentan desde la fecha de siembra.
@@ -217,13 +217,19 @@ function prepararTrasplantes() {
   const cuentas = () => {
     const lineas = aNumero(f.lineas.value) || 0;
     const dist = aNumero(f.distancia_cm.value) || 0;
-    const bancales = destinos().length;
+    const lugares = destinos();
+    const bancales = lugares.length;
     // Lo contado gana sobre lo calculado: si alguien los contó de verdad, ese
     // número vale más que multiplicar líneas por distancia.
     const contados = aNumero(f.plantines.value) || 0;
-    const porBancal = contados || plantasPorBancal(lineas, dist, f.disposicion.value);
-    return { lineas, dist, bancales, porBancal, contados,
-             total: Math.round(porBancal * bancales) };
+    // Cada bancal con el largo de su sector: pueden no medir lo mismo.
+    const enBancal = (sector) => contados || plantasPorBancal(lineas, dist, f.disposicion.value, sector);
+    const porBancal = enBancal(lugares[0] ? lugares[0].sector : "");
+    const porSector = lugares.map((l) => enBancal(l.sector));
+    const minimo = porSector.length ? Math.min(...porSector) : porBancal;
+    const maximo = porSector.length ? Math.max(...porSector) : porBancal;
+    return { lineas, dist, bancales, porBancal, contados, enBancal, minimo, maximo,
+             total: Math.round(bancales ? lugares.reduce((a, l) => a + enBancal(l.sector), 0) : 0) };
   };
 
   const recalcular = () => {
@@ -232,7 +238,9 @@ function prepararTrasplantes() {
     const s = elegido();
     const disponibles = s ? s.plantines : 0;
     const cambiado = c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm;
-    calculo.innerHTML = `<b>${num(c.porBancal)} plantines</b> por bancal`
+    calculo.innerHTML = (c.minimo !== c.maximo
+        ? `<b>${num(c.minimo)} a ${num(c.maximo)} plantines</b> por bancal <small>(según el largo de cada sector)</small>`
+        : `<b>${num(c.porBancal)} plantines</b> por bancal`)
       + (c.contados ? " <small>(contados)</small>" : "")
       + (c.bancales ? ` · ${c.bancales} bancal(es) elegidos = <b>${num(c.total)} plantines</b>` : "")
       + (cambiado && sugerido.lineas && !c.contados
@@ -357,7 +365,6 @@ function prepararTrasplantes() {
       // diferencia entre lo planificado y lo que de verdad pasó.
       marco: (c.lineas !== sugerido.lineas || c.dist !== sugerido.distancia_cm)
         ? "Modificado" : "Sugerido",
-      plantines: c.porBancal || "",
       operador: f.operador.value,
       observaciones: f.observaciones.value.trim(),
     };
@@ -365,7 +372,8 @@ function prepararTrasplantes() {
       ? "Trasplante guardado ✓"
       : `Trasplante guardado: ${lugares.length} bancales ✓`;
     lugares.forEach((l) => guardarRegistro("trasplantes",
-      Object.assign({}, comun, { sector: l.sector, bancal: l.bancal }), aviso_));
+      Object.assign({}, comun, { sector: l.sector, bancal: l.bancal,
+                                 plantines: c.enBancal(l.sector) || "" }), aviso_));
     render("trasplantes");
   };
 }

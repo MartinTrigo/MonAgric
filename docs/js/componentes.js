@@ -76,6 +76,121 @@ function renglonCosecha(i, valor = "", kg = "") {
   </div>`;
 }
 
+/* El formulario para sumar un cultivo a la lista de todas las chacras. Está
+   en Configuración y, desde el 03/10, también en Plan → Cultivos, que es
+   donde hace falta: ahí se nota que falta un cultivo, al ir a planificarlo.
+   Lo engancha prepararFormularioCultivo (configuracion.js). */
+function tarjetaCultivoNuevo() {
+  return `<details id="alta-cultivo">
+    <summary>¿No está en la lista? Agregar un cultivo</summary>
+    <p class="nota">Queda disponible para todas las chacras, no solo para la
+    tuya. Por eso conviene escribirlo como se lo conoce, y hay que cargar
+    todos los datos: un cultivo a medias no le sirve a nadie.</p>
+    ${cultivosPorCompletar().length ? `<p class="nota">Estos están en el
+    catálogo pero sin datos. Si cultivás alguno, escribí su nombre acá y
+    completalo: <b>${cultivosPorCompletar().map(esc).join(", ")}</b>.</p>` : ""}
+    <form id="form-cultivo">
+      <label>Nombre del cultivo</label>
+      <input type="text" name="cultivo" maxlength="40" placeholder="Ej: Cilantro" required>
+
+      <label>¿Cómo se siembra?</label>
+      <select name="tipo_siembra">
+        ${tiposSiembra().map((s) => `<option>${esc(s)}</option>`).join("")}
+      </select>
+
+      <div id="bloque-almacigo" class="fila">
+        <div>
+          <label>Días en almácigo <small>(de la siembra al trasplante)</small></label>
+          <input type="text" name="dias_almacigo" inputmode="numeric" placeholder="Ej: 35">
+        </div>
+        <div>
+          <label>De trasplante a cosecha</label>
+          <input type="text" name="dias_trasplante_cosecha" inputmode="numeric" placeholder="Ej: 52">
+        </div>
+      </div>
+      <!-- Opcionales a propósito: nadie sabe de memoria, parado en la
+           huerta, cuántos días tarda un pepinillo en invierno. Si quedan
+           vacíos el cultivo entra igual y se usa el número de arriba. -->
+      <div id="bloque-estacion" class="fila">
+        <div>
+          <label>Almácigo en invierno <small>(opcional)</small></label>
+          <input type="text" name="dias_almacigo_oi" inputmode="numeric" placeholder="Ej: 45">
+        </div>
+        <div>
+          <label>Almácigo en verano <small>(opcional)</small></label>
+          <input type="text" name="dias_almacigo_pv" inputmode="numeric" placeholder="Ej: 30">
+        </div>
+      </div>
+      <div class="fila">
+        <div id="bloque-directa">
+          <label>Días a cosecha <small>(desde la siembra)</small></label>
+          <input type="text" name="dias_a_cosecha" inputmode="numeric" placeholder="Ej: 87">
+        </div>
+        <div>
+          <label>Días en cosecha</label>
+          <input type="text" name="dias_en_cosecha" inputmode="numeric" placeholder="Ej: 30">
+        </div>
+      </div>
+      <p class="nota" id="suma-cosecha"></p>
+
+      <h3 class="sub">Marco de plantación</h3>
+      <div class="fila">
+        <div>
+          <label>Líneas por bancal</label>
+          <input type="text" name="lineas_bancal" inputmode="numeric" placeholder="Ej: 3">
+        </div>
+        <div>
+          <label>Distancia (cm)</label>
+          <input type="text" name="distancia_cm" inputmode="numeric" placeholder="Ej: 40">
+        </div>
+      </div>
+
+      <label>Rinde de referencia <small>(kg por m²)</small></label>
+      <input type="text" name="rinde_ref_kg_m2" inputmode="decimal" placeholder="Ej: 5,5">
+
+      <label>Observaciones <small>(lo único opcional)</small></label>
+      <input type="text" name="observaciones" maxlength="120"
+             placeholder="Variedad, de dónde salen los datos">
+
+      <button class="secundario">Agregar a la lista</button>
+    </form>
+  </details>`;
+}
+
+// Abre el formulario de cultivo nuevo con el nombre ya escrito (desde el
+// buscador, cuando lo que se busca no está).
+function abrirAltaCultivo(nombre = "") {
+  const d = $("#alta-cultivo");
+  if (!d) return;
+  d.open = true;
+  const f = d.querySelector("#form-cultivo");
+  if (f && nombre) f.cultivo.value = nombre;
+  d.scrollIntoView({ block: "start", behavior: "smooth" });
+  if (f) f.cultivo.focus({ preventScroll: true });
+}
+
+// Lo que dice el catálogo de los tiempos de un cultivo, en una línea. Es de
+// todas las chacras: se muestra, no se cambia acá (se corrige en el catálogo).
+function tiemposDelCultivo(cultivo) {
+  const p = perfil(cultivo) || {};
+  const conAlmacigo = /almácigo|almacigo/i.test(p.tipo_siembra || "");
+  const r = rangoAlmacigo(cultivo);
+  const partes = [];
+  if (conAlmacigo && (p.dias_almacigo || r)) {
+    partes.push(r ? `${r.min} a ${r.max} días en almácigo <small>(verano / invierno)</small>`
+                  : `${p.dias_almacigo} días en almácigo`);
+  }
+  const dePlantin = /trasplante|esqueje/i.test(p.tipo_siembra || "");
+  const aCosecha = conAlmacigo || dePlantin ? p.dias_trasplante_cosecha : p.dias_a_cosecha;
+  if (aCosecha) partes.push(`${aCosecha} días ${conAlmacigo ? "del trasplante"
+    : dePlantin ? "de la plantación" : "de la siembra en el bancal"} a la cosecha`);
+  const dura = p.dias_en_cosecha_max || p.dias_en_cosecha;
+  if (dura) partes.push(`${dura} días cosechando`);
+  return partes.length
+    ? `<b>Del catálogo:</b> ${partes.join(" · ")}.`
+    : `El catálogo no tiene los días de este cultivo: el plan va a dibujar una barra estimada.`;
+}
+
 // Enciende todos los buscadores que haya en un formulario.
 function enlazarBuscadores(form) {
   form.querySelectorAll("[data-buscador]").forEach((caja) => {
@@ -100,7 +215,10 @@ function enlazarBuscadores(form) {
         ? hallados.map((o, i) => `<div class="buscador-op${i === 0 ? " marcada" : ""}" data-valor="${esc(o)}">
              ${esc(o)}${destacadas.has(o) ? '<span class="del-plan">del plan</span>' : ""}
            </div>`).join("")
-        : `<div class="buscador-vacio">No hay ningún cultivo con ese nombre.</div>`;
+        : `<div class="buscador-vacio">No hay ningún cultivo con ese nombre.${
+            // Si en la pantalla está el formulario para sumar uno, se ofrece.
+            f && document.querySelector("#alta-cultivo")
+              ? ` <button type="button" class="enlace" data-agregar-cultivo="${esc(filtro.trim())}">Agregar «${esc(filtro.trim())}» a la lista</button>` : ""}</div>`;
       lista.hidden = false;
     };
 
@@ -136,6 +254,8 @@ function enlazarBuscadores(form) {
       }
     });
     lista.addEventListener("mousedown", (e) => {
+      const nuevo = e.target.closest("[data-agregar-cultivo]");
+      if (nuevo) { e.preventDefault(); abrirAltaCultivo(nuevo.dataset.agregarCultivo); return; }
       const op = e.target.closest(".buscador-op");
       if (op) { e.preventDefault(); elegir(op.dataset.valor); }
     });
@@ -237,7 +357,8 @@ const IMG_PACFARM =
 
 const filaSector = (s, i) => `<div class="registro">
   <div><div class="detalle">${esc(s.sector)}</div>
-    <div class="cuando">${esc(s.tipo_riego || "sin riego indicado")}</div></div>
+    <div class="cuando">${esc(s.tipo_riego || "sin riego indicado")}${
+      Number(s.largo_m) ? ` · bancales de ${num(s.largo_m, 1)} m` : ""}</div></div>
   <span class="etiqueta ok">${s.bancales} bancales</span>
   <button type="button" class="editar" data-editar-sector="${i}" aria-label="Editar">&#9998;</button>
   <button type="button" class="quitar" data-sector="${i}" aria-label="Quitar">&times;</button>

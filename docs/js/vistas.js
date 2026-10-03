@@ -567,7 +567,7 @@ const plantillas = {
           (leer(LS.generaciones, []) || [])
             .filter((g) => claveArea(g.sector) === claveArea(s.sector))
             .forEach((g) => bancalesDe(g).forEach((x) => tomados.add(x)));
-          const sup = n * m2;
+          const sup = n * bancalM2(s.sector);
           return `<div class="croquis">
             <div class="croquis-cab">
               <b>${esc(s.sector)}</b>
@@ -724,6 +724,10 @@ const plantillas = {
             </select>
           </div>
         </div>
+        ${CFG?.largo_por_sector ? `
+        <label>Largo de los bancales <small>(m · solo si es distinto del de la chacra${
+          Number(CFG?.bancal?.largo_m) ? `: ${num(CFG.bancal.largo_m, 1)} m` : ""})</small></label>
+        <input type="text" name="largo_m" inputmode="decimal" placeholder="Ej: 40 en el macrotúnel">` : ""}
         <button class="secundario" id="btn-sector">Agregar sector</button>
         <button type="button" class="secundario" id="btn-cancelar-sector" hidden>Cancelar</button>
       </form>
@@ -801,80 +805,7 @@ const plantillas = {
                       : `<p class="nota">Todavía no planificaste ningún cultivo.</p>`}
       </div>
 
-      <details id="alta-cultivo">
-        <summary>Agregar o completar un cultivo</summary>
-        <p class="nota">Queda disponible para todas las chacras, no solo para la
-        tuya. Por eso conviene escribirlo como se lo conoce, y hay que cargar
-        todos los datos: un cultivo a medias no le sirve a nadie.</p>
-        ${cultivosPorCompletar().length ? `<p class="nota">Estos están en el
-        catálogo pero sin datos. Si cultivás alguno, escribí su nombre acá y
-        completalo: <b>${cultivosPorCompletar().map(esc).join(", ")}</b>.</p>` : ""}
-        <form id="form-cultivo">
-          <label>Nombre del cultivo</label>
-          <input type="text" name="cultivo" maxlength="40" placeholder="Ej: Cilantro" required>
-
-          <label>¿Cómo se siembra?</label>
-          <select name="tipo_siembra">
-            ${tiposSiembra().map((s) => `<option>${esc(s)}</option>`).join("")}
-          </select>
-
-          <div id="bloque-almacigo" class="fila">
-            <div>
-              <label>Días en almácigo</label>
-              <input type="text" name="dias_almacigo" inputmode="numeric" placeholder="Ej: 35">
-            </div>
-            <div>
-              <label>De trasplante a cosecha</label>
-              <input type="text" name="dias_trasplante_cosecha" inputmode="numeric" placeholder="Ej: 52">
-            </div>
-          </div>
-          <!-- Opcionales a propósito: nadie sabe de memoria, parado en la
-               huerta, cuántos días tarda un pepinillo en invierno. Si quedan
-               vacíos el cultivo entra igual y se usa el número de arriba. -->
-          <div id="bloque-estacion" class="fila">
-            <div>
-              <label>Almácigo en invierno <small>(opcional)</small></label>
-              <input type="text" name="dias_almacigo_oi" inputmode="numeric" placeholder="Ej: 45">
-            </div>
-            <div>
-              <label>Almácigo en verano <small>(opcional)</small></label>
-              <input type="text" name="dias_almacigo_pv" inputmode="numeric" placeholder="Ej: 30">
-            </div>
-          </div>
-          <div class="fila">
-            <div id="bloque-directa">
-              <label>Días a cosecha <small>(desde la siembra)</small></label>
-              <input type="text" name="dias_a_cosecha" inputmode="numeric" placeholder="Ej: 87">
-            </div>
-            <div>
-              <label>Días en cosecha</label>
-              <input type="text" name="dias_en_cosecha" inputmode="numeric" placeholder="Ej: 30">
-            </div>
-          </div>
-          <p class="nota" id="suma-cosecha"></p>
-
-          <h3 class="sub">Marco de plantación</h3>
-          <div class="fila">
-            <div>
-              <label>Líneas por bancal</label>
-              <input type="text" name="lineas_bancal" inputmode="numeric" placeholder="Ej: 3">
-            </div>
-            <div>
-              <label>Distancia (cm)</label>
-              <input type="text" name="distancia_cm" inputmode="numeric" placeholder="Ej: 40">
-            </div>
-          </div>
-
-          <label>Rinde de referencia <small>(kg por m²)</small></label>
-          <input type="text" name="rinde_ref_kg_m2" inputmode="decimal" placeholder="Ej: 5,5">
-
-          <label>Observaciones <small>(lo único opcional)</small></label>
-          <input type="text" name="observaciones" maxlength="120"
-                 placeholder="Variedad, de dónde salen los datos">
-
-          <button class="secundario">Agregar al catálogo</button>
-        </form>
-      </details>
+      ${tarjetaCultivoNuevo()}
 
       <!-- El plan por cultivo se arma en Plan → Planificar, junto con sus
            generaciones y sus fechas. Estaba también acá, y eran las dos
