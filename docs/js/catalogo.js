@@ -57,6 +57,14 @@ const perfil = (cultivo) => {
 const actividades = () => CAT?.actividades || [];
 const tiposSiembra = () => CAT?.tipos_siembra || [];
 const tiposBandeja = () => CAT?.tipos_bandeja || [72, 128];
+// Un cajón (almaciguera sin alvéolos): los plantines no salen de multiplicar,
+// se cuentan o se estiman. Va en la columna Alvéolos con este nombre.
+const CAJON = "Cajón";
+// De dónde vienen los plantines. Si no son propios, la fecha de siembra es
+// teórica (se encargaron listos para una fecha) y no sirve para medir cuánto
+// tarda el cultivo en la bandeja.
+const ORIGENES = ["Propio", "Encargado", "Comprado"];
+const esPropio = (origen) => !origen || origen === "Propio";
 const tiposRiego = () => CAT?.tipos_riego || ["Aspersión", "Goteo"];
 const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 

@@ -83,7 +83,7 @@ const plantillas = {
       <h2>&#127793; Registrar siembra</h2>
       <div id="desde-el-plan"></div>
       <form id="form-siembras">
-        <label>Fecha</label>
+        <label id="rotulo-fecha-siembra">Fecha</label>
         <input type="date" name="fecha" value="${hoy()}" required>
 
         <label>Cultivo</label>
@@ -106,17 +106,29 @@ const plantillas = {
         </select>
 
         <div id="bloque-bandejas">
+          <!-- Encargados o comprados: no se sabe cuándo se sembraron, sí cuándo
+               llegan listos. La siembra queda con una fecha teórica. -->
+          <label>Plantines</label>
+          <select name="origen">
+            ${ORIGENES.map((o) => `<option value="${o}">${o === "Propio" ? "Los sembramos nosotros"
+              : o === "Encargado" ? "Encargados a otra persona" : "Comprados"}</option>`).join("")}
+          </select>
           <div class="fila">
             <div>
-              <label>Bandejas</label>
+              <label id="rotulo-bandejas">Bandejas</label>
               <input type="number" name="bandejas" value="1" min="1" max="999" inputmode="numeric">
             </div>
             <div>
               <label>Alvéolos por bandeja</label>
               <select name="tipo_bandeja">
                 ${tiposBandeja().map((v) => `<option${String(v) === "72" ? " selected" : ""}>${v}</option>`).join("")}
+                <option value="${CAJON}">${CAJON} (sin alvéolos)</option>
               </select>
             </div>
+          </div>
+          <div id="bloque-cajon" hidden>
+            <label>Plantines <small>(contados o estimados)</small></label>
+            <input type="number" name="plantines_cajon" min="1" max="99999" inputmode="numeric">
           </div>
         </div>
 

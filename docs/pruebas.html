@@ -138,17 +138,19 @@ almacenamiento del teléfono.</p>
       { cultivo: "Repollo bco", fecha_almacigo: "2026-09-15", fecha_campo: "2026-10-25" },
       { cultivo: "Repollo bco", fecha_almacigo: "2026-10-01", fecha_campo: "2026-10-31" }]), 40);
 
-  // --- el plan manda sobre la fecha estimada al sembrar (03/10: la berenjena
-  //     sembrada el 3/8 figuraba atrasada con el trasplante planeado al 16/10) ---
+  // --- planificado, real y previsto (03/10) ---
+  // La berenjena del plan: bandeja el 17/8, a campo el 16/10 (60 días en
+  // bandeja). Se encargó lista para el 20/10.
   {
     const getAntes = Storage.prototype.getItem;
+    const ber = { id: "gen-berenjena-1", cultivo: "Berenjena", generacion: 1, metodo: "Trasplante",
+      fecha_almacigo: "2026-08-17", fecha_campo: "2026-10-16", camas: 1, sembrada: true,
+      sembrada_el: "2026-08-21", siembra_id: "s-ber" };
     const datos = {
-      [LS.generaciones]: [{ id: "gen-berenjena-1", cultivo: "Berenjena", generacion: 1, metodo: "Trasplante",
-        fecha_almacigo: "2026-08-17", fecha_campo: "2026-10-16", camas: 1, sembrada: true,
-        sembrada_el: "2026-08-03", siembra_id: "s-ber" }],
+      [LS.generaciones]: [ber],
       [LS.almacigos]: [
-        { Id: "s-ber", Fecha: "2026-08-03", Cultivo: "Berenjena", Tipo: "Siembra almácigo", "Generación": 1,
-          Plantines: 144, "Trasplante estimado": "2026-09-02" },
+        { Id: "s-ber", Fecha: "2026-08-21", Cultivo: "Berenjena", Tipo: "Siembra almácigo", "Generación": 1,
+          Plantines: 144, "Trasplante estimado": "2026-09-20", Origen: "Encargado" },
         { Id: "s-alb", Fecha: "2026-09-05", Cultivo: "Albahaca", Tipo: "Siembra almácigo", "Generación": 1,
           Plantines: 384, "Trasplante estimado": "2026-10-15" }],
     };
@@ -157,25 +159,62 @@ almacenamiento del teléfono.</p>
     let guardada = null;
     guardarRegistro = (tipo, d) => { guardada = d; };
     render = () => {};
+    const campo = (v) => ({ value: v });
     try {
+      // El formulario de siembra: encargada, llega el 20/10.
+      const fs = fechasDeSiembra({ cultivo: campo("Berenjena"), tipo: campo("Siembra almácigo"),
+        generacion: campo("1"), origen: campo("Encargado"), fecha: campo("2026-10-20") });
+      igual("encargado: siembra teórica = llegada menos los días del plan, y la diferencia con lo planificado",
+        [fs.siembra, fs.trasplante, fs.planificada, fs.diferencia, fs.diasDe],
+        ["2026-08-21", "2026-10-20", "2026-08-17", 4, "del plan"]);
+      const propia = fechasDeSiembra({ cultivo: campo("Berenjena"), tipo: campo("Siembra almácigo"),
+        generacion: campo("1"), origen: campo("Propio"), fecha: campo("2026-08-14") });
+      igual("propia: trasplante previsto = siembra más los días del plan",
+        [propia.siembra, propia.trasplante, propia.diferencia], ["2026-08-14", "2026-10-13", -3]);
+
       const pend = almacigosPendientes();
-      const ber = pend.find((s) => s.id === "s-ber"), alb = pend.find((s) => s.id === "s-alb");
-      igual("para trasplantar: vale la fecha a campo del plan, no la estimada al sembrar", ber.objetivo, "2026-10-16");
-      igual("sin generación en el plan, vale la estimada al sembrar", alb.objetivo, "2026-10-15");
-      igual("lo atrasado se cuenta contra el plan", estadoAlmacigo(ber).dias, diasEntre(hoy(), "2026-10-16"));
-      const g = datos[LS.generaciones][0];
-      const t = tramosDe(g);
-      igual("sembrada: la barra arranca el día que se sembró y va a campo cuando dice el plan",
-        [t.inicio, t.campo], ["2026-08-03", "2026-10-16"]);
-      igual("en bandeja y sin trasplantar: se puede correr", esperaTrasplante(g, pend), true);
-      igual("ya trasplantada: no se corre", esperaTrasplante(g, pend.filter((s) => s.id !== "s-ber")), false);
+      const pb = pend.find((s) => s.id === "s-ber"), pa = pend.find((s) => s.id === "s-alb");
+      igual("para trasplantar: siembra más días del plan, no lo estimado el día que se cargó",
+        [pb.objetivo, pb.origen], ["2026-10-20", "Encargado"]);
+      igual("sin generación en el plan: los días del catálogo desde la siembra",
+        pa.objetivo, sumarDias("2026-09-05", diasAlmacigo("Albahaca", "2026-09-05")));
+
+      const t = tramosDe(ber);
+      igual("sembrada: la barra arranca en la siembra y el trasplante se prevé solo; el plan queda de base",
+        [t.inicio, t.campo, t.real.siembra, t.real.campo, t.plan.inicio, t.plan.campo],
+        ["2026-08-21", "2026-10-20", "2026-08-21", "", "2026-08-17", "2026-10-16"]);
+      const t2 = tramosDe({ ...ber, trasplantada_el: "2026-10-25" });
+      igual("trasplantada: la barra se corre al trasplante real y la cosecha cuenta desde ahí",
+        [t2.campo, t2.real.campo, t2.inicioCosecha],
+        ["2026-10-25", "2026-10-25", sumarDias("2026-10-25", perfil("Berenjena").dias_trasplante_cosecha)]);
+      const pendAntes = pendientes;
+      pendientes = [{ tipo: "trasplantes", datos: { siembra_id: "s-ber", cultivo: "Berenjena", generacion: 1, fecha: "2026-10-22" } }];
+      igual("un trasplante recién cargado (en la cola) ya corre la barra", tramosDe(ber).campo, "2026-10-22");
+      pendientes = pendAntes;
+      igual("sin sembrar: todo según el plan",
+        tramosDe({ ...ber, sembrada: false, sembrada_el: "" }).campo, "2026-10-16");
+
       correrGeneracion("gen-berenjena-1", 7);
-      igual("correr una sembrada mueve solo el trasplante",
-        [guardada?.fecha_almacigo, guardada?.fecha_campo], ["2026-08-17", "2026-10-23"]);
-      guardada = null;
-      correrGeneracion("gen-berenjena-1", -80);
-      igual("no se puede llevar al bancal antes de la siembra", guardada, null);
+      igual("una generación sembrada no se corre a mano", guardada, null);
     } finally { Storage.prototype.getItem = getAntes; ({ guardarRegistro, render } = frenar); }
+  }
+  // Corregir una siembra: la base planificada no se mueve; la diferencia sí.
+  {
+    const fila = { Id: "s9", Fecha: "2026-08-21", Cultivo: "Berenjena", Tipo: "Siembra almácigo",
+      "Generación": 1, Bandejas: 2, "Alvéolos": 72, Plantines: 144, Operador: "Marto",
+      Origen: "Encargado", "Fecha planificada": "2026-08-17", "Diferencia plan": 4 };
+    const caja = document.createElement("div");
+    caja.innerHTML = formularioCorreccion("siembras", fila);
+    const fc = caja.querySelector("form");
+    fc.elements.fecha.value = "2026-08-25";
+    const d = datosCorregidos("siembras", fila, fc);
+    igual("corregir la fecha de siembra recalcula la diferencia contra la misma base",
+      [d.fecha_planificada, d.diferencia_plan, d.origen], ["2026-08-17", 8, "Encargado"]);
+    const cajon = { Id: "s10", Fecha: "2026-09-04", Cultivo: "Puerro", Tipo: "Siembra almácigo",
+      "Generación": 1, Bandejas: 7, "Alvéolos": CAJON, Plantines: 2000, Operador: "Marto" };
+    caja.innerHTML = formularioCorreccion("siembras", cajon);
+    const d2 = datosCorregidos("siembras", cajon, caja.querySelector("form"));
+    igual("cajón: los plantines se cuentan, no se multiplican", [d2.tipo_bandeja, d2.plantines], [CAJON, 2000]);
   }
 
   // --- la cola por enviar se ve igual en el plan ---

@@ -79,16 +79,23 @@ var PANEL_ENCABEZADOS = ["Cultivo", "Bancales", "m² planificados", "Kg esperado
 var HOJAS = {
   siembras: {
     nombre: "Siembras",
+    // Las tres ultimas (03/10) van al final para no correr las filas que ya
+    // estaban. "Origen": Propio, Encargado o Comprado; si no es propio, la
+    // fecha de siembra es teorica (llegada menos los dias en bandeja) y no
+    // sirve para medir cuanto tarda el cultivo. "Fecha planificada" es la del
+    // plan el dia que se registro: queda congelada aca aunque despues el plan
+    // se corra, y la diferencia se puede estudiar temporada tras temporada.
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Variedad", "Tipo", "Generación",
                   "Bandejas", "Alvéolos", "Plantines", "Sector", "Bancal",
                   "Trasplante estimado", "Cosecha estimada", "Operador", "Observaciones",
-                  "Cargado por", "Recibido"],
+                  "Cargado por", "Recibido", "Origen", "Fecha planificada", "Diferencia plan"],
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.variedad || "", d.tipo, d.generacion,
               d.bandejas || "", d.tipo_bandeja || "", d.plantines || "", d.sector || "", d.bancal || "",
               d.trasplante_estimado || "", d.cosecha_estimada || "", d.operador || "",
-              d.observaciones || "", r.dispositivo || "", new Date()];
+              d.observaciones || "", r.dispositivo || "", new Date(),
+              d.origen || "", d.fecha_planificada || "", numeroOVacio(d.diferencia_plan)];
     },
   },
   tareas: {
@@ -144,7 +151,12 @@ var HOJAS = {
                   "Días en almácigo", "Días teóricos", "Diferencia días",
                   "Cultivo", "Variedad", "Generación", "Sector", "Bancal",
                   "Líneas", "Distancia cm", "Disposición", "Marco", "Plantines",
-                  "Operador", "Observaciones", "Cargado por", "Recibido"],
+                  "Operador", "Observaciones", "Cargado por", "Recibido",
+                  "Fecha planificada", "Diferencia plan"],
+    // Dos diferencias distintas, que no conviene mezclar: "Diferencia días"
+    // es contra el CATALOGO (cuanto tarda de verdad el cultivo aca: calibra
+    // el catalogo), y "Diferencia plan" es contra lo PLANIFICADO (si se hizo
+    // cuando se dijo: mide el cumplimiento del plan). Las dos ultimas, 03/10.
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.siembra_id || "",
@@ -153,7 +165,8 @@ var HOJAS = {
               d.cultivo, d.variedad || "", d.generacion || 1, d.sector || "", d.bancal || "",
               d.lineas || "", d.distancia_cm || "", d.disposicion || "",
               d.marco || "", d.plantines || "",
-              d.operador || "", d.observaciones || "", r.dispositivo || "", new Date()];
+              d.operador || "", d.observaciones || "", r.dispositivo || "", new Date(),
+              d.fecha_planificada || "", numeroOVacio(d.diferencia_plan)];
     },
   },
   // Se cosecha de varios bancales a la vez, asi que se registran los kilos
@@ -424,6 +437,9 @@ function atender(p) {
       // Guarda el largo de bancal de cada sector (03/10). Contra una versión
       // anterior la app no ofrece el campo: se perdería al guardar.
       cfg.largo_por_sector = true;
+      // Plan contra real (03/10): las generaciones traen su trasplante real y
+      // Siembras / Trasplantes guardan la fecha planificada y el origen.
+      cfg.seguimiento = true;
       // Los encabezados de cada hoja, como los escribe este codigo. La app
       // lee los datos por esos nombres: si alguno que usa no esta, avisa en
       // vez de mostrar huecos en silencio.
@@ -1196,6 +1212,26 @@ function generacionesDelPlan(chacra) {
     return null;
   };
 
+  /* Cuando se trasplanto de verdad cada generacion (03/10). Con esto el plan
+     corre solo: la barra se acomoda a la fecha real, y la cosecha se cuenta
+     desde ahi. Se cruza por la siembra de origen, que es el vinculo firme; si
+     el trasplante no la tiene (se puede cargar sin elegir almacigo), por
+     cultivo y generacion. Si una generacion se planto en varios dias, vale el
+     primero: es cuando empezo a ocupar el campo. */
+  var trasplantadas = { porSiembra: {}, porGeneracion: {} };
+  var ht = libro.getSheetByName(HOJAS.trasplantes.nombre);
+  if (ht && ht.getLastRow() > 1) {
+    ht.getRange(2, 1, ht.getLastRow() - 1, 11).getValues().forEach(function (f) {
+      if (!f[0] || !f[2]) return;
+      var cuando = texto(f[2]);
+      var poner = function (mapa, llave) {
+        if (llave && (!mapa[llave] || cuando < mapa[llave])) mapa[llave] = cuando;
+      };
+      poner(trasplantadas.porSiembra, String(f[3] || ""));
+      poner(trasplantadas.porGeneracion, claveCultivo(f[8]) + "|" + (Number(f[10]) || 1));
+    });
+  }
+
   return hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length)
     .getValues()
     .filter(function (f) { return f[0] && f[2]; })
@@ -1204,6 +1240,8 @@ function generacionesDelPlan(chacra) {
       // El dia que toca sembrar: la bandeja si va por almacigo, el bancal si
       // es siembra directa.
       var real = buscarSiembra(String(f[2]), gen, texto(f[5]) || texto(f[6]));
+      var trasplantada = (real && trasplantadas.porSiembra[real.id])
+        || trasplantadas.porGeneracion[claveCultivo(f[2]) + "|" + gen] || "";
       return {
         id: String(f[0]), cultivo: String(f[2]), generacion: gen,
         metodo: String(f[4] || ""), fecha_almacigo: texto(f[5]),
@@ -1221,6 +1259,8 @@ function generacionesDelPlan(chacra) {
         sembrada: !!real,
         siembra_id: real ? real.id : "",
         sembrada_el: real ? real.fecha : "",
+        // Solo en almacigo: en siembra directa la siembra ES la ida al campo.
+        trasplantada_el: texto(f[5]) ? trasplantada : "",
         variedad: String(f[13] || ""),
       };
     });
@@ -1256,6 +1296,8 @@ function fichaDeCultivo(chacra, cultivo) {
       plantines: Number(f[9]) || 0, sector: String(f[10] || ""),
       bancal: String(f[11] || ""), trasplante_estimado: texto(f[12]),
       cosecha_estimada: texto(f[13]), operador: String(f[14] || ""),
+      origen: String(f[18] || ""), fecha_planificada: texto(f[19]),
+      diferencia_plan: f[20] === "" ? "" : Number(f[20]),
     };
   });
 
@@ -1268,6 +1310,8 @@ function fichaDeCultivo(chacra, cultivo) {
       bancal: String(f[12] || ""), lineas: Number(f[13]) || 0,
       distancia_cm: Number(f[14]) || 0, marco: String(f[16] || ""),
       plantines: Number(f[17]) || 0,
+      fecha_planificada: texto(f[22]),
+      diferencia_plan: f[23] === "" ? "" : Number(f[23]),
     };
   });
 
@@ -1319,6 +1363,9 @@ function almacigosEsperando(chacra) {
         Variedad: String(f[4] || ""), Tipo: String(f[5] || ""),
         "Generación": Number(f[6]) || 1, Plantines: Number(f[9]) || 0,
         "Trasplante estimado": texto(f[12]),
+        // Encargado o comprado: su fecha de siembra es teorica y el
+        // trasplante no mide dias reales en bandeja.
+        Origen: String(f[18] || ""),
       };
     });
 }
@@ -2239,8 +2286,24 @@ function obtenerHoja(libro, def) {
       hoja.clear();
       ponerEncabezados(hoja, def.encabezados);
     }
+    return hoja;
+  }
+  // Con datos: si a la hoja le faltan columnas AL FINAL (las que se suman con
+  // el tiempo, como Origen en Siembras el 03/10), se escriben sus titulos. Las
+  // que ya estaban no se tocan: los datos se leen por posicion.
+  var ancho = hoja.getLastColumn();
+  if (ancho < def.encabezados.length) {
+    hoja.getRange(1, ancho + 1, 1, def.encabezados.length - ancho)
+        .setValues([def.encabezados.slice(ancho)])
+        .setFontWeight("bold").setBackground("#DCE9DD");
   }
   return hoja;
+}
+
+// Un numero, o vacio si no hay: el cero es un dato ("justo a tiempo") y no
+// tiene que quedar como celda vacia.
+function numeroOVacio(v) {
+  return (v === 0 || v === "0") ? 0 : (v === "" || v == null || isNaN(Number(v)) ? "" : Number(v));
 }
 
 function ponerEncabezados(hoja, encabezados) {

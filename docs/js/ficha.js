@@ -41,24 +41,28 @@ function fichaCultivo(cultivo) {
   const generaciones = siembras.map((s) => {
     const suyos = porSiembra[s.id] || [];
     // Las fechas, de lo más firme a lo menos: lo que pasó (el trasplante
-    // registrado), lo que dice hoy el plan, y lo que se estimó el día de la
-    // siembra. Las estimadas de la hoja Siembras son una foto de ese día: si
-    // el plan se corrió después, mostrarlas contradecía al Plan estratégico.
-    // Una siembra directa no tiene trasplante: su cosecha sale de la siembra.
-    const plan = EN_BANDEJA.has(s.tipo)
-      ? trasplanteDelPlan({ cultivo, generacion: s.generacion, id: s.id }) : "";
-    const aCampo = suyos.length ? suyos[0].fecha : plan;
+    // registrado) y, si todavía no pasó, lo previsto desde la siembra con los
+    // días en bandeja del plan (ver trasplantePrevisto). Una siembra directa
+    // no tiene trasplante: su cosecha sale de la siembra.
+    const previsto = EN_BANDEJA.has(s.tipo)
+      ? trasplantePrevisto({ cultivo, generacion: s.generacion, id: s.id, fecha: s.fecha,
+                             estimado: s.trasplante_estimado }) : "";
+    const aCampo = suyos.length ? suyos[0].fecha : previsto;
     const inicio = aCampo && p.dias_trasplante_cosecha
       ? sumarDias(aCampo, p.dias_trasplante_cosecha) : (s.cosecha_estimada || "");
     const dura = p.dias_en_cosecha_max || p.dias_en_cosecha || 0;
     const fin = inicio && dura ? sumarDias(inicio, dura) : "";
+    // Dos medidas: contra el plan (¿se hizo cuando se dijo?) y contra el
+    // catálogo (¿cuánto tarda de verdad acá?). La segunda solo con plantines
+    // propios: de uno encargado no se sabe cuándo se sembró.
     const real = suyos.length
-      ? `trasplantado el ${fechaCorta(suyos[0].fecha)} · ${suyos[0].dias_reales} días en bandeja`
-        + (suyos[0].diferencia
-            ? ` <b>(${suyos[0].diferencia > 0 ? "+" : ""}${suyos[0].diferencia} vs. lo teórico)</b>`
-            : "")
-      : plan ? `el plan lo trasplanta el ${fechaCorta(plan)}`
-      : (s.trasplante_estimado ? `trasplante estimado ${fechaCorta(s.trasplante_estimado)}` : "");
+      ? `trasplantado el ${fechaCorta(suyos[0].fecha)}`
+        + (suyos[0].diferencia_plan !== "" && suyos[0].diferencia_plan != null
+            ? ` · <b>${textoDiferencia(suyos[0].diferencia_plan)} contra el plan</b>` : "")
+        + (esPropio(s.origen) && suyos[0].dias_reales
+            ? ` · ${suyos[0].dias_reales} días en bandeja${suyos[0].diferencia
+                ? ` (${textoDiferencia(suyos[0].diferencia)} contra el catálogo)` : ""}` : "")
+      : previsto ? `trasplante previsto el ${fechaCorta(previsto)}` : "";
     const donde = suyos.length
       ? suyos.map((t) => `${t.sector} ${t.bancal}`).join(", ")
       : (s.sector ? `${s.sector} ${s.bancal}` : "");
@@ -66,7 +70,10 @@ function fichaCultivo(cultivo) {
       <div>
         <div class="detalle">G${s.generacion}${s.variedad ? " · " + esc(s.variedad) : ""}
           ${donde ? `<small>${esc(donde)}</small>` : ""}</div>
-        <div class="cuando">sembrado el ${fechaCorta(s.fecha)}${
+        <div class="cuando">${esPropio(s.origen)
+            ? `sembrado el ${fechaCorta(s.fecha)}${s.diferencia_plan !== "" && s.diferencia_plan != null
+                ? ` <b>(${textoDiferencia(s.diferencia_plan)} contra el plan)</b>` : ""}`
+            : `${esc(String(s.origen).toLowerCase())} · siembra teórica ${fechaCorta(s.fecha)}`}${
           s.plantines ? " · " + num(s.plantines) + " plantines" : ""}<br>${real}</div>
       </div>
       ${inicio ? `<span class="etiqueta ok">cosecha ${fechaCorta(inicio)}${

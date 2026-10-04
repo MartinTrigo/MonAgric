@@ -141,8 +141,10 @@ let registroEditando = "";   // "tipo|id"
 const CORRECCION = {
   siembras: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
     ["variedad", "Variedad", "texto"], ["generacion", "Generación", "numero"],
-    ["tipo", "Tipo", "tipoSiembra"], ["bandejas", "Bandejas", "numero"],
-    ["tipo_bandeja", "Alvéolos", "alveolos"], ["sector", "Sector (directa)", "sector"],
+    ["tipo", "Tipo", "tipoSiembra"], ["origen", "Plantines", "origen"],
+    ["bandejas", "Bandejas o cajones", "numero"],
+    ["tipo_bandeja", "Alvéolos", "alveolos"], ["plantines", "Plantines (solo cajón)", "numero"],
+    ["sector", "Sector (directa)", "sector"],
     ["bancal", "Bancal (directa)", "numero"], ["operador", "Operador", "persona"],
     ["observaciones", "Observaciones", "texto"]],
   trasplantes: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
@@ -165,13 +167,15 @@ const DE_LA_HOJA = {
     generacion: "Generación", bandejas: "Bandejas", tipo_bandeja: "Alvéolos",
     plantines: "Plantines", sector: "Sector", bancal: "Bancal",
     trasplante_estimado: "Trasplante estimado", cosecha_estimada: "Cosecha estimada",
-    operador: "Operador", observaciones: "Observaciones" },
+    operador: "Operador", observaciones: "Observaciones",
+    origen: "Origen", fecha_planificada: "Fecha planificada", diferencia_plan: "Diferencia plan" },
   trasplantes: { fecha: "Fecha", siembra_id: "Siembra origen", fecha_siembra: "Fecha siembra",
     dias_almacigo_real: "Días en almácigo", dias_almacigo_teorico: "Días teóricos",
     diferencia_dias: "Diferencia días", cultivo: "Cultivo", variedad: "Variedad",
     generacion: "Generación", sector: "Sector", bancal: "Bancal", lineas: "Líneas",
     distancia_cm: "Distancia cm", disposicion: "Disposición", marco: "Marco",
-    plantines: "Plantines", operador: "Operador", observaciones: "Observaciones" },
+    plantines: "Plantines", operador: "Operador", observaciones: "Observaciones",
+    fecha_planificada: "Fecha planificada", diferencia_plan: "Diferencia plan" },
   cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó" },
   horas: { fecha: "Fecha", integrante: "Integrante", horas: "Horas", actividad: "Actividad",
     area: "Área", observaciones: "Observaciones" },
@@ -190,7 +194,8 @@ function campoCorreccion([k, rotulo, clase], v) {
   else if (clase === "numero") campo = `<input type="text" name="${k}" inputmode="decimal" value="${esc(val)}">`;
   else if (clase === "cultivo") campo = `<select name="${k}">${opciones(cultivosOrdenados().lista)}</select>`;
   else if (clase === "tipoSiembra") campo = `<select name="${k}">${opciones(tiposSiembra())}</select>`;
-  else if (clase === "alveolos") campo = `<select name="${k}">${opciones(tiposBandeja().map(String))}</select>`;
+  else if (clase === "alveolos") campo = `<select name="${k}">${opciones([...tiposBandeja().map(String), CAJON])}</select>`;
+  else if (clase === "origen") campo = `<select name="${k}">${opciones(ORIGENES)}</select>`;
   else if (clase === "disposicion") campo = `<select name="${k}">${opciones(DISPOSICIONES)}</select>`;
   else if (clase === "persona") campo = `<select name="${k}">${opciones(integrantes())}</select>`;
   else if (clase === "sector") campo = `<select name="${k}"><option value="">—</option>${
@@ -223,21 +228,38 @@ function datosCorregidos(tipo, f, form) {
     const v = form.elements[k] ? form.elements[k].value.trim() : d[k];
     d[k] = clase === "numero" ? (v === "" ? "" : aNumero(v)) : v;
   });
+  // La diferencia con el plan se recalcula contra la fecha planificada que
+  // quedó congelada al cargarlo: corregir la fecha real no mueve la base.
+  const contraPlan = () => {
+    const base = d.fecha_planificada ? aFechaISO(d.fecha_planificada) : "";
+    d.fecha_planificada = base;
+    d.diferencia_plan = base && d.fecha ? diasEntre(base, d.fecha) : "";
+  };
   if (tipo === "siembras") {
     d.generacion = parseInt(d.generacion, 10) || 1;
     const conBandeja = EN_BANDEJA.has(d.tipo);
+    const cajon = d.tipo_bandeja === CAJON;
     d.bandejas = conBandeja ? parseInt(d.bandejas, 10) || 0 : 0;
-    d.tipo_bandeja = conBandeja ? parseInt(d.tipo_bandeja, 10) || 0 : 0;
-    d.plantines = conBandeja ? d.bandejas * d.tipo_bandeja : 0;
+    d.tipo_bandeja = !conBandeja ? 0 : cajon ? CAJON : parseInt(d.tipo_bandeja, 10) || 0;
+    // En un cajón los plantines se cuentan; en bandejas salen de multiplicar.
+    d.plantines = !conBandeja ? 0 : cajon ? (parseInt(d.plantines, 10) || 0) : d.bandejas * d.tipo_bandeja;
     if (conBandeja) { d.sector = ""; d.bancal = ""; }
+    d.origen = conBandeja ? (d.origen || "Propio") : "Propio";
     const p = perfil(d.cultivo) || {};
-    d.trasplante_estimado = conBandeja ? sumarDias(d.fecha, diasAlmacigo(d.cultivo, d.fecha)) : "";
-    d.cosecha_estimada = sumarDias(d.fecha, d.tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha);
+    const g = generacionDeSiembra(d.cultivo, d.generacion, f.Id);
+    const dias = conBandeja ? diasBandejaDe(d.cultivo, g, d.fecha) : 0;
+    d.trasplante_estimado = conBandeja && dias ? sumarDias(d.fecha, dias) : "";
+    d.cosecha_estimada = d.trasplante_estimado && p.dias_trasplante_cosecha
+      ? sumarDias(d.trasplante_estimado, p.dias_trasplante_cosecha)
+      : sumarDias(d.fecha, d.tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha);
+    contraPlan();
   } else if (tipo === "trasplantes") {
     d.generacion = parseInt(d.generacion, 10) || 1;
-    const real = d.fecha_siembra ? diasEntre(String(d.fecha_siembra).slice(0, 10), d.fecha) : null;
+    const real = d.fecha_siembra && d.dias_almacigo_teorico !== ""
+      ? diasEntre(String(d.fecha_siembra).slice(0, 10), d.fecha) : null;
     d.dias_almacigo_real = real === null ? "" : real;
     d.diferencia_dias = real === null || !d.dias_almacigo_teorico ? "" : real - Number(d.dias_almacigo_teorico);
+    contraPlan();
   }
   return d;
 }
@@ -248,11 +270,17 @@ function datosCorregidos(tipo, f, form) {
    manda su esquema con la configuración, y esto compara. */
 function columnasQueFaltan(esquema) {
   if (!esquema) return [];        // servicio anterior: no lo manda
+  // Las columnas de plan contra real (03/10) son nuevas: contra un servicio
+  // que todavía no las tiene no es un error, solo no se guardan.
+  const anterior = Array.isArray(esquema.siembras) && !esquema.siembras.includes("Origen");
+  const NUEVAS = new Set(["Origen", "Fecha planificada", "Diferencia plan"]);
   const faltan = [];
   Object.entries(DE_LA_HOJA).forEach(([hoja, campos]) => {
     if (!Array.isArray(esquema[hoja])) return;
     const hay = new Set(esquema[hoja]);
-    ["Id", ...Object.values(campos)].forEach((c) => { if (!hay.has(c)) faltan.push(`${hoja} «${c}»`); });
+    ["Id", ...Object.values(campos)].forEach((c) => {
+      if (!hay.has(c) && !(anterior && NUEVAS.has(c))) faltan.push(`${hoja} «${c}»`);
+    });
   });
   return faltan;
 }

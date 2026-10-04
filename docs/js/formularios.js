@@ -6,6 +6,38 @@
 // Los archivos se cargan en orden (ver index.html) y comparten el espacio
 // global: no son módulos. Se partió app.js el 30/09/2026 sin cambiar código.
 
+/* Las fechas de una siembra, tal como quedan guardadas.
+   - Propia: la fecha es la del formulario. Encargada o comprada: el
+     formulario dice cuándo llega lista, y la siembra queda con una fecha
+     teórica (llegada menos los días en bandeja). Así el plan y el gráfico
+     siguen andando igual, y la medición de días en bandeja la ignora.
+   - Prevista de trasplante y de cosecha: desde la siembra, con los días que
+     el plan le dio a esa generación (o los del catálogo).
+   - Planificada: la de la generación del plan; queda congelada en el
+     registro junto con la diferencia, para estudiarla después. */
+function fechasDeSiembra(f) {
+  const cultivo = f.cultivo.value;
+  const tipo = f.tipo.value;
+  const conBandeja = EN_BANDEJA.has(tipo);
+  const g = cultivo ? generacionDeSiembra(cultivo, parseInt(f.generacion.value, 10) || 1) : null;
+  const p = perfil(cultivo) || {};
+  const propio = !conBandeja || esPropio(f.origen?.value);
+  const delPlan = g && g.fecha_almacigo && g.fecha_campo && diasEntre(g.fecha_almacigo, g.fecha_campo) > 0;
+  // Para los días por estación hace falta una fecha de siembra: la del
+  // formulario si es propia; si llega hecha, la que planificó el plan.
+  const dias = conBandeja ? diasBandejaDe(cultivo, g, propio ? f.fecha.value : (g?.fecha_almacigo || f.fecha.value)) : 0;
+  const siembra = propio ? f.fecha.value : (dias ? sumarDias(f.fecha.value, -dias) : "");
+  const trasplante = conBandeja ? (propio ? (dias ? sumarDias(siembra, dias) : "") : f.fecha.value) : "";
+  const planificada = g ? (conBandeja ? (g.fecha_almacigo || g.fecha_campo) : (g.fecha_campo || g.fecha_almacigo)) : "";
+  const cosecha = conBandeja
+    ? (trasplante && p.dias_trasplante_cosecha ? sumarDias(trasplante, p.dias_trasplante_cosecha)
+       : (siembra && p.dias_a_cosecha ? sumarDias(siembra, p.dias_a_cosecha) : ""))
+    : (siembra ? sumarDias(siembra, tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha) : "");
+  return { siembra, trasplante, cosecha, dias, planificada,
+           diasDe: delPlan ? "del plan" : "del catálogo",
+           diferencia: planificada && siembra ? diasEntre(planificada, siembra) : "" };
+}
+
 function prepararSiembras() {
   const f = $("#form-siembras");
   // Si el teléfono todavía no está activado, la vista muestra la tarjeta
@@ -62,48 +94,50 @@ function prepararSiembras() {
   }
   f.tipo_bandeja.addEventListener("change", sugerirBandejas);
 
+  // Cajón: no tiene alvéolos, los plantines se cuentan o se estiman.
+  const enCajon = () => f.tipo_bandeja.value === CAJON;
+  const plantinesDe = () => (enCajon()
+    ? parseInt(f.plantines_cajon.value, 10) || 0
+    : (parseInt(f.bandejas.value, 10) || 0) * (parseInt(f.tipo_bandeja.value, 10) || 0));
+
   const actualizar = () => {
     const tipo = f.tipo.value;
     const conBandeja = EN_BANDEJA.has(tipo);
     bandejas.style.display = conBandeja ? "" : "none";
     lugar.style.display = conBandeja ? "none" : "";
+    $("#bloque-cajon").hidden = !enCajon();
+    $("#rotulo-bandejas").textContent = enCajon() ? "Cajones" : "Bandejas";
+    const propio = !conBandeja || esPropio(f.origen.value);
+    $("#rotulo-fecha-siembra").textContent = propio ? "Fecha" : "Llegan listos para trasplantar el";
 
-    const p = perfil(f.cultivo.value);
+    const fs = fechasDeSiembra(f);
     const partes = [];
     if (conBandeja) {
-      const total = (parseInt(f.bandejas.value, 10) || 0) * (parseInt(f.tipo_bandeja.value, 10) || 0);
-      partes.push(`<b>${num(total)}</b> plantines`);
+      partes.push(`<b>${num(plantinesDe())}</b> plantines`);
       // Lo que pide el plan, para que la cuenta de las bandejas se vea.
-      const b = delPlan && claveArea(delPlan.cultivo) === claveArea(f.cultivo.value)
+      const b = delPlan && !enCajon() && claveArea(delPlan.cultivo) === claveArea(f.cultivo.value)
         ? bandejasDelPlan(delPlan.cultivo, delPlan.camas || 1, parseInt(f.tipo_bandeja.value, 10) || 0, delPlan.sector) : null;
       if (b) partes.push(`el plan pide <b>${num(b.plantas)} plantas</b> (${num(b.bancales, 1)} bancal(es),
         ${b.lineas} líneas a ${b.distancia} cm) = ${b.bandejas} bandeja(s) de ${b.alveolos}`);
-      // Los días dependen de la estación: se cuentan desde la fecha de siembra.
-      const alm = diasAlmacigo(f.cultivo.value, f.fecha.value);
-      // Si la generación está en el plan, su fecha a campo es la que vale: es
-      // la que después usan "Para trasplantar" y el Plan estratégico.
-      const g = generacionDeSiembra(f.cultivo.value, parseInt(f.generacion.value, 10) || 1);
-      if (g?.fecha_campo) {
-        const d = diasEntre(f.fecha.value, g.fecha_campo);
-        partes.push(`el plan la trasplanta el <b>${fechaCorta(g.fecha_campo)}</b>`
-          + (d > 0 ? ` <small>(${d} días en bandeja)</small>`
-             : ` <small class="alerta">(antes de esta siembra: corregí el plan)</small>`));
-      } else if (alm) {
-        const r = rangoAlmacigo(f.cultivo.value);
-        partes.push(`trasplante estimado: <b>${fechaCorta(sumarDias(f.fecha.value, alm))}</b>`
-          + (r ? ` <small>(${alm} días; entre ${r.min} y ${r.max} según la estación)</small>` : ""));
+      if (!propio && fs.siembra) {
+        partes.push(`siembra teórica: <b>${fechaCorta(fs.siembra)}</b> <small>(${fs.dias} días antes, ${fs.diasDe})</small>`);
       }
-      const cosecha = g?.fecha_campo && p.dias_trasplante_cosecha
-        ? sumarDias(g.fecha_campo, p.dias_trasplante_cosecha)
-        : (p.dias_a_cosecha ? sumarDias(f.fecha.value, p.dias_a_cosecha) : "");
-      if (cosecha) partes.push(`cosecha estimada: <b>${fechaCorta(cosecha)}</b>`);
-    } else {
-      const dias = tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha;
-      if (dias) partes.push(`cosecha estimada: <b>${fechaCorta(sumarDias(f.fecha.value, dias))}</b>`);
+      // Desde la siembra, el trasplante se prevé solo: siembra más los días en
+      // bandeja que le dio el plan a esta generación (o los del catálogo).
+      if (propio && fs.trasplante) {
+        partes.push(`trasplante previsto: <b>${fechaCorta(fs.trasplante)}</b> <small>(${fs.dias} días en bandeja, ${fs.diasDe})</small>`);
+      }
+    }
+    // Contra lo planificado: la diferencia que queda guardada con la siembra.
+    if (fs.planificada) {
+      partes.push(`planificada para el ${fechaCorta(fs.planificada)}: <b>${textoDiferencia(fs.diferencia)}</b>`);
+    }
+    if (fs.cosecha) partes.push(`cosecha prevista: <b>${fechaCorta(fs.cosecha)}</b>`);
+    if (!conBandeja) {
       const plan = enPlan(f.cultivo.value);
       if (plan) partes.push(`plan: ${num(plan.superficie_m2)} m² · ${num(plan.lineas)} líneas a ${num(plan.distancia_cm)} cm`);
     }
-    calculo.innerHTML = partes.length ? partes.join(" · ") : "Elegí el cultivo para ver las fechas estimadas.";
+    calculo.innerHTML = f.cultivo.value && partes.length ? partes.join(" · ") : "Elegí el cultivo para ver las fechas.";
   };
 
   f.addEventListener("input", actualizar);
@@ -118,8 +152,11 @@ function prepararSiembras() {
     if (!f.cultivo.value) return aviso("Elegí el cultivo.", true);
     if (!(gen >= 1)) return aviso("La generación debe ser 1 o mayor.", true);
 
+    const fs = fechasDeSiembra(f);
+    if (!fs.siembra) return aviso("No hay días en bandeja para calcular la siembra: cargala como propia con su fecha.", true);
+    if (fs.siembra > hoy()) return aviso("La fecha de siembra es posterior a hoy: revisala.", true);
     const datos = {
-      fecha: f.fecha.value,
+      fecha: fs.siembra,
       cultivo: f.cultivo.value,
       variedad: f.variedad.value.trim(),
       tipo,
@@ -127,23 +164,22 @@ function prepararSiembras() {
       operador: f.operador.value,
       observaciones: f.observaciones.value.trim(),
       bandejas: 0, tipo_bandeja: 0, plantines: 0, sector: "", bancal: 0,
+      // Plan contra real: lo planificado queda congelado en el registro.
+      origen: conBandeja ? f.origen.value : "Propio",
+      fecha_planificada: fs.planificada, diferencia_plan: fs.diferencia,
+      trasplante_estimado: fs.trasplante, cosecha_estimada: fs.cosecha,
     };
 
     if (conBandeja) {
       datos.bandejas = parseInt(f.bandejas.value, 10) || 0;
-      datos.tipo_bandeja = parseInt(f.tipo_bandeja.value, 10) || 0;
-      datos.plantines = datos.bandejas * datos.tipo_bandeja;
-      if (!datos.bandejas) return aviso("Indicá cuántas bandejas sembraste.", true);
+      datos.tipo_bandeja = enCajon() ? CAJON : parseInt(f.tipo_bandeja.value, 10) || 0;
+      datos.plantines = plantinesDe();
+      if (!datos.bandejas) return aviso(`Indicá cuántos ${enCajon() ? "cajones" : "bandejas"} sembraste.`, true);
+      if (enCajon() && !datos.plantines) return aviso("Poné cuántos plantines hay en los cajones, aunque sea aproximado.", true);
     } else if (f.sector) {
       datos.sector = f.sector.value;
       datos.bancal = parseInt(f.bancal.value, 10) || 0;
     }
-
-    const p = perfil(datos.cultivo);
-    datos.trasplante_estimado = conBandeja
-      ? sumarDias(datos.fecha, diasAlmacigo(datos.cultivo, datos.fecha)) : "";
-    datos.cosecha_estimada = sumarDias(datos.fecha,
-      tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha);
 
     if (!leer(LS.nombre, "")) escribir(LS.nombre, datos.operador);
     guardarRegistro("siembras", datos);
@@ -200,10 +236,10 @@ function prepararTrasplantes() {
     f.variedad.value = s.variedad || "";
     f.generacion.value = s.generacion || 1;
     sugerirMarco(s.cultivo);
-    const sembrada = s.fecha ? `sembrado el ${fechaCorta(s.fecha)}` : "";
-    const plan = trasplanteDelPlan(s);
-    const espera = plan ? ` · el plan lo trasplanta el ${fechaCorta(plan)}`
-      : (s.estimado ? ` · estimado para ${fechaCorta(s.estimado)}` : "");
+    const sembrada = !esPropio(s.origen) ? `${esc(String(s.origen).toLowerCase())}`
+      : s.fecha ? `sembrado el ${fechaCorta(s.fecha)}` : "";
+    const previsto = s.objetivo || trasplantePrevisto(s);
+    const espera = previsto ? ` · trasplante previsto el ${fechaCorta(previsto)}` : "";
     nota.innerHTML = `${esc(s.cultivo)}${s.variedad ? " " + esc(s.variedad) : ""}
       · G${s.generacion} · ${sembrada}${espera}`;
     recalcular();
@@ -352,8 +388,14 @@ function prepararTrasplantes() {
     const s = elegido();
     // Los teóricos se cuentan con la estación en que se SEMBRÓ, no con la de
     // hoy: es contra eso que se compara lo que de verdad tardó en la bandeja.
-    const teoricos = s ? diasAlmacigo(s.cultivo, s.fecha) : 0;
-    const reales = s ? diasEntre(s.fecha, f.fecha.value) : null;
+    // De un plantín encargado no se sabe cuándo se sembró: no se mide.
+    const medible = s && esPropio(s.origen);
+    const teoricos = medible ? diasAlmacigo(s.cultivo, s.fecha) : 0;
+    const reales = medible ? diasEntre(s.fecha, f.fecha.value) : null;
+    // Contra el plan: la fecha a campo planificada de la generación, que queda
+    // congelada en el registro con la diferencia (cumplimiento del plan).
+    const genPlan = generacionDeSiembra(f.cultivo.value, parseInt(f.generacion.value, 10) || 1, s ? s.id : "");
+    const planificada = genPlan ? (tramosDe(genPlan)?.plan.campo || "") : "";
     const lugares = destinos();
     if (!lugares.length) return aviso("Elegí al menos un bancal.", true);
     escribir(LS.nombre, f.operador.value);
@@ -380,6 +422,8 @@ function prepararTrasplantes() {
         ? "Modificado" : "Sugerido",
       operador: f.operador.value,
       observaciones: f.observaciones.value.trim(),
+      fecha_planificada: planificada,
+      diferencia_plan: planificada ? diasEntre(planificada, f.fecha.value) : "",
     };
     const aviso_ = lugares.length === 1
       ? "Trasplante guardado ✓"

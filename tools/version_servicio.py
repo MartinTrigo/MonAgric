@@ -130,6 +130,12 @@ def main() -> None:
     else:
         print("  [ANTERIOR] cada sector puede tener su largo de bancal (la app no ofrece el campo)")
         viejas.append("el largo de bancal por sector")
+    if cf.get("seguimiento"):
+        print("  [al dia]   plan contra real: trasplante real del plan, origen y fecha planificada")
+    else:
+        print("  [ANTERIOR] plan contra real (la barra no se corre con el trasplante real "
+              "y no se guarda la diferencia con el plan)")
+        viejas.append("plan contra real")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")

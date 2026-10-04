@@ -206,6 +206,21 @@ Trabajadores y tarifas") con $7.500, y correr `importarHoras` en bioma-db.
    todos en `Config`, así que borrarlas no cambia ninguna tarifa — pero
    conviene confirmarlo antes, que es justo el agujero por el que se coló Mili.
 
+### 0 quinquies. Seguimiento: plan contra real (03/10, etapas 3 y 4)
+
+Hechas las etapas 1 y 2 (planificado/real/previsto, diferencias guardadas en
+los registros, origen encargado, cajón). Faltan:
+- **Pantalla Seguimiento ("los relojes")**: por temporada, % de etapas a
+  tiempo y atraso promedio (Diferencia plan); por cultivo, días reales en
+  bandeja contra el catálogo (Diferencia días, solo origen Propio) con la
+  propuesta de corregir el catálogo para la temporada siguiente; kg reales
+  contra esperados y kg/m²; bancales usados contra planificados; horas por kg.
+- **Cosecha por generación** (opcional, la app sugiere la que está en
+  ventana): sin eso el rinde y el inicio real de cosecha no se pueden atar a
+  una generación, y la barra de cosecha sigue siendo solo prevista.
+- Aviso al cargar una siembra si esa generación ya tiene una registrada
+  (lo del puerro: diez siembras sobre generaciones repetidas).
+
 ### 0 cuater. Revisar en el catálogo (03/10)
 
 - **"Ajo de verdeo" tiene los datos y la ficha de la cebolla de verdeo**

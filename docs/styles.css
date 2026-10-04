@@ -845,6 +845,18 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
 /* Lo planificado se dibuja más tenue que lo que ya se sembró: de un vistazo se
    ve qué es decisión tomada y qué es intención. */
 .plan-pista:not(.sembrada) .tramo { opacity: .55; }
+/* Sembrada: lo que ya pasó, firme; lo previsto desde ahí, más claro. */
+.plan-pista.sembrada .tramo.prevista { opacity: .55; }
+/* Dónde estaba lo planificado, cuando lo real o lo previsto se apartó. */
+.marca-plan {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 0;
+  border-left: 2px dotted #2c3a28;
+  opacity: .7;
+  z-index: 2;
+}
 
 /* Una generación planificada se puede correr arrastrándola. Las sembradas no:
    su fecha es un hecho. */

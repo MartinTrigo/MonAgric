@@ -52,9 +52,6 @@ function formularioGeneracion(g) {
   const sembrada = esSembrada(g);
   const directa = g.metodo === "Siembra directa" || (!g.fecha_almacigo && g.fecha_campo);
   const bloqueo = sembrada ? " disabled" : "";
-  // En bandeja esperando el trasplante: la siembra es un hecho, pero el día
-  // que va al bancal todavía se decide.
-  const enBandeja = sembrada && esperaTrasplante(g);
   return `<form class="editar-gen" data-form-gen="${esc(g.id)}">
     <div class="fila">
       <div>
@@ -78,7 +75,7 @@ function formularioGeneracion(g) {
       </div>
       <div>
         <label class="rotulo-campo">${directa ? "Siembra en el bancal" : "A campo <small>(opcional)</small>"}</label>
-        <input type="date" name="campo" value="${esc(g.fecha_campo || "")}"${enBandeja ? "" : bloqueo}>
+        <input type="date" name="campo" value="${esc(g.fecha_campo || "")}"${bloqueo}>
       </div>
     </div>
     <!-- Dónde va. Antes solo se podía elegir en el mapa, que en el teléfono no
@@ -97,10 +94,10 @@ function formularioGeneracion(g) {
         <input type="text" name="desde" inputmode="numeric" value="${bancalesDe(g).length ? Math.min(...bancalesDe(g)) : ""}">
       </div>
     </div>
-    ${enBandeja ? `<p class="nota">Ya se sembró${g.sembrada_el ? ` el ${fechaCorta(g.sembrada_el)}` : ""}:
-      la siembra y el método no se cambian. El día que va a campo sí, mientras
-      siga en bandeja.</p>`
-      : sembrada ? `<p class="nota">Ya se sembró: las fechas y el método son un hecho y no se cambian.</p>` : ""}
+    ${sembrada ? `<p class="nota">Ya se sembró${g.sembrada_el ? ` el ${fechaCorta(g.sembrada_el)}` : ""}:
+      las fechas planificadas quedan como línea de base para comparar, y lo que
+      sigue se calcula con lo que se registra. Si la fecha de siembra está mal,
+      se arregla con Corregir en Siembras → Últimos movimientos.</p>` : ""}
     <div class="editar-gen-botones">
       <button class="principal">Guardar</button>
       <button type="button" class="secundario" data-cancelar-gen>Cancelar</button>
@@ -156,8 +153,13 @@ function cultivoEditable(cultivo, lista, todas) {
         <div>
           <div class="detalle">${nombreGen(g, todas)}${
             sembrada ? ` <span class="etiqueta ok">sembrada</span>` : ""}</div>
-          <div class="cuando">${fechaCorta((sembrada && g.sembrada_el) || arranqueDe(g))}${
-            directa ? " · directa" : ` · en bandeja${g.fecha_campo ? `, a campo ${fechaCorta(g.fecha_campo)}` : ""}`}${
+          <div class="cuando">${(() => {
+            // Lo real si ya pasó, lo previsto si no: lo mismo que dibuja la barra.
+            const t = tramosDe(g);
+            const arranque = fechaCorta((sembrada && g.sembrada_el) || arranqueDe(g));
+            return directa ? `${arranque} · directa`
+              : `${arranque} · en bandeja${t?.campo ? `, a campo ${fechaCorta(t.campo)}` : ""}`;
+          })()}${
             g.camas ? ` · ${num(g.camas, 1)} bancal(es)` : ""}${
             g.sector ? ` · ${esc(g.sector)}${bancalesDe(g).length ? " " + bancalesDe(g).join(", ") : ""}` : ""}</div>
         </div>
@@ -434,11 +436,6 @@ function prepararEdicionCultivos() {
         campo = f.campo.value;
         if (directa && !campo) return aviso("Falta la fecha de siembra en el bancal.", true);
         if (!directa && !almacigo) return aviso("Falta la fecha de siembra en bandeja.", true);
-      } else if (esperaTrasplante(g)) {
-        campo = f.campo.value;
-        if (campo && g.sembrada_el && campo <= g.sembrada_el) {
-          return aviso("No puede ir al bancal antes de la siembra.", true);
-        }
       }
       // Dónde va: el sector elegido y, si se dice, desde qué bancal. Si sigue
       // en el mismo sector sin decir bancal, conserva los suyos (corridos si

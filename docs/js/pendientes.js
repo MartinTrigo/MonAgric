@@ -33,7 +33,7 @@ function almacigosPendientes() {
     id: String(f.Id), cultivo: f.Cultivo, variedad: f.Variedad || "",
     generacion: Number(f["Generación"]) || 1, tipo: f.Tipo,
     plantines: Number(f.Plantines) || 0, fecha: f.Fecha,
-    estimado: f["Trasplante estimado"] || "",
+    estimado: f["Trasplante estimado"] || "", origen: f.Origen || "",
   }));
   const locales = pendientes.concat(enviados)
     .filter((r) => r.tipo === "siembras")
@@ -41,7 +41,7 @@ function almacigosPendientes() {
       id: String(r.id), cultivo: r.datos.cultivo, variedad: r.datos.variedad || "",
       generacion: Number(r.datos.generacion) || 1, tipo: r.datos.tipo,
       plantines: Number(r.datos.plantines) || 0, fecha: r.datos.fecha,
-      estimado: r.datos.trasplante_estimado || "",
+      estimado: r.datos.trasplante_estimado || "", origen: r.datos.origen || "",
     }));
 
   const vistos = new Set();
@@ -49,9 +49,9 @@ function almacigosPendientes() {
     .filter((s) => /almácigo|almacigo/i.test(s.tipo || ""))
     .filter((s) => !yaHechos.has(s.id))
     .filter((s) => (vistos.has(s.id) ? false : vistos.add(s.id)))
-    // Cuándo va al bancal: lo que dice HOY el plan, no lo que se estimó al
-    // sembrar (ver trasplanteDelPlan).
-    .map((s) => Object.assign(s, { objetivo: trasplanteDelPlan(s) || s.estimado }))
+    // Cuándo va al bancal: la siembra real más los días en bandeja del plan
+    // (ver trasplantePrevisto), no lo que se estimó el día que se cargó.
+    .map((s) => Object.assign(s, { objetivo: trasplantePrevisto(s) }))
     // Primero lo que hace más tiempo que espera: es lo que corre riesgo de
     // pasarse de punto en la bandeja.
     .sort((a, b) => String(a.objetivo || a.fecha).localeCompare(String(b.objetivo || b.fecha)))
@@ -79,15 +79,53 @@ function generacionDeSiembra(cultivo, generacion, id = "") {
     || null;
 }
 
-/* Cuándo va al bancal un almácigo ya sembrado: la fecha a campo del plan.
-   La columna "Trasplante estimado" de Siembras es una foto del día en que se
-   sembró (fecha + días del catálogo) y no se entera si después se corre el
-   plan: la berenjena sembrada el 3/8 figuraba "atrasada 31 días" con el
-   trasplante planeado para el 16/10 (03/10). Si la generación no está en el
-   plan, o el plan no dice cuándo va a campo, vale lo estimado al sembrar. */
-function trasplanteDelPlan(s) {
-  return generacionDeSiembra(s.cultivo, s.generacion, s.id)?.fecha_campo || "";
+/* ---- Planificado, real y previsto ----
+   Cada etapa de una generación tiene tres fechas (decidido con Martín, 03/10):
+   - PLANIFICADA: la del plan (Plan generaciones). Se mueve libremente
+     mientras la etapa no se hizo; después queda como línea de base, y además
+     se congela en el registro (columna "Fecha planificada").
+   - REAL: la registrada en Siembras o Trasplantes. Solo cambia con Corregir.
+   - PREVISTA: para lo que falta, la última fecha real más los días teóricos.
+     La calcula la app; nadie la escribe.
+   Los días teóricos son los que el plan le dio a ESA generación (de la
+   bandeja al bancal); si el plan no los dice, los del catálogo para la
+   estación en que se sembró. */
+function diasBandejaDe(cultivo, g, fechaSiembra) {
+  const delPlan = g && g.fecha_almacigo && g.fecha_campo ? diasEntre(g.fecha_almacigo, g.fecha_campo) : 0;
+  return delPlan > 0 ? delPlan : diasAlmacigo(cultivo, fechaSiembra || g?.fecha_almacigo);
 }
+
+/* Cuándo se espera llevar al bancal un almácigo que ya está sembrado: su
+   siembra real más los días en bandeja. La columna "Trasplante estimado" de
+   Siembras es una foto del día en que se cargó y no se entera de nada
+   después; queda de respaldo si no hay con qué calcular. */
+function trasplantePrevisto(s) {
+  const g = generacionDeSiembra(s.cultivo, s.generacion, s.id);
+  const dias = s.fecha ? diasBandejaDe(s.cultivo, g, s.fecha) : 0;
+  return (dias && sumarDias(s.fecha, dias)) || s.estimado || "";
+}
+
+/* Cuándo se trasplantó de verdad una generación. Lo manda el servicio
+   (trasplantada_el); mientras no llegue —un trasplante recién cargado, o un
+   servicio anterior— se busca en lo que este teléfono tiene: la cola y los
+   últimos trasplantes. Vale el primer día: es cuando empezó a ocupar campo. */
+function trasplantadaEl(g) {
+  if (g.trasplantada_el) return g.trasplantada_el;
+  const k = claveArea(g.cultivo);
+  const esDeEsta = (siembra, cultivo, gen) => (g.siembra_id && siembra === g.siembra_id)
+    || (claveArea(cultivo) === k && Number(gen) === Number(g.generacion));
+  const fechas = [
+    ...pendientes.concat(enviados).filter((r) => r.tipo === "trasplantes"
+      && esDeEsta(r.datos.siembra_id, r.datos.cultivo, r.datos.generacion)).map((r) => r.datos.fecha),
+    ...((leer(LS.ultimos, {}) || {}).trasplantes || []).filter((f) =>
+      esDeEsta(String(f["Siembra origen"] || ""), f.Cultivo, f["Generación"])).map((f) => aFechaISO(f.Fecha)),
+  ].filter(Boolean).sort();
+  return fechas[0] || "";
+}
+
+// Diferencia en días, con signo y escrita para leerla de un vistazo.
+const textoDiferencia = (d) => (d === null || d === undefined || d === "" ? ""
+  : d === 0 ? "justo a tiempo" : `${d > 0 ? "+" : "−"}${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`);
 
 // Cuánto le falta o hace cuánto se pasó, según el plan (o lo estimado). Es lo
 // que convierte la lista en una sugerencia y no en un archivo: se ve de un
@@ -100,16 +138,6 @@ function estadoAlmacigo(s) {
   if (dias === 0) return { texto: "es hoy", orden: 0, dias };
   if (dias <= DIAS_AVISO) return { texto: `en ${dias} días`, orden: 1, dias };
   return { texto: `para ${fechaCorta(cuando)}`, orden: 2, dias };
-}
-
-/* Una generación sembrada en bandeja que todavía no se trasplantó: su siembra
-   es un hecho, pero el día que va al bancal sigue siendo una decisión, y se
-   tiene que poder correr desde el plan. */
-function esperaTrasplante(g, pend = almacigosPendientes()) {
-  if (!g.fecha_almacigo) return false;
-  const k = claveArea(g.cultivo);
-  return pend.some((s) => (g.siembra_id && s.id === g.siembra_id)
-    || (claveArea(s.cultivo) === k && Number(s.generacion) === Number(g.generacion)));
 }
 
 function etiquetaAlmacigo(s) {
@@ -281,8 +309,10 @@ function tarjetaParaTrasplantar(pend, listos, pronto) {
       data-trasplantar="${esc(s.id)}">
     <div><div class="detalle">${esc(s.cultivo)}${s.variedad ? ` <span class="gen">${esc(s.variedad)}</span>` : ""}
       <span class="gen">G${s.generacion}</span></div>
-      <div class="cuando">sembrado el ${fechaCorta(s.fecha)}${
-        diasEntre(s.fecha, hoy()) > 0 ? ` <small>(${diasEntre(s.fecha, hoy())} días en bandeja)</small>` : ""}${
+      <div class="cuando">${esPropio(s.origen)
+          ? `sembrado el ${fechaCorta(s.fecha)}${
+              diasEntre(s.fecha, hoy()) > 0 ? ` <small>(${diasEntre(s.fecha, hoy())} días en bandeja)</small>` : ""}`
+          : `${esc(String(s.origen).toLowerCase())}, llega listo`}${
         s.plantines ? ` · ${num(s.plantines)} plantines` : ""}${
         (() => {
           const bs = bancalesPlanificados(s.cultivo, s.generacion);
@@ -297,11 +327,10 @@ function tarjetaParaTrasplantar(pend, listos, pronto) {
         listos.length ? `<span class="etiqueta alerta">${listos.length} listo${listos.length === 1 ? "" : "s"}</span>` : ""}${
         pronto.length ? `<span class="etiqueta ok">${pronto.length} esta semana</span>` : ""}</span>
     </summary>
-    <p class="nota">Los almácigos que esperan, según la fecha a campo del plan
-    (si no están en el plan, según los días en bandeja del catálogo). Para
-    cambiar la fecha, corré la generación en el Plan estratégico o editala en
-    Plan → Cultivos. Es una guía: manda lo que se ve en la bandeja. Tocá uno y
-    el formulario se completa con el plan —bancales, marco, generación—.</p>
+    <p class="nota">Los almácigos que esperan. La fecha es la siembra más los
+    días en bandeja que les dio el plan (si no están en el plan, los del
+    catálogo). Es una guía: manda lo que se ve en la bandeja. Tocá uno y el
+    formulario se completa con el plan —bancales, marco, generación—.</p>
     ${listos.map((s) => fila(s, true)).join("")}
     ${pronto.map((s) => fila(s, false)).join("")}
     ${despues.map((s) => fila(s, false)).join("")}

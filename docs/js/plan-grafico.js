@@ -21,30 +21,37 @@ function nombreGen(g, todas = leer(LS.generaciones, []) || []) {
 // la barra, que queda marcada como estimada. No se guarda en ningún lado.
 const DIAS_SUPUESTOS = { almacigo: 28, cosecha: 60 };
 
-// Los cuatro momentos de una generación. En siembra directa no hay tramo de
-// almácigo: la planta arranca en el bancal.
+/* Los cuatro momentos de una generación. En siembra directa no hay tramo de
+   almácigo: la planta arranca en el bancal.
+
+   Cada momento sale de lo más firme que haya (ver "Planificado, real y
+   previsto" en pendientes.js): lo registrado; si no, lo previsto desde el
+   último registro; si todavía no pasó nada, lo planificado. Así, al cargar
+   una siembra o un trasplante la barra se corre sola, y lo planificado queda
+   en `plan` para marcar cuánto se apartó. */
 function tramosDe(g) {
   const p = perfil(g.cultivo) || {};
   const directa = !g.fecha_almacigo;
-  // Ya sembrada, la barra arranca el día que de verdad se sembró: es un hecho
-  // y es contra él que se cuentan los días en bandeja. Antes arrancaba en la
-  // fecha planificada, y la berenjena sembrada el 3/8 se dibujaba desde el 17/8
-  // (03/10). En siembra directa, ese día es también el de ir al bancal.
   const sembradaEl = (esSembrada(g) && g.sembrada_el) || "";
-  const inicioTodo = sembradaEl || g.fecha_almacigo || g.fecha_campo;
+  const trasplantada = directa ? "" : trasplantadaEl(g);
+  const planInicio = g.fecha_almacigo || g.fecha_campo;
+  const inicioTodo = sembradaEl || planInicio;
   if (!inicioTodo) return null;
 
-  const aCampo = (directa ? sembradaEl : "") || g.fecha_campo || "";
-  // De la bandeja al bancal: si el plan trae la fecha se respeta, porque es
-  // una decisión; si no, se estima con los días de almácigo de la estación.
+  // De la bandeja al bancal: los días que le dio el plan; si no los dice, los
+  // del catálogo para la estación.
   //
   // Si el catálogo no tiene los días, la barra igual se dibuja, con un largo
   // supuesto y marcada como estimada. Antes la fila quedaba vacía —el nombre
   // sin barra, como pasó con Pak choi el 28/09— y no se entendía por qué.
   const faltan = [];
-  let enBandeja = directa || aCampo ? 0 : diasAlmacigo(g.cultivo, inicioTodo);
-  if (!directa && !aCampo && !enBandeja) { enBandeja = DIAS_SUPUESTOS.almacigo; faltan.push("días de almácigo"); }
-  const campo = aCampo || sumarDias(inicioTodo, enBandeja) || inicioTodo;
+  let enBandeja = directa ? 0 : diasBandejaDe(g.cultivo, g, inicioTodo);
+  if (!directa && !enBandeja) { enBandeja = DIAS_SUPUESTOS.almacigo; faltan.push("días de almácigo"); }
+  const planCampo = directa ? g.fecha_campo
+    : (g.fecha_campo || sumarDias(g.fecha_almacigo, diasBandejaDe(g.cultivo, g, g.fecha_almacigo) || enBandeja));
+  const campo = directa
+    ? (sembradaEl || g.fecha_campo)
+    : (trasplantada || (sembradaEl ? sumarDias(sembradaEl, enBandeja) : planCampo)) || inicioTodo;
   let aCosecha = directa
     ? (p.dias_a_cosecha || 0)
     : (p.dias_trasplante_cosecha || 0);
@@ -57,7 +64,12 @@ function tramosDe(g) {
   const finCosecha = inicioCosecha && dura ? sumarDias(inicioCosecha, dura) : inicioCosecha;
 
   return { inicio: inicioTodo, campo, inicioCosecha, fin: finCosecha || campo, directa,
-           faltan };
+           faltan,
+           // Lo registrado de verdad: con esto se sabe qué tramo es un hecho
+           // y cuál una previsión.
+           real: { siembra: sembradaEl, campo: directa ? sembradaEl : trasplantada },
+           // La línea de base, para medir cuánto se apartó cada momento.
+           plan: { inicio: planInicio, campo: planCampo } };
 }
 
 function generacionesParaElPlan() {
@@ -156,7 +168,6 @@ function planEstrategico() {
   const anchoMinimoFecha = (34 / anchoGrafico) * 100;
 
   const todasGens = leer(LS.generaciones, []) || [];
-  const esperando = almacigosPendientes();
   const filas = gens.map((g, i) => {
     const t = g.tramos;
     // Recortado a la temporada: lo que empieza antes de julio o sigue después
@@ -175,11 +186,25 @@ function planEstrategico() {
         cabe && etiqueta ? `<b>${esc(etiqueta)}</b>` : ""}</div>`;
     };
     const sigue = t.fin > isoDe(d1);
-    // Una generación ya sembrada no se puede correr: su fecha es un hecho, no
-    // una intención. Las planificadas sí, arrastrándolas. Y las que están en
-    // bandeja esperando el trasplante también, pero solo se corre el día que
-    // van al bancal (ver correrGeneracion).
-    const movible = !esSembrada(g) || esperaTrasplante(g, esperando);
+    // Una generación ya sembrada no se corre a mano: desde la siembra, lo que
+    // sigue se calcula solo con los registros (ver tramosDe). Las planificadas
+    // sí, arrastrándolas.
+    const movible = !esSembrada(g);
+    // Dónde estaba lo planificado, si lo real o lo previsto se apartó: una
+    // marca fina, para ver de un vistazo cuánto se corrió cada momento.
+    const marca = (iso, que, ahora) => {
+      if (!iso || !ahora || iso === ahora) return "";
+      const x = pct(iso);
+      if (x < 0 || x > 100) return "";
+      return `<i class="marca-plan" style="left:${x}%" title="${esc(
+        `${que} planificado el ${fechaCorta(iso)} · ahora ${fechaCorta(ahora)} (${textoDiferencia(diasEntre(iso, ahora))})`)}"></i>`;
+    };
+    const marcas = esSembrada(g)
+      ? marca(t.plan.inicio, t.directa ? "Siembra" : "Siembra en bandeja", t.real.siembra)
+        + (t.directa ? "" : marca(t.plan.campo, "Trasplante", t.campo))
+      : "";
+    // Lo que ya pasó se ve firme; lo previsto, más claro.
+    const previsto = (hecho) => (hecho ? "" : " prevista");
     // Una línea algo más marcada donde empieza otro cultivo: separa los grupos.
     const nuevoCultivo = ordenPlan === "cultivo" && i > 0 && gens[i - 1].cultivo !== g.cultivo;
     const nombre = nombreGen(g, todasGens);
@@ -194,13 +219,16 @@ function planEstrategico() {
       </div>
       <div class="plan-pista${
         (("sembrada" in g) ? g.sembrada : g.estado === "Sembrado") ? " sembrada" : ""}">
-        ${t.directa ? "" : seg(t.inicio, t.campo, "tramo almacigo",
-          `almácigo: ${fechaCorta(t.inicio)} a ${fechaCorta(t.campo)}`, diaMes(t.inicio))}
-        ${seg(t.campo, t.inicioCosecha || t.fin, "tramo campo",
-          `${t.directa ? "sembrado" : "trasplantado"} el ${fechaCorta(t.campo)}`, diaMes(t.campo))}
-        ${t.inicioCosecha ? seg(t.inicioCosecha, t.fin, "tramo cosecha",
-          `cosecha: ${fechaCorta(t.inicioCosecha)} a ${fechaCorta(t.fin)}`,
+        ${t.directa ? "" : seg(t.inicio, t.campo, `tramo almacigo${previsto(t.real.siembra)}`,
+          `${t.real.siembra ? "sembrado" : "siembra planificada"} el ${fechaCorta(t.inicio)} · ${
+            t.real.campo ? "trasplantado" : "trasplante previsto"} el ${fechaCorta(t.campo)}`, diaMes(t.inicio))}
+        ${seg(t.campo, t.inicioCosecha || t.fin, `tramo campo${previsto(t.real.campo)}`,
+          `${t.real.campo ? (t.directa ? "sembrado" : "trasplantado") : (t.directa ? "siembra prevista" : "trasplante previsto")} el ${
+            fechaCorta(t.campo)}`, diaMes(t.campo))}
+        ${t.inicioCosecha ? seg(t.inicioCosecha, t.fin, "tramo cosecha prevista",
+          `cosecha prevista: ${fechaCorta(t.inicioCosecha)} a ${fechaCorta(t.fin)}`,
           diaMes(t.inicioCosecha)) : ""}
+        ${marcas}
         ${sigue ? `<div class="sigue" title="sigue en cosecha hasta el ${
           fechaCorta(t.fin)}, ya fuera de esta temporada">›</div>` : ""}
       </div>
@@ -290,9 +318,15 @@ function panelGeneracion(g) {
   const tr = (ficha?.trasplantes || []).filter((x) =>
     Number(x.generacion) === Number(g.generacion)
     || (g.siembra_id && x.siembra_id === g.siembra_id));
-  const trasplantada = tr.length > 0;
+  const trasplantada = tr.length > 0 || !!t.real?.campo;
   const cosechado = ficha?.kg_cosechados || 0;
   const hoyIso = hoy();
+  // "planificada el 17/8 · +4 días": cuánto se apartó lo real o lo previsto
+  // de la línea de base. Es la medida de cumplimiento del plan.
+  const contraPlan = (planificada, ahora) => planificada && ahora && planificada !== ahora
+    ? `planificada el ${fechaCorta(planificada)} · <b>${textoDiferencia(diasEntre(planificada, ahora))}</b>`
+    : (planificada ? "como estaba planificada" : "");
+  const origen = g.siembra_id && ficha?.siembras?.find((s) => s.id === g.siembra_id)?.origen;
 
   // Cada etapa: hecha, en curso, atrasada o por venir. Lo que ya pasó sin
   // registro se marca atrasado: es lo único de la lista que pide hacer algo.
@@ -305,16 +339,21 @@ function panelGeneracion(g) {
     !t.directa && {
       nombre: "Siembra en bandeja", fecha: t.inicio,
       e: estado(sembrada, t.inicio),
-      detalle: sembrada && g.sembrada_el ? `registrada el ${fechaCorta(g.sembrada_el)}` : "",
+      detalle: sembrada && g.sembrada_el
+        ? (esPropio(origen) ? `registrada · ${contraPlan(t.plan.inicio, g.sembrada_el)}`
+           : `${esc(String(origen).toLowerCase())}: fecha teórica (llega listo para trasplantar)`)
+        : "",
       boton: sembrada ? "" : `<button type="button" class="secundario" data-panel-sembrar>Registrar siembra</button>`,
     },
     {
       nombre: t.directa ? "Siembra directa" : "Trasplante al bancal", fecha: t.campo,
       e: t.directa ? estado(sembrada, t.campo) : estado(trasplantada, t.campo),
       detalle: t.directa
-        ? (sembrada && g.sembrada_el ? `registrada el ${fechaCorta(g.sembrada_el)}` : "")
-        : (trasplantada ? `registrado el ${fechaCorta(tr[0].fecha)}${
-            tr[0].dias_reales ? ` · ${tr[0].dias_reales} días en bandeja` : ""}` : ""),
+        ? (sembrada && g.sembrada_el ? `registrada · ${contraPlan(t.plan.inicio, g.sembrada_el)}` : "")
+        : trasplantada
+          ? `registrado · ${contraPlan(t.plan.campo, t.campo)}${
+              tr[0]?.dias_reales ? ` · ${tr[0].dias_reales} días en bandeja` : ""}`
+          : sembrada ? `previsto desde la siembra · ${contraPlan(t.plan.campo, t.campo)}` : "",
       boton: t.directa
         ? (sembrada ? "" : `<button type="button" class="secundario" data-panel-sembrar>Registrar siembra</button>`)
         : (trasplantada ? "" : `<button type="button" class="secundario" data-panel-trasplantar>Registrar trasplante</button>`),
@@ -366,7 +405,9 @@ function panelGeneracion(g) {
       <button type="button" class="secundario" data-panel-ficha>Ver ficha del cultivo</button>
       ${sembrada ? "" : `<button type="button" class="secundario peligro" data-panel-quitar>Sacar del plan</button>`}
     </div>
-    <p class="nota">Para correr las fechas, arrastrá la barra en el gráfico.</p>
+    <p class="nota">${sembrada
+      ? "Desde la siembra, las fechas se corren solas con lo que se registra. Si una fecha registrada está mal, se arregla con Corregir en Siembras o Trasplantes."
+      : "Para correr las fechas, arrastrá la barra en el gráfico."}</p>
   </aside>`;
 }
 
@@ -509,22 +550,16 @@ function correrGeneracion(id, dias) {
   const g = gens.find((x) => x.id === id);
   if (!g || !dias) return;
 
+  // Lo sembrado es la línea de base contra la que se mide: no se corre.
+  if (esSembrada(g)) return;
   const corrida = (f) => (f ? sumarDias(f, dias) : "");
-  // Sembrada y en bandeja: la siembra ya pasó y queda donde está; lo que se
-  // corre es el día que va al bancal. Si el plan no lo decía, se parte del
-  // que dibuja la barra.
-  const soloCampo = esSembrada(g);
-  const campo = g.fecha_campo || (soloCampo ? tramosDe(g)?.campo : "");
   const nueva = {
     ...g,
-    fecha_almacigo: soloCampo ? g.fecha_almacigo : corrida(g.fecha_almacigo),
-    fecha_campo: corrida(campo),
+    fecha_almacigo: corrida(g.fecha_almacigo),
+    fecha_campo: corrida(g.fecha_campo),
   };
-  const antes = soloCampo ? campo : (g.fecha_almacigo || g.fecha_campo);
-  const despues = soloCampo ? nueva.fecha_campo : (nueva.fecha_almacigo || nueva.fecha_campo);
-  if (soloCampo && g.sembrada_el && despues <= g.sembrada_el) {
-    return aviso("No puede ir al bancal antes de la siembra.", true);
-  }
+  const antes = g.fecha_almacigo || g.fecha_campo;
+  const despues = nueva.fecha_almacigo || nueva.fecha_campo;
 
   guardarRegistro("generaciones", {
     generacion_id: g.id, cultivo: g.cultivo, generacion: g.generacion,
@@ -533,7 +568,7 @@ function correrGeneracion(id, dias) {
     // Solo números: si la planilla alguna vez convirtió "4, 5, 6" en una
     // fecha, reenviarlo tal cual lo volvía a guardar dañado.
     bancales: bancalesDe(g).join(", "), estado: g.estado, origen: "AMA",
-  }, `${g.cultivo} ${nombreGen(g)}: ${soloCampo ? "trasplante " : ""}${fechaCorta(antes)} → ${fechaCorta(despues)} ✓`);
+  }, `${g.cultivo} ${nombreGen(g)}: ${fechaCorta(antes)} → ${fechaCorta(despues)} ✓`);
 
   // Se mueve en la copia local para que el gráfico responda al instante.
   escribir(LS.generaciones, gens.map((x) => (x.id === id ? nueva : x)));

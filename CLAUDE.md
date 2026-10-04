@@ -121,15 +121,36 @@ refactorización en pasos) está en `ARQUITECTURA.md`.
   copia). Los botones aparecen solo si la configuración trae
   `corregir: true` (servicio nuevo); contra uno viejo quedarían en la cola.
 - La generación del plan tiene **Variedad** (columna al final de la hoja).
-- **El día de trasplante lo dice el plan, en todas las secciones** (03/10).
-  "Trasplante estimado" y "Cosecha estimada" de la hoja Siembras son una foto
-  del día de la siembra (fecha + días del catálogo) y no se enteran si el plan
-  se corre: la berenjena figuraba "atrasada 31 días" con el trasplante
-  planeado al 16/10. Para Trasplantes, Inicio, la ficha y el formulario se usa
-  `trasplanteDelPlan()` (pendientes.js); la columna queda solo para lo que no
-  está en el plan. Una generación **sembrada y todavía en bandeja** se puede
-  correr en el Plan estratégico o editar en Cultivos, pero solo su fecha a
-  campo (`esperaTrasplante`); la barra de una sembrada arranca el día real.
+
+## Planificado, real y previsto (03/10)
+
+Cada etapa de una generación tiene tres fechas. Es el corazón del
+seguimiento: ver en tiempo real qué pasa en el campo y, temporada tras
+temporada, tener un catálogo con fechas reales.
+
+- **Planificada**: la de *Plan generaciones*. Se mueve (arrastrar, editar)
+  solo mientras la generación no se sembró. Después es la **línea de base** y
+  no se toca: una sembrada no se arrastra ni se edita su fecha.
+- **Real**: Siembras / Trasplantes. Se cambia solo con Corregir.
+- **Prevista**: lo que falta = última fecha real + días teóricos. Los días
+  teóricos son los del **plan de esa generación** (bandeja → campo) con el
+  catálogo de respaldo (`diasBandejaDe`, `trasplantePrevisto`,
+  `trasplantadaEl` en pendientes.js; `tramosDe` en plan-grafico.js). Al
+  registrar la siembra o el trasplante, la barra se corre sola y deja una marca
+  punteada donde estaba lo planificado.
+- **Dónde queda la diferencia**: en el registro mismo, congelada al cargarlo:
+  columnas "Fecha planificada" y "Diferencia plan" en Siembras y Trasplantes
+  (cumplimiento del plan). Aparte, Trasplantes guarda "Días en almácigo" contra
+  "Días teóricos" del catálogo (calibración). **No mezclar las dos.**
+- **Origen** en Siembras: Propio / Encargado / Comprado. Si no es propio, el
+  formulario pide cuándo llega listo y guarda una siembra **teórica** (llegada
+  − días en bandeja); esa no cuenta para medir días reales en bandeja.
+- **Cajón** (sin alvéolos) en Alvéolos: los plantines se cuentan, no se
+  multiplican.
+- Las columnas "Trasplante estimado" / "Cosecha estimada" de Siembras son una
+  foto del día de carga: la pantalla usa siempre lo previsto. (La berenjena
+  "atrasada 31 días" del 03/10 salió de ahí.)
+- `generaciones` trae `trasplantada_el` del servicio (`cfg.seguimiento`).
 
 ## Multi-chacra: lo que no hay que romper
 
