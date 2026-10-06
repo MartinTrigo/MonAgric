@@ -221,6 +221,15 @@ los registros, origen encargado, cajón). Faltan:
 - Aviso al cargar una siembra si esa generación ya tiene una registrada
   (lo del puerro: diez siembras sobre generaciones repetidas).
 
+### 0 sexies. La guía de uso (06/10)
+
+Publicada en `docs/ayuda/`. Falta:
+- **El video** (hay un lugar reservado al final de la página).
+- **Captura del mapa**: no se pudo sacar. A unos 960 px de ancho el área del
+  mapa queda de 48 px (Plan → Mapa); revisar ese diseño en notebooks chicas.
+- Cuando cambie una pantalla, rehacer su captura con
+  `ayuda/capturas/datos-ejemplo.js`.
+
 ### 0 cuater. Revisar en el catálogo (03/10)
 
 - **"Ajo de verdeo" tiene los datos y la ficha de la cebolla de verdeo**

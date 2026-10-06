@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#5C7A5E">
+<title>Guía de AMA Producción</title>
+<meta name="description" content="Cómo usar AMA Producción: planificar la temporada, registrar lo que se hace en la chacra y leer lo que se mide.">
+<link rel="icon" href="../img/icon-192.png">
+<!-- Página aparte de la app: no la descarga la app ni la guarda el service
+     worker, así no le suma peso al teléfono. Las capturas son de una chacra de
+     ejemplo con datos inventados (ver capturas/datos-ejemplo.js). -->
+<style>
+  :root {
+    --sage: #5C7A5E; --sage-dark: #3f5a41; --sage-suave: #e6eee4; --crema: #f7f9f5;
+    --ambar: #D4860B; --ambar-suave: #f7e6c8; --texto: #2c3a28; --gris: #5f6b5b; --borde: #d6e0d2;
+    --ancho: 1040px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body { margin: 0; background: #eef2ec; color: var(--texto);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--sage-dark); }
+  header.portada { background: linear-gradient(135deg, #5C7A5E, #3f5a41); color: #fff; padding: 36px 16px 30px; }
+  .portada .dentro { max-width: var(--ancho); margin: 0 auto; display: flex; gap: 18px; align-items: center; }
+  .portada img { width: 64px; height: 64px; border-radius: 14px; background: #fff2; }
+  .portada h1 { margin: 0; font-size: 1.7rem; line-height: 1.2; }
+  .portada p { margin: 6px 0 0; opacity: .92; }
+  .volver { display: inline-block; margin-top: 14px; color: #fff; background: #ffffff26; border: 1px solid #ffffff55;
+            padding: 6px 14px; border-radius: 999px; text-decoration: none; font-weight: 600; font-size: .92rem; }
+  nav.indice { position: sticky; top: 0; z-index: 5; background: var(--crema); border-bottom: 1px solid var(--borde); }
+  nav.indice .dentro { max-width: var(--ancho); margin: 0 auto; display: flex; gap: 6px; overflow-x: auto;
+                       padding: 10px 16px; scrollbar-width: none; }
+  nav.indice a { flex: 0 0 auto; text-decoration: none; padding: 5px 12px; border-radius: 999px;
+                 background: #fff; border: 1px solid var(--borde); font-size: .88rem; font-weight: 600; color: var(--sage-dark); }
+  main { max-width: var(--ancho); margin: 0 auto; padding: 8px 16px 60px; }
+  section { background: #fff; border: 1px solid var(--borde); border-radius: 18px; padding: 22px 22px 8px; margin: 22px 0; }
+  h2 { margin: 0 0 6px; font-size: 1.45rem; color: var(--sage-dark); }
+  h3 { margin: 26px 0 6px; font-size: 1.15rem; }
+  .bajada { color: var(--gris); margin-top: 0; }
+  .paso { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; margin: 18px 0 22px; }
+  .paso + .paso { border-top: 1px dashed var(--borde); padding-top: 18px; }
+  .capturas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  /* Ancho propio: las capturas cargan de a poco, y sin esto la figura se
+     achicaba hasta que llegaba la imagen. */
+  figure { margin: 0; text-align: center; width: 260px; max-width: 100%; flex: 0 0 auto; }
+  figure.ancha { width: 100%; }
+  figure img { display: block; width: 100%; max-width: 260px; height: auto; border-radius: 14px;
+               border: 1px solid var(--borde); box-shadow: 0 6px 18px #2c3a2818; background: var(--crema); }
+  figure.ancha img { max-width: 100%; }
+  figcaption { font-size: .82rem; color: var(--gris); margin-top: 6px; max-width: 260px; }
+  figure.ancha figcaption { max-width: none; }
+  ol, ul { padding-left: 1.3em; }
+  li { margin: 4px 0; }
+  .consejo, .ojo { border-radius: 12px; padding: 12px 14px; margin: 14px 0; font-size: .95rem; }
+  .consejo { background: var(--sage-suave); border-left: 4px solid var(--sage); }
+  .ojo { background: var(--ambar-suave); border-left: 4px solid var(--ambar); }
+  .consejo b:first-child, .ojo b:first-child { display: block; margin-bottom: 2px; }
+  .ciclo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 16px 0 10px; }
+  .ciclo div { background: var(--crema); border: 1px solid var(--borde); border-radius: 12px; padding: 12px; text-align: center; }
+  .ciclo b { display: block; color: var(--sage-dark); font-size: 1.05rem; }
+  .ciclo span { font-size: .85rem; color: var(--gris); }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; margin: 10px 0 16px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  th { background: var(--crema); }
+  .relojes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 12px 0 18px; }
+  .reloj { border: 1px solid var(--borde); border-radius: 14px; padding: 14px; background: var(--crema); }
+  .reloj b { display: block; color: var(--sage-dark); }
+  .reloj small { color: var(--gris); }
+  details { border: 1px solid var(--borde); border-radius: 12px; padding: 10px 14px; margin: 8px 0; background: var(--crema); }
+  summary { cursor: pointer; font-weight: 600; }
+  .video { aspect-ratio: 16/9; border-radius: 14px; background: var(--sage-suave); border: 2px dashed #b8cdb9;
+           display: flex; align-items: center; justify-content: center; text-align: center; color: var(--gris); padding: 20px; }
+  footer { text-align: center; color: var(--gris); font-size: .85rem; padding: 10px 16px 40px; }
+  @media (min-width: 820px) {
+    .paso { grid-template-columns: minmax(0, 1fr) auto; gap: 26px; }
+    .paso.al-reves { grid-template-columns: auto minmax(0, 1fr); }
+    .paso.al-reves .capturas { order: -1; }
+    .paso.ancho { grid-template-columns: 1fr; }
+    /* Dos capturas por fila como mucho: con tres, el texto quedaba en una
+       columna de 160 px. */
+    .capturas { justify-content: flex-start; max-width: 504px; }
+    .paso.ancho .capturas { max-width: none; }
+    figure { width: 240px; }
+    figure.ancha { width: 100%; }
+    figure img { max-width: 240px; }
+  }
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    header.portada { padding: 24px 16px 22px; }
+    .portada .dentro { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .portada img { width: 48px; height: 48px; border-radius: 11px; }
+    .portada h1 { font-size: 1.45rem; }
+    section { padding: 18px 16px 6px; border-radius: 14px; }
+    .ciclo { grid-template-columns: repeat(2, 1fr); }
+    figure { width: 230px; }
+    figure.ancha { width: 100%; }
+    figure img { max-width: 230px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="portada">
+  <div class="dentro">
+    <img src="../img/icon-192.png" alt="">
+    <div>
+      <h1>Guía de AMA Producción</h1>
+      <p>Cómo planificar la temporada, registrar lo que se hace en la chacra y leer lo que
+      se mide para mejorar de una temporada a la otra.</p>
+      <a class="volver" href="../">← Volver a la app</a>
+    </div>
+  </div>
+</header>
+
+<nav class="indice" aria-label="Secciones">
+  <div class="dentro">
+    <a href="#que-es">Qué es</a>
+    <a href="#empezar">Empezar</a>
+    <a href="#planificar">Planificar</a>
+    <a href="#registrar">Registrar</a>
+    <a href="#medimos">Qué medimos</a>
+    <a href="#consejos">Consejos</a>
+    <a href="#preguntas">Preguntas</a>
+    <a href="#video">Video</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ================================================================== -->
+<section id="que-es">
+  <h2>Qué es AMA y para qué sirve</h2>
+  <p class="bajada">AMA (Aplicaciones para el Manejo Agroecológico) nació para monitorear y
+  mejorar la sustentabilidad de los emprendimientos agroecológicos. AMA Producción es la
+  parte de la chacra: siembras, trasplantes, cosechas, horas y tareas.</p>
+
+  <p>La idea es un ciclo que se repite cada temporada:</p>
+  <div class="ciclo">
+    <div><b>1 · Planificar</b><span>qué, cuándo, dónde y cuánto</span></div>
+    <div><b>2 · Registrar</b><span>lo que de verdad se hizo</span></div>
+    <div><b>3 · Comparar</b><span>plan contra realidad</span></div>
+    <div><b>4 · Mejorar</b><span>ajustar el plan y el catálogo</span></div>
+  </div>
+  <p>Durante la temporada, el plan se va acomodando solo con lo que se registra: si una
+  siembra se atrasó una semana, el trasplante y la cosecha previstos se corren una semana.
+  Y al terminar, queda guardado cuánto se apartó cada cosa de lo planificado y cuánto
+  tardó de verdad cada cultivo en <b>esta</b> chacra, que es lo que permite planificar
+  mejor la temporada siguiente.</p>
+
+  <div class="consejo"><b>Cada chacra ve lo suyo.</b>
+  Las cinco chacras comparten el catálogo de cultivos y las áreas de trabajo (para poder
+  compararse), pero cada una tiene su planilla, su plan y su gente.</div>
+</section>
+
+<!-- ================================================================== -->
+<section id="empezar">
+  <h2>Primeros pasos</h2>
+  <ol>
+    <li><b>Abrí la app</b> desde el enlace que te pasaron, en el navegador del teléfono.</li>
+    <li><b>Instalala:</b> en el menú del navegador, «Agregar a pantalla de inicio» (Android)
+      o «Compartir → Agregar a inicio» (iPhone). Queda como cualquier otra aplicación.</li>
+    <li><b>Elegí tu chacra y escribí el código de invitación</b> que te dieron. Se usa una
+      sola vez: el teléfono queda habilitado.</li>
+    <li><b>Elegí tu nombre.</b> Es el que va a figurar en lo que cargues.</li>
+  </ol>
+  <div class="consejo"><b>Funciona sin señal.</b>
+  Lo que cargues en el campo queda guardado en el teléfono y se envía solo cuando vuelve la
+  conexión. Arriba se ve «por enviar» mientras haya algo esperando; cuando dice «al día ✓»,
+  ya está todo en la planilla.</div>
+</section>
+
+<!-- ================================================================== -->
+<section id="planificar">
+  <h2>Planificar la temporada</h2>
+  <p class="bajada">Se hace una vez al empezar y se ajusta cuando haga falta. Conviene
+  seguir este orden: primero la chacra, después los cultivos, después el calendario y por
+  último el lugar en el campo. El calendario y el mapa se usan desde la computadora.</p>
+
+  <h3>1. Configuración de la chacra</h3>
+  <div class="paso">
+    <div>
+      <p>Se entra con el engranaje ⚙ de arriba, o desde <b>Plan → Configuración</b>.</p>
+      <ul>
+        <li><b>La chacra y la temporada:</b> nombre, temporada (por ejemplo «2026-27») y
+          fecha de inicio.</li>
+        <li><b>Medidas del bancal:</b> largo, ancho y pasillo. <b>De acá salen todas las
+          cuentas</b>: superficie, plantas, bandejas y kilos esperados.</li>
+        <li><b>Sectores:</b> cada parte de la chacra con su cantidad de bancales y su riego.
+          Si un sector tiene bancales de otro largo (un invernadero de 20 m en una chacra de
+          30 m), se le pone su largo y las cuentas de ese sector usan ese.</li>
+        <li><b>Quiénes trabajan</b> y las <b>áreas propias</b> de la chacra (por ejemplo,
+          Plantinera o Biofábrica), además de las seis áreas comunes.</li>
+      </ul>
+      <div class="consejo"><b>Medí bien el bancal.</b>
+      Un error en el largo o el ancho se arrastra a todas las cuentas del plan.</div>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/14-config-chacra.jpg" width="480" height="738"
+        alt="Formulario de la chacra: nombre, temporada y medidas del bancal">
+        <figcaption>La chacra, la temporada y el bancal.</figcaption></figure>
+      <figure><img loading="lazy" src="img/15-config-sectores.jpg" width="480" height="738"
+        alt="Lista de sectores con bancales, riego y largo propio">
+        <figcaption>Sectores: el invernadero tiene bancales de 20 m.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>2. Cultivos y generaciones</h3>
+  <div class="paso">
+    <div>
+      <p>En <b>Plan → Cultivos</b> se decide todo lo de cada cultivo:</p>
+      <ol>
+        <li><b>Elegí el cultivo.</b> Si no está, abajo dice «¿No está en la lista? Agregar un
+          cultivo»: se suma al catálogo común con sus días y su marco.</li>
+        <li><b>Marco de plantación y rinde:</b> vienen del catálogo; si acá se hace distinto,
+          se cambia y queda para esta chacra.</li>
+        <li><b>Las generaciones:</b> cómo se siembra (almácigo o directa), la primera
+          siembra, cuántas generaciones, cada cuántos días, cuántos bancales cada una y en
+          qué sector.</li>
+      </ol>
+      <p>La app calcula sola la superficie, las plantas, los kilos esperados y cuándo se
+      cosecharía la última. No hay que cargar esos números aparte.</p>
+      <p>Cada generación se puede editar con ✎: fechas (mientras no se sembró), bancales,
+      sector y variedad.</p>
+      <div class="consejo"><b>¿Qué es una generación?</b>
+      Cada tanda de un mismo cultivo: la lechuga que se siembra cada tres semanas son varias
+      generaciones (G1, G2, G3…). El número es la llave que une el plan con lo que se
+      registra después.</div>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/17-cultivos-generaciones.jpg" width="480" height="738"
+        alt="Cuatro generaciones de brócoli cada 21 días, con bancales y kilos calculados">
+        <figcaption>Cuatro generaciones de brócoli: la app calcula bancales, plantas y kilos.</figcaption></figure>
+      <figure><img loading="lazy" src="img/20-ficha-catalogo.jpg" width="480" height="787"
+        alt="Ficha de la lechuga: lo que dice el catálogo y el plan de la chacra">
+        <figcaption>La ficha de un cultivo: catálogo y plan.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>3. Plan estratégico (el calendario)</h3>
+  <div class="paso ancho">
+    <div>
+      <p>En la computadora, <b>Plan → Plan estratégico</b> muestra una barra por
+      generación, con tres colores: <b>en almácigo</b>, <b>en el bancal</b> y
+      <b>en cosecha</b>. La línea roja es hoy.</p>
+      <ul>
+        <li><b>Para correr una generación, arrastrá su barra.</b> Se puede mientras no esté
+          sembrada: es planificar.</li>
+        <li><b>Una vez sembrada, ya no se arrastra:</b> la barra arranca el día real de la
+          siembra y lo que sigue se calcula solo. Cuando se registra el trasplante, se corre
+          sola a esa fecha.</li>
+        <li><b>La marca punteada</b> muestra dónde estaba lo planificado, para ver de un
+          vistazo cuánto se corrió.</li>
+        <li>Lo ya hecho se ve firme; lo previsto, más claro.</li>
+        <li>Tocá una barra para ver el detalle de la generación.</li>
+      </ul>
+    </div>
+    <div class="capturas">
+      <figure class="ancha"><img loading="lazy" src="img/18-plan-estrategico.jpg" width="800" height="504"
+        alt="Calendario de la temporada con una barra por generación">
+        <figcaption>El plan de la chacra de ejemplo. La acelga se trasplantó el 30/9 en lugar
+        del 15/9: la marca punteada quedó donde estaba planificada.</figcaption></figure>
+    </div>
+  </div>
+  <div class="paso">
+    <div>
+      <p><b>El detalle de una generación</b> dice, etapa por etapa, qué se hizo, qué falta
+      y cuánto se apartó cada cosa de lo planificado. Desde ahí también se puede registrar
+      la siembra o el trasplante, y se abre la ficha del cultivo.</p>
+      <p>En el ejemplo, la acelga se sembró 2 días después de lo planificado y se trasplantó
+      15 días después.</p>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/19-detalle-generacion.jpg" width="480" height="787"
+        alt="Detalle de la acelga G1: sembrada +2 días, trasplantada +15 días">
+        <figcaption>Detalle de una generación.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>4. El mapa (dónde va cada cosa)</h3>
+  <div class="paso">
+    <div>
+      <p>En la computadora, <b>Plan → Mapa</b> muestra los sectores como están en el
+      campo. Las generaciones se arrastran a los bancales, y la app avisa si un bancal ya
+      está ocupado en esas fechas. Los sectores se acomodan arrastrando su título.</p>
+      <p>El sector y los bancales de una generación también se cambian desde
+      <b>Cultivos → ✎</b>, que funciona en el teléfono.</p>
+      <p>Desde el teléfono, <b>Plan → Resumen</b> tiene el plan de cada cultivo (kilos
+      esperados y cosechados) y un croquis por sector con los bancales ocupados.</p>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/12-plan-resumen.jpg" width="480" height="738"
+        alt="Resumen del plan: cada cultivo con su superficie y kilos">
+        <figcaption>Plan → Resumen.</figcaption></figure>
+      <figure><img loading="lazy" src="img/13-plan-sectores.jpg" width="480" height="738"
+        alt="Croquis de los sectores con los bancales ocupados">
+        <figcaption>Cómo quedó el campo, sector por sector.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="registrar">
+  <h2>Durante la temporada: registrar</h2>
+  <p class="bajada">Lo que se registra es <b>lo que se hizo, tal cual</b>: la fecha real,
+  el marco real, los kilos reales. La diferencia con el plan la calcula la app.</p>
+
+  <h3>Inicio</h3>
+  <div class="paso">
+    <div>
+      <p>La temporada de un vistazo: superficie planificada, kilos esperados y cosechados.
+      <b>Para hacer</b> dice cuántas siembras y trasplantes tocan según el plan; tocalo y
+      vas directo a la lista.</p>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/01-inicio.jpg" width="480" height="738"
+        alt="Pantalla de inicio con la temporada y lo que hay para hacer">
+        <figcaption>Inicio.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>Siembras</h3>
+  <div class="paso">
+    <div>
+      <p>Arriba está <b>Para sembrar</b>: las generaciones del plan que toca sembrar esta
+      semana o que están atrasadas. <b>Tocá una y el formulario se completa solo</b> con el
+      cultivo, la generación, la variedad y las bandejas que hacen falta para los bancales
+      del plan.</p>
+      <ul>
+        <li>Revisá la fecha (es la de hoy) y cambiá lo que se haya hecho distinto.</li>
+        <li><b>Bandejas:</b> cantidad y alvéolos. Si se sembró en <b>cajón</b> (sin
+          alvéolos), elegí «Cajón» y escribí los plantines contados o estimados.</li>
+        <li><b>Plantines encargados o comprados:</b> en «Plantines» elegí esa opción y poné
+          la fecha en que llegan listos para trasplantar. La app guarda una siembra teórica.</li>
+        <li><b>Siembra directa:</b> se elige el sector y el bancal.</li>
+      </ul>
+      <p>Abajo del formulario, la app muestra cuántos plantines son, cuántos pide el plan,
+      el trasplante y la cosecha previstos, y <b>cuántos días se apartó del plan</b>.</p>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/02-para-sembrar.jpg" width="480" height="738"
+        alt="Lista Para sembrar con lechuga, rabanito, zapallito y zanahoria">
+        <figcaption>Para sembrar, según el plan.</figcaption></figure>
+      <figure><img loading="lazy" src="img/03-siembra-desde-plan.jpg" width="480" height="738"
+        alt="Formulario de siembra completado con lo que dice el plan">
+        <figcaption>Al tocar una, el formulario viene completo.</figcaption></figure>
+      <figure><img loading="lazy" src="img/04-siembra-cuentas.jpg" width="480" height="738"
+        alt="Cuentas de la siembra: plantines, trasplante previsto y diferencia con el plan">
+        <figcaption>Las cuentas: plantines, trasplante previsto y diferencia con el plan.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>Trasplantes</h3>
+  <div class="paso">
+    <div>
+      <p><b>Para trasplantar</b> lista los almácigos que esperan, con los días que llevan en
+      bandeja y cuándo se espera llevarlos al bancal: la siembra más los días que el plan le
+      dio a esa generación.</p>
+      <p>Tocá uno: el formulario trae el cultivo, la generación y <b>los bancales que el plan
+      le asignó en el mapa</b>. Se puede agregar o quitar bancales. Los plantines se calculan
+      con el marco y el largo del bancal de cada sector, o se escriben si se contaron.</p>
+      <p>Al guardar, la barra del plan se corre sola a la fecha real del trasplante.</p>
+      <div class="ojo"><b>Elegí siempre el almácigo de origen.</b>
+      Es lo que une el trasplante con su siembra y permite medir cuántos días tardó de verdad
+      en la bandeja.</div>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/05-para-trasplantar.jpg" width="480" height="738"
+        alt="Lista Para trasplantar con los días en bandeja de cada almácigo">
+        <figcaption>Para trasplantar.</figcaption></figure>
+      <figure><img loading="lazy" src="img/06-trasplante-bancales.jpg" width="480" height="738"
+        alt="Formulario de trasplante con los bancales del plan">
+        <figcaption>Los bancales vienen del plan.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>Cosechas</h3>
+  <div class="paso">
+    <div>
+      <p>Los kilos totales de cada cultivo, de todos los bancales juntos. Hay dos formas:</p>
+      <ul>
+        <li><b>Lista:</b> un renglón por cultivo; con + se suma otro.</li>
+        <li><b>Pizarra:</b> todos los cultivos del plan, como en la pizarra del galpón. Se
+          escriben los kilos solo de lo que se cosechó.</li>
+      </ul>
+      <p>Lo cosechado se va sumando contra los kilos esperados del plan.</p>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/07-cosecha-pizarra.jpg" width="480" height="738"
+        alt="Cosecha en modo pizarra con los cultivos del plan">
+        <figcaption>Cosecha en modo pizarra.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>Horas de trabajo</h3>
+  <div class="paso">
+    <div>
+      <p>Quién trabajó, en qué <b>área</b> y en qué <b>actividad</b>, cuántas horas y qué se
+      hizo. Las áreas son seis, iguales para todas las chacras (Hortícola, Frutícola, Fungis,
+      Comercialización, Administración y Mantenimiento), más las propias de cada una.</p>
+      <div class="consejo"><b>¿Por qué áreas fijas?</b>
+      Si cada chacra inventara sus nombres, las horas no se podrían comparar entre
+      colectivos. Lo propio de cada lugar se suma aparte, como área propia.</div>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/08-horas.jpg" width="480" height="738"
+        alt="Formulario de horas con área, actividad y horas">
+        <figcaption>Registrar horas.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>Tareas</h3>
+  <div class="paso">
+    <div>
+      <p>Lo que hay que hacer, para cuándo, con qué importancia y quién lo toma. Se marca
+      como hecha tocando el círculo. <b>Hoy</b> muestra todo por fecha; <b>Por área</b> junta
+      las tareas de cada área con las horas que se le dedicaron.</p>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/09-tareas.jpg" width="480" height="738"
+        alt="Lista de tareas pendientes">
+        <figcaption>Tareas pendientes.</figcaption></figure>
+      <figure><img loading="lazy" src="img/10-tareas-por-area.jpg" width="480" height="738"
+        alt="Tareas agrupadas por área con las horas cargadas">
+        <figcaption>Por área, con sus horas.</figcaption></figure>
+    </div>
+  </div>
+
+  <h3>Corregir y borrar</h3>
+  <div class="paso">
+    <div>
+      <p>Abajo de cada sección están los <b>Últimos movimientos</b> de toda la chacra. Con
+      ✎ se corrige un registro y con 🗑 se borra.</p>
+      <p>Lo que se cambia queda copiado, como estaba, en la hoja <b>Cambios</b> de la
+      planilla: un borrado por error se puede recuperar.</p>
+      <div class="ojo"><b>Corregí desde la app, no en la planilla.</b>
+      La app vuelve a calcular lo que depende del dato (plantines, fechas previstas,
+      diferencia con el plan). Cambiando la planilla a mano eso queda desparejo.</div>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/11-ultimos-movimientos.jpg" width="480" height="738"
+        alt="Últimos movimientos con los botones de corregir y borrar">
+        <figcaption>Últimos movimientos.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="medimos">
+  <h2>Qué estamos midiendo</h2>
+  <p class="bajada">Los «relojes» de la chacra: indicadores para saber cómo va la temporada
+  y qué ajustar para la próxima.</p>
+
+  <h3>Tres fechas para cada etapa</h3>
+  <table>
+    <tr><th>Fecha</th><th>Qué es</th><th>Quién la cambia</th></tr>
+    <tr><td><b>Planificada</b></td><td>Lo que se decidió al planificar. Es la línea de base.</td>
+        <td>Se mueve mientras la etapa no se hizo; después queda fija.</td></tr>
+    <tr><td><b>Real</b></td><td>Lo que pasó, tal como se registró.</td>
+        <td>Solo se cambia con «Corregir».</td></tr>
+    <tr><td><b>Prevista</b></td><td>Para lo que falta: la última fecha real más los días
+        que le dio el plan a esa generación (o los del catálogo).</td>
+        <td>La calcula la app; nadie la escribe.</td></tr>
+  </table>
+
+  <div class="relojes">
+    <div class="reloj"><b>Cumplimiento del plan</b>
+      ¿Se sembró, trasplantó y cosechó cuando se había dicho?<br>
+      <small>Queda guardado en cada siembra y trasplante como «Diferencia plan».</small></div>
+    <div class="reloj"><b>Calibración del catálogo</b>
+      ¿Cuántos días tarda de verdad cada cultivo en esta chacra?<br>
+      <small>Días reales en bandeja contra los del catálogo, solo con plantines propios.</small></div>
+    <div class="reloj"><b>Producción</b>
+      Kilos cosechados contra los esperados, y kilos por m².<br>
+      <small>En Inicio, en Plan → Resumen y en la ficha de cada cultivo.</small></div>
+    <div class="reloj"><b>Trabajo</b>
+      Horas por área y por actividad.<br>
+      <small>En Tareas → Por área.</small></div>
+  </div>
+
+  <div class="paso">
+    <div>
+      <p><b>Un ejemplo.</b> En la ficha de la lechuga de la chacra de ejemplo:</p>
+      <ul>
+        <li>La G1 se sembró <b>2 días</b> después de lo planificado y se trasplantó
+          <b>4 días</b> después: eso es cumplimiento del plan.</li>
+        <li>Estuvo <b>37 días en bandeja</b>, 2 más de lo que dice el catálogo: eso es
+          calibración. Si temporada tras temporada pasa lo mismo, conviene corregir el
+          catálogo para esta zona.</li>
+      </ul>
+      <p>Las dos medidas son distintas y no conviene mezclarlas: una habla de cómo nos
+      organizamos, la otra de cómo responde el cultivo acá.</p>
+      <div class="consejo"><b>En camino:</b> una pantalla de seguimiento que junte todos
+      estos indicadores por temporada y proponga cómo ajustar el catálogo para la
+      siguiente.</div>
+    </div>
+    <div class="capturas">
+      <figure><img loading="lazy" src="img/21-ficha-generaciones.jpg" width="480" height="787"
+        alt="Generaciones de la lechuga con la diferencia contra el plan y contra el catálogo">
+        <figcaption>Cada generación, contra el plan y contra el catálogo.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section id="consejos">
+  <h2>Consejos</h2>
+  <ul>
+    <li><b>Cargá el mismo día.</b> Al día siguiente ya no se recuerda bien cuántas bandejas
+      o a qué bancal fue cada cosa.</li>
+    <li><b>Entrá por «Para sembrar» y «Para trasplantar».</b> Así lo registrado queda atado a
+      su generación del plan, y las cuentas y las barras se corren solas.</li>
+    <li><b>Cuidá el número de generación.</b> Si una siembra queda con el número de otra, el
+      plan las confunde. Si te equivocaste, corregilo con ✎.</li>
+    <li><b>Si el plan cambió antes de sembrar, corré la barra</b> en el Plan estratégico. Si
+      ya se sembró, no hace falta: se acomoda sola con lo que se registra.</li>
+    <li><b>Una vez por semana, mirá el plan estratégico</b> con el equipo: qué se atrasó, qué
+      viene, qué bancales se liberan.</li>
+    <li><b>Al cerrar la temporada,</b> revisá los días reales de cada cultivo contra el
+      catálogo y ajustá lo que se repita.</li>
+    <li><b>¿Algo no anda o falta algo?</b> En Inicio está «¿Qué mejorarías de la app?».</li>
+  </ul>
+</section>
+
+<!-- ================================================================== -->
+<section id="preguntas">
+  <h2>Preguntas frecuentes</h2>
+  <details><summary>¿Por qué dice «atrasado» algo que todavía no toca?</summary>
+    <p>«Para trasplantar» cuenta desde la siembra real más los días en bandeja que el plan
+    le dio a esa generación. Si la siembra se registró con una fecha equivocada, o con otro
+    número de generación, la cuenta sale mal: corregí la siembra con ✎ en Siembras.</p></details>
+  <details><summary>¿Puedo mover una generación que ya sembré?</summary>
+    <p>No hace falta. Desde la siembra, la barra se calcula sola con lo que se registra.
+    Cuando cargues el trasplante, se corre a esa fecha. Lo planificado queda como referencia
+    para comparar.</p></details>
+  <details><summary>Encargamos los plantines y no sabemos cuándo se sembraron</summary>
+    <p>En Siembras, elegí «Encargados a otra persona» o «Comprados» y poné la fecha en que
+    llegan listos para trasplantar. La app guarda una siembra teórica y no la usa para medir
+    días en bandeja.</p></details>
+  <details><summary>Sembramos en cajones, sin alvéolos</summary>
+    <p>En «Alvéolos por bandeja» elegí «Cajón» y escribí los plantines, contados o
+    aproximados.</p></details>
+  <details><summary>No hay señal en el campo</summary>
+    <p>Cargá igual. Queda guardado en el teléfono y se envía solo cuando vuelve la conexión.
+    No borres los datos del navegador mientras diga «por enviar».</p></details>
+  <details><summary>No veo el Plan estratégico ni el Mapa en el teléfono</summary>
+    <p>Necesitan pantalla ancha y se usan desde la computadora. En el teléfono, Plan →
+    Resumen muestra el plan y un croquis de los sectores, y Cultivos → ✎ permite cambiar
+    fechas, sector y bancales.</p></details>
+  <details><summary>Me equivoqué al cargar algo</summary>
+    <p>En «Últimos movimientos» de esa sección, ✎ para corregir o 🗑 para borrar. Queda copia
+    de cómo estaba en la hoja Cambios.</p></details>
+  <details><summary>Un cultivo no está en la lista</summary>
+    <p>En Plan → Cultivos, «¿No está en la lista? Agregar un cultivo». Se suma al catálogo
+    común, para todas las chacras.</p></details>
+</section>
+
+<!-- ================================================================== -->
+<section id="video">
+  <h2>Video</h2>
+  <div class="video">Próximamente: un recorrido en video por la app, de la planificación al
+  registro diario.</div>
+  <p></p>
+</section>
+
+</main>
+
+<footer>
+  AMA · Aplicaciones para el Manejo Agroecológico · Las capturas son de una chacra de ejemplo
+  con datos inventados. · <a href="../">Volver a la app</a>
+</footer>
+
+</body>
+</html>

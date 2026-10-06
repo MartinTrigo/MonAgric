@@ -38,6 +38,10 @@
   </div>
 
   <button data-vista="plan" class="tab fija"><span class="tab-icono">&#9776;</span>Plan</button>
+  <!-- La guía es una página aparte: no se descarga con la app ni la guarda
+       el service worker, así no la hace más lenta. -->
+  <a class="tab fija tab-ayuda" href="ayuda/" target="_blank" rel="noopener"
+     title="Guía de uso de la app"><span class="tab-icono">?</span>Ayuda</a>
 </nav>
 
 <div id="aviso" class="aviso oculto"></div>

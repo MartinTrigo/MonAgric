@@ -5,7 +5,7 @@
 // señal se sirve la última copia guardada, que es lo que importa en el campo.
 // Desde el 01/10, al abrir la app se espera a la red un máximo de 3 segundos:
 // con señal débil, la copia (ver abrir()).
-const CACHE = "monagric-v75";
+const CACHE = "monagric-v76";
 const ARCHIVOS = [
   ".",
   "index.html",
@@ -62,6 +62,9 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;                  // los envíos no se cachean
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;         // las planillas van siempre a la red
+  // La guía (con sus capturas, y más adelante un video) va directo a la red:
+  // guardarla en el teléfono le sumaría peso a la app sin hacer falta en el campo.
+  if (url.pathname.includes("/ayuda/")) return;
   if (e.request.mode === "navigate") e.respondWith(abrir(e.request));
   else e.respondWith(usarCopia ? copiaPrimero(e.request) : redPrimero(e.request));
 });

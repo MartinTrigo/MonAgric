@@ -9,7 +9,8 @@
 // ==========================================================
 // ARRANQUE
 // ==========================================================
-document.querySelectorAll(".tab").forEach((t) =>
+// Solo las que cambian de sección: Ayuda es un enlace a otra página.
+document.querySelectorAll(".tab[data-vista]").forEach((t) =>
   t.addEventListener("click", () => render(t.dataset.vista)));
 $("#btn-ajustes").addEventListener("click", () => render("ajustes"));
 window.addEventListener("online", () => sincronizar());

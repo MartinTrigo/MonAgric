@@ -49,6 +49,11 @@ docs/pruebas.html   pruebas de las cuentas (etapas, plantas, bandejas, cola…):
 docs/sw.js          service worker: red primero, caché de respaldo
 docs/catalogo.json  cultivos y perfiles, iguales para todas las chacras
 docs/juego/         Pac-Farm, el juego
+docs/ayuda/         la guía de uso (botón «Ayuda» de la barra): página aparte, el
+                    service worker NO la guarda, así no pesa en el teléfono. Las
+                    capturas son de una chacra inventada: rehacerlas con
+                    ayuda/capturas/datos-ejemplo.js (instrucciones adentro).
+                    Nunca capturas con datos de una chacra real: el repo es público
 apps-script/Code.gs            el "servidor" de las cinco chacras
 apps-script/Codigo-horas-bioma.gs  script aparte, vive en la planilla de horas
                     (Web App archivado el 30/09: Code.gs escribe esas horas)

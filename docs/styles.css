@@ -279,6 +279,14 @@ button.secundario {
 .tabs-medio .tab { flex: 0 0 auto; min-width: 78px; scroll-snap-align: center; }
 
 .tab.fija { flex: 0 0 auto; min-width: 68px; }
+/* Ayuda: un enlace con cara de pestaña, más angosto para no apretar la barra. */
+a.tab { text-decoration: none; }
+.tab.fija.tab-ayuda { min-width: 52px; border-left: 1px solid var(--sage-light); }
+.tab-ayuda .tab-icono {
+  width: 1.25rem; height: 1.25rem; border-radius: 50%; box-sizing: border-box;
+  border: 2px solid currentColor; font-size: .8rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
 
 .tab {
   flex: 1;
