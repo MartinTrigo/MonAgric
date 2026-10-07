@@ -425,6 +425,10 @@ Fase 4.8 de bioma-mov.
   temporada, un cuarto del total. Cuadra con julio; conviene confirmarlo.
 
 ### 5. Qué hojas de la planilla de horas se pueden borrar
+**Al 07/10 ya se borraron**: quedan solo «Respuestas de formulario 1»,
+«Registro Horas», «Resumen General» y «Config». Lo que falta limpiar está
+en el O4 del PLAN.md de bioma-mov. Texto anterior:
+
 Lo que AMA necesita sí o sí: **`Respuestas de formulario 1`** y **`Config`**.
 Sin uso y se pueden borrar: las 12 pestañas "Cuenta individual", "Resumen
 general de horas y pagos" y "Gestión de pagos". AMA ya **no lee** `Registro Horas` ni `Pagos`: se apagó el espejo de las
