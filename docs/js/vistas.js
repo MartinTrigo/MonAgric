@@ -319,7 +319,7 @@ const plantillas = {
       concepto: un honorario, por ejemplo. Se corrige en la app de Bioma.</p>
       ${d.pagos_sin_persona.map((g) => `<div class="registro">
         <div><div class="detalle">${pesos(g.monto)}</div>
-          <div class="cuando">${fechaCorta(g.fecha)}${g.obs ? " · " + esc(g.obs) : ""}</div></div>
+          <div class="cuando">${datosDelPago(g)}</div></div>
       </div>`).join("")}
     </div>` : ""}
     ${tarjetasDeEconomia(d.economia)}

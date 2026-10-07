@@ -169,6 +169,18 @@ function tarjetasDeEconomia(e) {
   </div>` : ""}`;
 }
 
+// La línea chica de un pago: cuándo, cómo y hasta qué día cubre. Medio y
+// período existen desde el 07/10; los pagos anteriores no los traen y no se
+// muestra nada en su lugar.
+function datosDelPago(g) {
+  return [
+    fechaCorta(g.fecha),
+    g.medio ? esc(g.medio) : "",
+    g.periodo ? `cubre hasta el ${fechaCorta(g.periodo)}` : "",
+    g.obs ? esc(g.obs) : ""
+  ].filter(Boolean).join(" · ");
+}
+
 // La cuenta de una persona: qué ganó, qué cobró y qué le queda.
 function detalleDeCuenta(x, d) {
   const propia = claveArea(x.nombre) === claveArea(d.yo || "");
@@ -219,7 +231,7 @@ function detalleDeCuenta(x, d) {
     <h2>Pagos recibidos <small>${(x.pagos || []).length}</small></h2>
     ${(x.pagos || []).length ? (x.pagos || []).map((g) => `<div class="registro">
       <div><div class="detalle">${pesos(g.monto)}</div>
-        <div class="cuando">${fechaCorta(g.fecha)}${g.obs ? " · " + esc(g.obs) : ""}</div></div>
+        <div class="cuando">${datosDelPago(g)}</div></div>
     </div>`).join("") : `<p class="nota">Todavía no recibiste pagos.</p>`}
     <p class="nota">Los pagos se registran en la app de Bioma. Si falta alguno o
     hay un número que no cierra, avisá: se corrige allá, no acá.</p>
