@@ -174,12 +174,13 @@ function cultivoEditable(cultivo, lista, todas) {
 }
 
 function pantallaPlanificar() {
-  // Dentro de cada cultivo, por fecha: el orden en que se siembran, que es el
-  // que importa al mirar la lista. El número de generación queda en el nombre.
+  // Dentro de cada cultivo, por número de generación (G1, G2, G3…), igual
+  // que el gráfico (09/10); las partes de una generación partida, por fecha.
   const gens = (leer(LS.generaciones, []) || [])
     .slice()
     .sort((a, b) => a.cultivo.localeCompare(b.cultivo)
-      || arranqueDe(a).localeCompare(arranqueDe(b)) || a.generacion - b.generacion);
+      || (Number(a.generacion) || 0) - (Number(b.generacion) || 0)
+      || arranqueDe(a).localeCompare(arranqueDe(b)));
 
   const porCultivo = new Map();
   gens.forEach((g) => {

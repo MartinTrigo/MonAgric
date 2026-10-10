@@ -87,22 +87,53 @@ function generacionDeSiembra(cultivo, generacion, id = "") {
    - REAL: la registrada en Siembras o Trasplantes. Solo cambia con Corregir.
    - PREVISTA: para lo que falta, la última fecha real más los días teóricos.
      La calcula la app; nadie la escribe.
-   Los días teóricos son los que el plan le dio a ESA generación (de la
-   bandeja al bancal); si el plan no los dice, los del catálogo para la
-   estación en que se sembró. */
+   Los días teóricos de lo ya sembrado son los del CATÁLOGO para la estación
+   de la siembra real (09/10; antes, los del plan de esa generación: ver
+   diasBandejaPrevistos). Lo planificado sigue usando los días del plan. */
 function diasBandejaDe(cultivo, g, fechaSiembra) {
   const delPlan = g && g.fecha_almacigo && g.fecha_campo ? diasEntre(g.fecha_almacigo, g.fecha_campo) : 0;
   return delPlan > 0 ? delPlan : diasAlmacigo(cultivo, fechaSiembra || g?.fecha_almacigo);
 }
 
-/* Cuándo se espera llevar al bancal un almácigo que ya está sembrado: su
-   siembra real más los días en bandeja. La columna "Trasplante estimado" de
-   Siembras es una foto del día en que se cargó y no se entera de nada
-   después; queda de respaldo si no hay con qué calcular. */
+/* Los días en bandeja de lo que YA SE SEMBRÓ (09/10, decidido con Martín):
+   los del CATÁLOGO para la estación de la siembra real, no los del plan.
+   El plan es lo que se pensó al planificar y queda como línea de base; el
+   catálogo es lo que hoy se sabe del cultivo, y corregirlo (planilla «AMA -
+   Catálogo de cultivos») tiene que mover todo lo que está en bandeja. Pasó
+   con la coliflor: plan de 35 días, la G1 tardó 41 y la G2 pedía trasplante
+   antes de estar lista. Si el catálogo no tiene el dato, el del plan. */
+function diasBandejaPrevistos(cultivo, g, fechaSiembra) {
+  return diasAlmacigo(cultivo, fechaSiembra) || diasBandejaDe(cultivo, g, fechaSiembra);
+}
+
+/* Cuándo va al bancal un almácigo ya sembrado:
+   - Encargado o comprado: el día que llega listo (columna "Trasplante
+     estimado"). Su fecha de siembra es teórica, y contarle días de catálogo
+     lo daría por atrasado (la berenjena "atrasada 31 días" del 03/10).
+   - Propio: la siembra real más los días de catálogo de esa estación.
+   La columna "Trasplante estimado" de un propio es una foto del día en que
+   se cargó: queda solo de respaldo si no hay con qué calcular. */
+function previstoDesdeSiembra(cultivo, g, fecha, origen, estimado) {
+  if (!esPropio(origen) && estimado) return aFechaISO(estimado);
+  const dias = fecha ? diasBandejaPrevistos(cultivo, g, fecha) : 0;
+  return (dias && sumarDias(fecha, dias)) || aFechaISO(estimado) || "";
+}
+
 function trasplantePrevisto(s) {
   const g = generacionDeSiembra(s.cultivo, s.generacion, s.id);
-  const dias = s.fecha ? diasBandejaDe(s.cultivo, g, s.fecha) : 0;
-  return (dias && sumarDias(s.fecha, dias)) || s.estimado || "";
+  return previstoDesdeSiembra(s.cultivo, g, s.fecha, s.origen, s.estimado);
+}
+
+/* La siembra que espera en bandeja de una generación del plan, para saber
+   su origen y su llegada: la lista del servicio o, si recién se cargó, la
+   cola de este teléfono. */
+function almacigoDeGeneracion(g) {
+  const id = String(g.siembra_id || "");
+  if (!id) return {};
+  const f = (leer(LS.almacigos, []) || []).find((x) => String(x.Id) === id);
+  if (f) return { origen: f.Origen || "", estimado: f["Trasplante estimado"] || "" };
+  const r = pendientes.concat(enviados).find((x) => x.tipo === "siembras" && String(x.id) === id);
+  return r ? { origen: r.datos.origen || "", estimado: r.datos.trasplante_estimado || "" } : {};
 }
 
 /* Cuándo se trasplantó de verdad una generación. Lo manda el servicio

@@ -137,12 +137,24 @@ temporada, tener un catálogo con fechas reales.
   solo mientras la generación no se sembró. Después es la **línea de base** y
   no se toca: una sembrada no se arrastra ni se edita su fecha.
 - **Real**: Siembras / Trasplantes. Se cambia solo con Corregir.
-- **Prevista**: lo que falta = última fecha real + días teóricos. Los días
-  teóricos son los del **plan de esa generación** (bandeja → campo) con el
-  catálogo de respaldo (`diasBandejaDe`, `trasplantePrevisto`,
-  `trasplantadaEl` en pendientes.js; `tramosDe` en plan-grafico.js). Al
+- **Prevista**: lo que falta = última fecha real + días teóricos. Desde el
+  09/10 los días teóricos de lo ya sembrado son los del **catálogo para la
+  estación de la siembra real** (`diasBandejaPrevistos`), con el plan de
+  respaldo; antes eran los del plan de la generación, y corregir el catálogo
+  no movía nada (la coliflor G2 pedía trasplante a los 35 días del plan
+  cuando la G1 había tardado 41). Lo **encargado o comprado** va al bancal el
+  día que llega (columna "Trasplante estimado"), nunca siembra teórica +
+  días (`previstoDesdeSiembra`). Lo planificado sigue con los días del plan
+  (`diasBandejaDe`). Ver también `trasplantadaEl` y `tramosDe`. Al
   registrar la siembra o el trasplante, la barra se corre sola y deja una marca
   punteada donde estaba lo planificado.
+- **Los datos de los cultivos se corrigen en la planilla «AMA - Catálogo de
+  cultivos»** (hoja Cultivos; propiedad `PLANILLA_CATALOGO`): un número ahí
+  le gana a `catalogo.json`; vacío o 0 no borra. Los días de almácigo por
+  estación son las columnas N (otoño-invierno, abril a septiembre) y O
+  (primavera-verano): ganan sobre C. El servidor la recuerda 10 minutos.
+- **En el gráfico del plan**, dentro de cada cultivo las barras van G1, G2,
+  G3… de arriba hacia abajo (09/10), aunque se hayan sembrado en otro orden.
 - **Dónde queda la diferencia**: en el registro mismo, congelada al cargarlo:
   columnas "Fecha planificada" y "Diferencia plan" en Siembras y Trasplantes
   (cumplimiento del plan). Aparte, Trasplantes guarda "Días en almácigo" contra

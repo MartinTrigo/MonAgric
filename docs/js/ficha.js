@@ -42,11 +42,12 @@ function fichaCultivo(cultivo) {
     const suyos = porSiembra[s.id] || [];
     // Las fechas, de lo más firme a lo menos: lo que pasó (el trasplante
     // registrado) y, si todavía no pasó, lo previsto desde la siembra con los
-    // días en bandeja del plan (ver trasplantePrevisto). Una siembra directa
-    // no tiene trasplante: su cosecha sale de la siembra.
+    // días en bandeja del catálogo, o su llegada si es encargada (ver
+    // trasplantePrevisto). Una siembra directa no tiene trasplante: su
+    // cosecha sale de la siembra.
     const previsto = EN_BANDEJA.has(s.tipo)
       ? trasplantePrevisto({ cultivo, generacion: s.generacion, id: s.id, fecha: s.fecha,
-                             estimado: s.trasplante_estimado }) : "";
+                             estimado: s.trasplante_estimado, origen: s.origen }) : "";
     const aCampo = suyos.length ? suyos[0].fecha : previsto;
     const inicio = aCampo && p.dias_trasplante_cosecha
       ? sumarDias(aCampo, p.dias_trasplante_cosecha) : (s.cosecha_estimada || "");

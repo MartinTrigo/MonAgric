@@ -49,9 +49,16 @@ function tramosDe(g) {
   if (!directa && !enBandeja) { enBandeja = DIAS_SUPUESTOS.almacigo; faltan.push("días de almácigo"); }
   const planCampo = directa ? g.fecha_campo
     : (g.fecha_campo || sumarDias(g.fecha_almacigo, diasBandejaDe(g.cultivo, g, g.fecha_almacigo) || enBandeja));
+  // Sembrada y todavía en bandeja: lo previsto desde la siembra real, con
+  // los días del catálogo (o su llegada, si es encargada). Ver
+  // previstoDesdeSiembra en pendientes.js.
+  const enEspera = sembradaEl && !directa && !trasplantada ? almacigoDeGeneracion(g) : null;
   const campo = directa
     ? (sembradaEl || g.fecha_campo)
-    : (trasplantada || (sembradaEl ? sumarDias(sembradaEl, enBandeja) : planCampo)) || inicioTodo;
+    : (trasplantada
+       || (enEspera ? (previstoDesdeSiembra(g.cultivo, g, sembradaEl, enEspera.origen, enEspera.estimado)
+                       || sumarDias(sembradaEl, enBandeja))
+                    : planCampo)) || inicioTodo;
   let aCosecha = directa
     ? (p.dias_a_cosecha || 0)
     : (p.dias_trasplante_cosecha || 0);
@@ -86,11 +93,14 @@ function generacionesParaElPlan() {
     .sort((a, b) => ordenPlan === "fecha"
       ? String(a.tramos.inicioCosecha || a.tramos.inicio)
           .localeCompare(String(b.tramos.inicioCosecha || b.tramos.inicio))
-      // Por cultivo, y dentro de cada uno por la fecha en que arranca: al
-      // correr una generación en el gráfico, se reacomoda sola en su lugar.
+      /* Por cultivo, y dentro de cada uno por número de generación: G1
+         arriba, después G2, G3… (09/10, pedido de Martín). Antes iba por la
+         fecha en que arranca, y una generación sembrada antes que su número
+         (la G4 del mix, sembrada antes que la G3) quedaba arriba de las
+         otras. Las partes de una generación partida, por fecha. */
       : a.cultivo.localeCompare(b.cultivo)
-        || String(a.tramos.inicio).localeCompare(String(b.tramos.inicio))
-        || a.generacion - b.generacion);
+        || (Number(a.generacion) || 0) - (Number(b.generacion) || 0)
+        || String(a.tramos.inicio).localeCompare(String(b.tramos.inicio)));
 }
 
 function planEstrategico() {

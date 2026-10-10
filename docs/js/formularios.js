@@ -22,10 +22,13 @@ function fechasDeSiembra(f) {
   const g = cultivo ? generacionDeSiembra(cultivo, parseInt(f.generacion.value, 10) || 1) : null;
   const p = perfil(cultivo) || {};
   const propio = !conBandeja || esPropio(f.origen?.value);
-  const delPlan = g && g.fecha_almacigo && g.fecha_campo && diasEntre(g.fecha_almacigo, g.fecha_campo) > 0;
   // Para los días por estación hace falta una fecha de siembra: la del
   // formulario si es propia; si llega hecha, la que planificó el plan.
-  const dias = conBandeja ? diasBandejaDe(cultivo, g, propio ? f.fecha.value : (g?.fecha_almacigo || f.fecha.value)) : 0;
+  // Lo sembrado se prevé con los días del catálogo (09/10, ver
+  // diasBandejaPrevistos); el plan solo si el catálogo no los tiene.
+  const fechaEstacion = propio ? f.fecha.value : (g?.fecha_almacigo || f.fecha.value);
+  const delCatalogo = conBandeja && diasAlmacigo(cultivo, fechaEstacion) > 0;
+  const dias = conBandeja ? diasBandejaPrevistos(cultivo, g, fechaEstacion) : 0;
   const siembra = propio ? f.fecha.value : (dias ? sumarDias(f.fecha.value, -dias) : "");
   const trasplante = conBandeja ? (propio ? (dias ? sumarDias(siembra, dias) : "") : f.fecha.value) : "";
   const planificada = g ? (conBandeja ? (g.fecha_almacigo || g.fecha_campo) : (g.fecha_campo || g.fecha_almacigo)) : "";
@@ -34,7 +37,7 @@ function fechasDeSiembra(f) {
        : (siembra && p.dias_a_cosecha ? sumarDias(siembra, p.dias_a_cosecha) : ""))
     : (siembra ? sumarDias(siembra, tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha) : "");
   return { siembra, trasplante, cosecha, dias, planificada,
-           diasDe: delPlan ? "del plan" : "del catálogo",
+           diasDe: delCatalogo ? "del catálogo" : "del plan",
            diferencia: planificada && siembra ? diasEntre(planificada, siembra) : "" };
 }
 
@@ -123,7 +126,7 @@ function prepararSiembras() {
         partes.push(`siembra teórica: <b>${fechaCorta(fs.siembra)}</b> <small>(${fs.dias} días antes, ${fs.diasDe})</small>`);
       }
       // Desde la siembra, el trasplante se prevé solo: siembra más los días en
-      // bandeja que le dio el plan a esta generación (o los del catálogo).
+      // bandeja del catálogo para la estación (o los del plan, si no los dice).
       if (propio && fs.trasplante) {
         partes.push(`trasplante previsto: <b>${fechaCorta(fs.trasplante)}</b> <small>(${fs.dias} días en bandeja, ${fs.diasDe})</small>`);
       }

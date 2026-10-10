@@ -247,8 +247,11 @@ function datosCorregidos(tipo, f, form) {
     d.origen = conBandeja ? (d.origen || "Propio") : "Propio";
     const p = perfil(d.cultivo) || {};
     const g = generacionDeSiembra(d.cultivo, d.generacion, f.Id);
-    const dias = conBandeja ? diasBandejaDe(d.cultivo, g, d.fecha) : 0;
-    d.trasplante_estimado = conBandeja && dias ? sumarDias(d.fecha, dias) : "";
+    const dias = conBandeja ? diasBandejaPrevistos(d.cultivo, g, d.fecha) : 0;
+    // Encargado o comprado: el trasplante estimado es el día que llega, no
+    // una cuenta; corregir la siembra no lo cambia.
+    const llegada = !esPropio(d.origen) && aFechaISO(f["Trasplante estimado"]);
+    d.trasplante_estimado = llegada || (conBandeja && dias ? sumarDias(d.fecha, dias) : "");
     d.cosecha_estimada = d.trasplante_estimado && p.dias_trasplante_cosecha
       ? sumarDias(d.trasplante_estimado, p.dias_trasplante_cosecha)
       : sumarDias(d.fecha, d.tipo === "Trasplante" ? p.dias_trasplante_cosecha : p.dias_a_cosecha);
