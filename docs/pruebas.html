@@ -195,6 +195,21 @@ almacenamiento del teléfono.</p>
         pc.objetivo > "2026-10-08", true);
       igual("la barra de la coliflor G2 va al bancal en la misma fecha que la lista",
         tramosDe(col).campo, pc.objetivo);
+
+      // 10/10: el teléfono que CARGÓ la berenjena guarda su copia enviada,
+      // de cuando era "Propio". Después se la marcó "Encargado" en la
+      // planilla: tiene que ganar la planilla, no la copia vieja. Si no,
+      // 21/08 + días de catálogo = "atrasado".
+      const enviadosAntes = enviados;
+      enviados = [{ id: "s-ber", tipo: "siembras", enviado_en: "2026-10-03T10:00:00",
+        datos: { cultivo: "Berenjena", generacion: 1, tipo: "Siembra almácigo", fecha: "2026-08-21",
+                 plantines: 144, origen: "Propio", trasplante_estimado: "2026-10-20" } }];
+      try {
+        const conCopia = almacigosPendientes().find((s) => s.id === "s-ber");
+        igual("lo que dice la planilla le gana a la copia que guardó el teléfono al enviar",
+          [conCopia.origen, conCopia.objetivo], ["Encargado", "2026-10-20"]);
+        igual("y la barra del plan, lo mismo", tramosDe(ber).campo, "2026-10-20");
+      } finally { enviados = enviadosAntes; }
       igual("sin generación en el plan: los días del catálogo desde la siembra",
         pa.objetivo, sumarDias("2026-09-05", diasAlmacigo("Albahaca", "2026-09-05")));
 

@@ -44,8 +44,13 @@ function almacigosPendientes() {
       estimado: r.datos.trasplante_estimado || "", origen: r.datos.origen || "",
     }));
 
+  /* Primero lo de la planilla: si el mismo almácigo está en los dos lados,
+     gana la planilla, que es lo último que se sabe. Lo del teléfono suma
+     solo lo que la planilla todavía no tiene (lo recién cargado). Al revés
+     (10/10), la copia que guardó al enviar —"Propio", de antes de marcarla
+     "Encargado" en la planilla— le ganaba, y la berenjena salía atrasada. */
   const vistos = new Set();
-  const lista = [...locales, ...deLaPlanilla]
+  const lista = [...deLaPlanilla, ...locales]
     .filter((s) => /almácigo|almacigo/i.test(s.tipo || ""))
     .filter((s) => !yaHechos.has(s.id))
     .filter((s) => (vistos.has(s.id) ? false : vistos.add(s.id)))

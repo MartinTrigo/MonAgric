@@ -205,6 +205,11 @@ function render_(vista, conservarScroll, htmlListo) {
   // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
   // aunque la sección que se está mirando sea Trasplantes.
   if (vista === "trasplantes") { traerUltimos("siembras"); traerAlmacigos(); }
+  // Inicio y el gráfico del plan también dicen cuándo va cada almácigo al
+  // bancal (y si es encargado): antes solo se renovaba entrando a
+  // Trasplantes, y mostraban datos de días atrás (10/10). Con freno de 20 s y
+  // redibujo solo si cambió: no hace lazo.
+  if (vista === "inicio" || vista === "plan") traerAlmacigos();
 
   engancharFilas();
   const volver = $("#volver-plan");

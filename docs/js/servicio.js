@@ -314,7 +314,7 @@ async function traerAlmacigos(forzar = false) {
     if (!d.ok || !Array.isArray(d.almacigos)) return;
     const cambio = JSON.stringify(leer(LS.almacigos, null)) !== JSON.stringify(d.almacigos);
     escribir(LS.almacigos, d.almacigos);
-    if (cambio && vistaActual === "trasplantes") redibujarConDatos("trasplantes");
+    if (cambio && ["trasplantes", "inicio", "plan"].includes(vistaActual)) redibujarConDatos(vistaActual);
   } catch { /* sin conexión: se usa lo último que se bajó */ }
 }
 
