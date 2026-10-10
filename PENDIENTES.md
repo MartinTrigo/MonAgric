@@ -1,10 +1,27 @@
-# Dónde quedamos — 28 de septiembre de 2026
+# Dónde quedamos — 10 de octubre de 2026
 
 Estado de **AMA y bioma-mov**, que desde hoy se gestionan desde la misma
 conversación. El contexto de cada uno está en su `CLAUDE.md`; acá va solo lo
 que falta hacer.
 
 ---
+
+## Revisión de datos del 10/10 — para Martín
+
+Con la regla nueva (lo sembrado se prevé con los días del catálogo) ningún
+almácigo queda atrasado. Lo que salió al revisar los 38 que esperan:
+
+- **Zapallito G1** (`mur7ttsr866r78`) tiene fecha de siembra **30/10**, en el
+  futuro: ¿era el 30/09? Corregir desde Últimos movimientos.
+- **Puerro G1** tiene cuatro siembras (04/09 dos veces, 15/09 y 30/09) y las
+  G2 a G8 una cada una: ¿alguna era de otra generación?
+- **Tomate G1** junta las tres siembras propias (10/09, 10/09, 12/09) con el
+  encargado (17/08, llega el 20/10). ¿Las propias eran G2?
+- **Pak choi** y **Corredor Biológico** no tienen días de almácigo en el
+  catálogo: sus almácigos no tienen fecha de trasplante prevista. Completar
+  C (y N, O) en «AMA - Catálogo de cultivos».
+- Sigue **«ZZ Prueba»** en el catálogo compartido.
+- Ya son **seis** chacras (Tierra Linda): `CLAUDE.md` todavía dice cinco.
 
 ## Revisión de datos del 29/09 — para Martín
 
