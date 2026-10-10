@@ -153,6 +153,12 @@ temporada, tener un catálogo con fechas reales.
   le gana a `catalogo.json`; vacío o 0 no borra. Los días de almácigo por
   estación son las columnas N (otoño-invierno, abril a septiembre) y O
   (primavera-verano): ganan sobre C. El servidor la recuerda 10 minutos.
+- **Lo que dice la planilla le gana a la copia del teléfono.** El teléfono
+  guarda lo que envió (`enviados`, los últimos 60); al juntarlo con lo del
+  servicio va **después**, solo para sumar lo que el servicio todavía no
+  tiene. Al revés (10/10), una siembra corregida en la planilla («Propio» →
+  «Encargado») seguía viéndose como estaba en el teléfono que la cargó, y la
+  berenjena salía atrasada.
 - **En el gráfico del plan**, dentro de cada cultivo las barras van G1, G2,
   G3… de arriba hacia abajo (09/10), aunque se hayan sembrado en otro orden.
 - **Dónde queda la diferencia**: en el registro mismo, congelada al cargarlo:
