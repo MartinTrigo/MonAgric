@@ -6,6 +6,18 @@ que falta hacer.
 
 ---
 
+## Lo que viene, acordado el 10/10
+
+1. **Estilo de AMA Economía**: la misma letra (Figtree) y paleta vino (los
+   tonos claros), con modo claro y oscuro. Producción ya está (v80).
+2. **Indicadores de monitoreo en el Inicio** (es una app de monitoreo): un
+   gráfico de araña esperado contra real para las variables productivas, y
+   "relojes" de indicadores de sustentabilidad. El "% de lo esperado" en kg
+   queda en 0 hasta la primera cosecha: sumar uno que se mueva desde el
+   principio (p. ej. % de generaciones ya sembradas).
+3. **Stock**: sección nueva. Pensar bien el sistema de registro antes de
+   programar (qué entra, qué sale, en qué unidad, quién lo carga).
+
 ## Revisión de datos del 10/10 — para Martín
 
 Con la regla nueva (lo sembrado se prevé con los días del catálogo) ningún

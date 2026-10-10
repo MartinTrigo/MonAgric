@@ -639,6 +639,15 @@ function prepararAjustes() {
 
   // Borra la copia guardada y vuelve a pedir todo a la red. Los registros que
   // esperan enviarse NO se tocan: viven aparte y se sincronizan igual.
+  // Apariencia: se aplica en el momento y queda guardada en este teléfono.
+  document.querySelectorAll("#aj-tema [data-tema]").forEach((b) => {
+    b.onclick = () => {
+      escribir(LS.tema, b.dataset.tema);
+      aplicarTema(b.dataset.tema);
+      document.querySelectorAll("#aj-tema [data-tema]").forEach((x) => x.classList.toggle("activa", x === b));
+    };
+  });
+
   $("#btn-actualizar-app").onclick = async () => {
     aviso("Buscando actualización…");
     try {

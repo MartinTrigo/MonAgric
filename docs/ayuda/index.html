@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#5C7A5E">
+<meta name="theme-color" content="#5E8C34">
 <title>Guía de AMA Producción</title>
 <meta name="description" content="Cómo usar AMA Producción: planificar la temporada, registrar lo que se hace en la chacra y leer lo que se mide.">
 <link rel="icon" href="../img/icon-192.png">
@@ -11,17 +11,19 @@
      worker, así no le suma peso al teléfono. Las capturas son de una chacra de
      ejemplo con datos inventados (ver capturas/datos-ejemplo.js). -->
 <style>
+  @font-face { font-family: "Figtree"; src: url("../fuentes/figtree.woff2") format("woff2");
+               font-weight: 300 900; font-display: swap; }
   :root {
-    --sage: #5C7A5E; --sage-dark: #3f5a41; --sage-suave: #e6eee4; --crema: #f7f9f5;
-    --ambar: #D4860B; --ambar-suave: #f7e6c8; --texto: #2c3a28; --gris: #5f6b5b; --borde: #d6e0d2;
+    --sage: #5E8C34; --sage-dark: #3E6322; --sage-suave: #E9F2DA; --crema: #FDFEFA;
+    --ambar: #D4860B; --ambar-suave: #f7e6c8; --texto: #25321B; --gris: #5f6b52; --borde: #D5E4BF;
     --ancho: 1040px;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; scroll-padding-top: 64px; }
-  body { margin: 0; background: #eef2ec; color: var(--texto);
-         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { margin: 0; background: #F1F6E7; color: var(--texto);
+         font: 17px/1.6 "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   a { color: var(--sage-dark); }
-  header.portada { background: linear-gradient(135deg, #5C7A5E, #3f5a41); color: #fff; padding: 36px 16px 30px; }
+  header.portada { background: linear-gradient(135deg, #5E8C34, #4A7326); color: #fff; padding: 36px 16px 30px; }
   .portada .dentro { max-width: var(--ancho); margin: 0 auto; display: flex; gap: 18px; align-items: center; }
   .portada img { width: 64px; height: 64px; border-radius: 14px; background: #fff2; }
   .portada h1 { margin: 0; font-size: 1.7rem; line-height: 1.2; }
@@ -69,7 +71,7 @@
   .reloj small { color: var(--gris); }
   details { border: 1px solid var(--borde); border-radius: 12px; padding: 10px 14px; margin: 8px 0; background: var(--crema); }
   summary { cursor: pointer; font-weight: 600; }
-  .video { aspect-ratio: 16/9; border-radius: 14px; background: var(--sage-suave); border: 2px dashed #b8cdb9;
+  .video { aspect-ratio: 16/9; border-radius: 14px; background: var(--sage-suave); border: 2px dashed #C3D9A3;
            display: flex; align-items: center; justify-content: center; text-align: center; color: var(--gris); padding: 20px; }
   footer { text-align: center; color: var(--gris); font-size: .85rem; padding: 10px 16px 40px; }
   @media (min-width: 820px) {

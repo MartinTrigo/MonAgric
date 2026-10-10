@@ -31,7 +31,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 79 · 10/10/2026";
+const VERSION_APP = "versión 80 · 10/10/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -84,7 +84,23 @@ const LS = {
   planPlegado: "monagric_plan_plegado",
   fichas: "monagric_fichas",
   generaciones: "monagric_generaciones",
+  tema: "monagric_tema",                     // "" (el del teléfono), "claro" u "oscuro"
 };
+
+/* Claro u oscuro (10/10). Sin elegir, sigue al teléfono: lo resuelve
+   styles.css con prefers-color-scheme. Elegido a mano, va como data-tema en
+   <html>, y el color de la barra del sistema se acomoda al mismo. Lo lee
+   también index.html antes de dibujar, para que no parpadee en blanco. */
+const COLOR_BARRA = { claro: "#5E8C34", oscuro: "#1C2416" };
+function aplicarTema(tema) {
+  const html = document.documentElement;
+  if (tema === "claro" || tema === "oscuro") html.dataset.tema = tema;
+  else delete html.dataset.tema;
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    const propio = (m.media || "").includes("dark") ? COLOR_BARRA.oscuro : COLOR_BARRA.claro;
+    m.content = COLOR_BARRA[tema] || propio;
+  });
+}
 
 /* Lo leído mientras se dibuja una pantalla queda en memoria hasta que el
    dibujo termina (enMemoria, más abajo). Antes cada leer() volvía a sacar el

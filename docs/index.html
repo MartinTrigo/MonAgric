@@ -3,8 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#5C7A5E">
+<meta name="theme-color" content="#5E8C34" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C2416" media="(prefers-color-scheme: dark)">
 <title>AMA Producción</title>
+<script>
+  /* El tema elegido a mano (Configuración → Apariencia) va antes de dibujar
+     nada: si no, abrir en oscuro mostraría un instante la pantalla blanca.
+     Sin elegir, manda el teléfono (prefers-color-scheme en styles.css). */
+  try {
+    var tema = JSON.parse(localStorage.getItem("monagric_tema") || '""');
+    if (tema === "claro" || tema === "oscuro") document.documentElement.dataset.tema = tema;
+  } catch (e) {}
+</script>
+<link rel="preload" href="fuentes/figtree.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/icon-192.png">
 <link rel="apple-touch-icon" href="img/icon-192.png">

@@ -1,22 +1,78 @@
-/* MonAgric — paleta verde salvia / ámbar, mobile-first */
+/* AMA Producción — verdes claros hacia el lima, mobile-first.
+   Modo claro y oscuro (10/10): el oscuro sigue al teléfono, salvo que en
+   Configuración se elija uno a mano (data-tema en <html>, ver arranque en
+   index.html). Los colores van SIEMPRE por estas variables: un color escrito
+   a mano no cambia con el modo y queda ilegible en el oscuro.
+
+   Figtree, la misma letra que AMA Economía. Va dentro de la app (fuentes/)
+   para que se vea igual en todos los teléfonos y ande sin señal. Licencia
+   OFL, en fuentes/OFL.txt. */
+@font-face {
+  font-family: "Figtree";
+  src: url("fuentes/figtree.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
 :root {
-  --sage: #5C7A5E;
-  --sage-dark: #3F5C42;
-  --sage-light: #B8CDB9;
+  color-scheme: light;
+  --sage: #5E8C34;          /* el verde principal: botones, marcas, barras */
+  --prim-fuerte: #4A7326;   /* el principal apretado, avisos */
+  --sage-dark: #3E6322;     /* títulos, etiquetas, cifras */
+  --sage-light: #D5E4BF;    /* bordes */
+  --sage-suave: #E9F2DA;    /* fondos suaves: lo elegido, lo que se edita */
+  --sobre-prim: #FFFFFF;    /* letra sobre el verde principal */
+  --cab: #5E8C34;           /* encabezado */
+  --cab-2: #4A7326;
+  --cab-tx: #FFFFFF;
   --amber: #D4860B;
+  --ambar: var(--amber);    /* se usaba sin estar definido (importancia Media) */
   --amber-suave: #F6E3C5;
-  --crema: #F7F9F5;
-  --superficie: #EEF2EC;
-  --texto: #26332A;
-  --tenue: #7B8A7D;
+  --amber-tx: #7A5200;
+  --crema: #FDFEFA;         /* tarjetas */
+  --blanco: #FFFFFF;        /* campos, paneles, menús */
+  --superficie: #F1F6E7;    /* fondo de la página */
+  --texto: #25321B;
+  --tenue: #68785B;
+  --linea: #E4EADB;
+  --linea-fuerte: #B9C2B2;
   --peligro: #A94438;
+  --peligro-suave: #FBE9E7;
+  --peligro-borde: #F0C9C3;
+  --alerta: #C0392B;
   --radio: 14px;
+}
+
+/* El oscuro, dos veces: por el teléfono (si no se eligió "claro" a mano)
+   y elegido a mano. CSS no deja compartir el bloque entre los dos. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    color-scheme: dark;
+    --sage: #A6CC6E; --prim-fuerte: #8DB857; --sage-dark: #C8E39E;
+    --sage-light: #334027; --sage-suave: #25301D; --sobre-prim: #16200C;
+    --cab: #1C2416; --cab-2: #162012; --cab-tx: #CFE6A8;
+    --amber: #E8A33A; --amber-suave: #3A2C12; --amber-tx: #F0C27A;
+    --crema: #1A2016; --blanco: #20281B; --superficie: #11150F;
+    --texto: #E6EDDC; --tenue: #9CAA8E; --linea: #2A3322; --linea-fuerte: #46523A;
+    --peligro: #EE9488; --peligro-suave: #3A1F1B; --peligro-borde: #5A2A24; --alerta: #F07A6A;
+  }
+}
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+  --sage: #A6CC6E; --prim-fuerte: #8DB857; --sage-dark: #C8E39E;
+  --sage-light: #334027; --sage-suave: #25301D; --sobre-prim: #16200C;
+  --cab: #1C2416; --cab-2: #162012; --cab-tx: #CFE6A8;
+  --amber: #E8A33A; --amber-suave: #3A2C12; --amber-tx: #F0C27A;
+  --crema: #1A2016; --blanco: #20281B; --superficie: #11150F;
+  --texto: #E6EDDC; --tenue: #9CAA8E; --linea: #2A3322; --linea-fuerte: #46523A;
+  --peligro: #EE9488; --peligro-suave: #3A1F1B; --peligro-borde: #5A2A24; --alerta: #F07A6A;
 }
 
 * { box-sizing: border-box; margin: 0; }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;   /* las cifras quedan alineadas en columna */
   background: var(--superficie);
   color: var(--texto);
   min-height: 100vh;
@@ -28,8 +84,8 @@ body {
 
 /* ---- barra superior ---- */
 .topbar {
-  background: var(--sage);
-  color: #fff;
+  background: var(--cab);
+  color: var(--cab-tx);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -49,7 +105,7 @@ body {
   width: 40px; height: 40px;
   font-size: 1.4rem;
   line-height: 1;
-  color: #fff;
+  color: var(--cab-tx);
   background: rgba(255,255,255,.15);
   border: none;
   border-radius: 10px;
@@ -89,11 +145,11 @@ main {
 
 /* ---- encabezado de temporada ---- */
 .temporada-cab {
-  background: linear-gradient(140deg, var(--sage) 0%, var(--sage-dark) 100%);
-  color: #fff;
+  background: linear-gradient(140deg, var(--cab) 0%, var(--cab-2) 100%);
+  color: var(--cab-tx);
   border: none;
 }
-.temporada-cab h2 { color: #fff; }
+.temporada-cab h2 { color: var(--cab-tx); }
 .temporada-cab .chacra { font-size: .86rem; opacity: .9; }
 .temporada-cab .rango { font-size: .8rem; opacity: .82; margin-top: 2px; }
 /* Columnas de igual ancho que bajan de renglon cuando no entran. Antes era una
@@ -120,7 +176,7 @@ input, select, textarea {
   padding: 11px 12px;
   border: 1.5px solid var(--sage-light);
   border-radius: 10px;
-  background: #fff;
+  background: var(--blanco);
   color: var(--texto);
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--sage); border-color: var(--sage); }
@@ -161,11 +217,11 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   padding: 7px 13px;
   border: 1.5px solid var(--sage-light);
   border-radius: 20px;
-  background: #fff;
+  background: var(--blanco);
   font-size: .85rem;
   cursor: pointer;
 }
-.chip input:checked + span { background: var(--sage); border-color: var(--sage); color: #fff; font-weight: 600; }
+.chip input:checked + span { background: var(--sage); border-color: var(--sage); color: var(--sobre-prim); font-weight: 600; }
 
 /* cálculo asistido */
 .calculo {
@@ -174,9 +230,9 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   background: var(--amber-suave);
   border-radius: 10px;
   font-size: .87rem;
-  color: #7a5200;
+  color: var(--amber-tx);
 }
-.calculo b { color: #5e3f00; }
+.calculo b { color: var(--amber-tx); }
 
 button.principal {
   width: 100%;
@@ -184,13 +240,13 @@ button.principal {
   padding: 14px;
   font-size: 1.08rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--sobre-prim);
   background: var(--sage);
   border: none;
   border-radius: 12px;
   cursor: pointer;
 }
-button.principal:active { background: var(--sage-dark); }
+button.principal:active { background: var(--prim-fuerte); }
 button.secundario {
   width: 100%;
   margin-top: 10px;
@@ -207,7 +263,7 @@ button.secundario {
 /* ---- barras de progreso plan vs logrado ---- */
 .barra {
   height: 8px;
-  background: #DFE7DE;
+  background: var(--sage-light);
   border-radius: 6px;
   overflow: hidden;
   margin-top: 6px;
@@ -237,8 +293,8 @@ button.secundario {
 .registro .detalle { color: var(--sage-dark); font-weight: 600; }
 .registro .cuando { font-size: .74rem; color: var(--tenue); margin-top: 2px; }
 .etiqueta { font-size: .68rem; font-weight: 700; border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
-.etiqueta.ok { background: #DCE9DD; color: var(--sage-dark); }
-.etiqueta.espera { background: var(--amber-suave); color: #8a5a00; }
+.etiqueta.ok { background: var(--sage-suave); color: var(--sage-dark); }
+.etiqueta.espera { background: var(--amber-suave); color: var(--amber-tx); }
 
 .enlace-planilla {
   display: block;
@@ -248,7 +304,7 @@ button.secundario {
   font-size: .95rem;
   font-weight: 600;
   color: var(--sage-dark);
-  background: #fff;
+  background: var(--blanco);
   border: 1.5px solid var(--sage);
   border-radius: 12px;
   text-decoration: none;
@@ -352,7 +408,7 @@ a.tab { text-decoration: none; }
   padding: 10px 0 0 0;
   cursor: pointer;
 }
-.renglon-cosecha .quitar:active { color: #c0392b; }
+.renglon-cosecha .quitar:active { color: var(--alerta); }
 /* Un solo renglón no se puede quitar: sin él no queda nada que cargar. */
 .renglon-cosecha:only-child .quitar { visibility: hidden; }
 
@@ -380,7 +436,7 @@ a.tab { text-decoration: none; }
 /* Una siembra que se pasó de fecha se ve de otro color: es lo único de esa
    lista que pide una decisión y no solo una tarea. */
 .etiqueta.alerta {
-  background: #fbe9e7;
+  background: var(--peligro-suave);
   color: var(--peligro);
 }
 .registro .gen { color: var(--tenue); font-weight: 400; }
@@ -423,7 +479,7 @@ a.tab { text-decoration: none; }
   border: 1px solid var(--sage-light);
   border-radius: 9px;
   padding: 9px 10px;
-  background: #fff;
+  background: var(--blanco);
 }
 .croquis-cab {
   display: flex;
@@ -445,7 +501,7 @@ a.tab { text-decoration: none; }
   aspect-ratio: 1;
   border-radius: 2px;
   background: var(--crema);
-  border: 1px solid #e6eae3;
+  border: 1px solid var(--linea);
 }
 .croquis-camas i.lleno { background: var(--sage); border-color: var(--sage); }
 .croquis-pie { font-size: .74rem; color: var(--tenue); }
@@ -469,7 +525,7 @@ a.tab { text-decoration: none; }
   font-size: .87rem;
   font-weight: 600;
   color: var(--tenue);
-  background: #fff;
+  background: var(--blanco);
   border: 1.5px solid var(--sage-light);
   border-radius: 20px;
   cursor: pointer;
@@ -478,7 +534,7 @@ a.tab { text-decoration: none; }
 .plan-nav-btn.activa {
   background: var(--sage);
   border-color: var(--sage);
-  color: #fff;
+  color: var(--sobre-prim);
 }
 .plan-nav-btn .ico { font-size: 1rem; line-height: 1; }
 /* El botón de plegar no tiene sentido en el teléfono: ahí es una fila. */
@@ -583,7 +639,7 @@ a.tab { text-decoration: none; }
   border: 1px solid var(--sage-light);
   border-radius: 8px;
   background:
-    radial-gradient(circle, #dfe5da 1px, transparent 1.2px) 0 0 / 25px 25px,
+    radial-gradient(circle, var(--linea) 1px, transparent 1.2px) 0 0 / 25px 25px,
     var(--crema);
   cursor: grab;
   touch-action: none;          /* el dedo mueve el mapa, no la página */
@@ -597,7 +653,7 @@ a.tab { text-decoration: none; }
 }
 .lz-bloque {
   position: absolute;
-  background: #fff;
+  background: var(--blanco);
   border: 1px solid var(--sage-light);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0,0,0,.06);
@@ -650,19 +706,19 @@ a.tab { text-decoration: none; }
   border: 1px solid var(--sage-light);
   background:
     repeating-linear-gradient(to right, transparent 0 calc(var(--bancal) - 1px),
-      #edf0ea calc(var(--bancal) - 1px) var(--bancal)),
-    #fff;
+      var(--linea) calc(var(--bancal) - 1px) var(--bancal)),
+    var(--blanco);
 }
 .lz-linea-mes {
   position: absolute;
   left: 0; right: 0;
-  border-top: 1px solid #e2e7de;
+  border-top: 1px solid var(--linea);
 }
 .lz-hoy {
   position: absolute;
   left: -6px; right: 0;
   height: 0;
-  border-top: 2px solid #c0392b;
+  border-top: 2px solid var(--alerta);
   z-index: 4;
   pointer-events: none;
 }
@@ -703,7 +759,7 @@ a.tab { text-decoration: none; }
   outline: 2px solid var(--sage-dark);
   border-radius: 3px;
 }
-.lz-destino.choca { background: rgba(192,57,43,.45); outline-color: #c0392b; }
+.lz-destino.choca { background: rgba(192,57,43,.45); outline-color: var(--alerta); }
 .lz-flotante {
   position: fixed;
   z-index: 1000;
@@ -797,7 +853,7 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
   position: sticky;
   top: 0;
   z-index: 5;
-  background: #fff;
+  background: var(--blanco);
   padding-bottom: 4px;
   border-bottom: 1px solid var(--sage-light);
   margin-bottom: 6px;
@@ -832,16 +888,16 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
   position: relative;
   z-index: 1;
   padding: 2px 0;
-  border-bottom: 1px solid #eef0eb;
+  border-bottom: 1px solid var(--linea);
 }
-.plan-gen.nuevo-cultivo { border-top: 1px solid #d9dfd4; }
+.plan-gen.nuevo-cultivo { border-top: 1px solid var(--linea); }
 .plan-gen .plan-pista { background: transparent; }
 .plan-linea-mes {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 0;
-  border-left: 1px solid #e6eae2;
+  border-left: 1px solid var(--linea);
   pointer-events: none;
 }
 .plan-pista {
@@ -861,7 +917,7 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
   top: -3px;
   bottom: -3px;
   width: 0;
-  border-left: 2px dotted #2c3a28;
+  border-left: 2px dotted var(--texto);
   opacity: .7;
   z-index: 2;
 }
@@ -920,7 +976,7 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
   align-items: center;
   font-size: .95rem;
   font-weight: 700;
-  color: #3d6b35;
+  color: var(--sage-dark);
   cursor: help;
 }
 
@@ -929,7 +985,7 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
   top: -6px;
   bottom: -2px;
   width: 2px;
-  background: #c0392b;
+  background: var(--alerta);
   z-index: 1;
   pointer-events: none;
 }
@@ -953,7 +1009,7 @@ body.lz-arrastrando, body.lz-arrastrando * { cursor: grabbing !important; }
 .plan-leyenda .m-almacigo { background: #b98a4a; }
 .plan-leyenda .m-campo    { background: #8fae7d; }
 .plan-leyenda .m-cosecha  { background: #3d6b35; }
-.plan-leyenda .m-hoy      { background: #c0392b; width: 3px; height: 13px; }
+.plan-leyenda .m-hoy      { background: var(--alerta); width: 3px; height: 13px; }
 
 /* En la notebook el gráfico entra entero: no tiene sentido partirlo en dos
    columnas como el resto de las tarjetas. */
@@ -1133,7 +1189,7 @@ button.mas {
   cursor: pointer;
 }
 .chip-nombre .quitar:active,
-.registro .quitar:active { color: #c0392b; }
+.registro .quitar:active { color: var(--alerta); }
 
 /* ---- configuración ---- */
 h3.sub {
@@ -1150,7 +1206,7 @@ form.alta {
 }
 .chip-chacra {
   border: 1.5px solid var(--sage);
-  background: #fff;
+  background: var(--blanco);
   color: var(--sage-dark);
   border-radius: 22px;
   padding: 11px 20px;
@@ -1169,7 +1225,7 @@ form.alta {
   left: 0; right: 0;
   max-height: 232px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--blanco);
   border: 1.5px solid var(--sage);
   border-radius: 12px;
   box-shadow: 0 6px 18px rgba(0,0,0,.16);
@@ -1200,7 +1256,7 @@ form.alta {
   font-size: .9rem;
   font-weight: 600;
   color: var(--tenue);
-  background: #fff;
+  background: var(--blanco);
   border: 1.5px solid var(--sage-light);
   border-radius: 20px;
   cursor: pointer;
@@ -1208,7 +1264,7 @@ form.alta {
 .pestana.activa {
   background: var(--sage);
   border-color: var(--sage-dark);
-  color: #fff;
+  color: var(--sobre-prim);
 }
 .tarjeta.proyecto .cifras { margin-top: 4px; }
 .tarjeta.proyecto.pausado { opacity: .65; }
@@ -1227,14 +1283,14 @@ form.alta {
   width: 27px; height: 27px;
   border: 2px solid var(--sage);
   border-radius: 50%;
-  background: #fff;
+  background: var(--blanco);
   cursor: pointer;
   padding: 0;
   font-size: .95rem;
   line-height: 1;
   color: var(--sage-dark);
 }
-.tarea-check.hecha { background: var(--sage); color: #fff; border-color: var(--sage-dark); }
+.tarea-check.hecha { background: var(--sage); color: var(--sobre-prim); border-color: var(--sage-dark); }
 .tarea-texto { flex: 1; min-width: 0; }
 .tarea-texto .titulo { font-weight: 600; line-height: 1.35; }
 .tarea.lista .tarea-texto .titulo { text-decoration: line-through; color: var(--tenue); }
@@ -1246,10 +1302,10 @@ form.alta {
   margin-right: 5px;
   vertical-align: baseline;
 }
-.imp-Alta { background: #c0392b; }
+.imp-Alta { background: var(--alerta); }
 .imp-Media { background: var(--ambar); }
 .imp-Baja { background: var(--sage); }
-.tarea.vencida .tarea-meta { color: #c0392b; font-weight: 600; }
+.tarea.vencida .tarea-meta { color: var(--alerta); font-weight: 600; }
 
 /* ---- acceso al juego: discreto, al final del inicio ---- */
 .acceso-juego {
@@ -1282,8 +1338,8 @@ form.alta {
   left: 50%;
   bottom: calc(86px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  background: var(--sage-dark);
-  color: #fff;
+  background: var(--prim-fuerte);
+  color: var(--sobre-prim);
   padding: 11px 20px;
   border-radius: 24px;
   font-size: .93rem;
@@ -1468,7 +1524,7 @@ h3.sub {
   right: 0;
   bottom: 0;
   width: min(380px, 92vw);
-  background: #fff;
+  background: var(--blanco);
   border-left: 1px solid var(--sage-light);
   box-shadow: -8px 0 24px rgba(0,0,0,.12);
   padding: 18px 18px 90px;
@@ -1517,7 +1573,7 @@ h3.sub {
   height: 18px;
   border-radius: 50%;
   border: 2px solid var(--sage-light);
-  background: #fff;
+  background: var(--blanco);
   margin-top: 1px;
 }
 .etapa.hecha .etapa-marca { background: var(--sage); border-color: var(--sage); }
@@ -1525,8 +1581,8 @@ h3.sub {
   content: "✓"; color: #fff; font-size: .7rem; display: block;
   text-align: center; line-height: 14px; font-weight: 700;
 }
-.etapa.curso .etapa-marca { border-color: var(--amber); background: #fdf1dc; }
-.etapa.atrasada .etapa-marca { border-color: var(--peligro); background: #fbe9e7; }
+.etapa.curso .etapa-marca { border-color: var(--amber); background: var(--amber-suave); }
+.etapa.atrasada .etapa-marca { border-color: var(--peligro); background: var(--peligro-suave); }
 .etapa-texto b { display: block; font-size: .92rem; }
 .etapa-texto span { font-size: .82rem; color: var(--tenue); }
 .etapa.atrasada .etapa-texto span { color: var(--peligro); font-weight: 600; }
@@ -1535,7 +1591,7 @@ h3.sub {
 
 .panel-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .panel-acciones button { margin: 0; }
-button.peligro { color: var(--peligro); border-color: #f0c9c3; }
+button.peligro { color: var(--peligro); border-color: var(--peligro-borde); }
 
 /* La barra abierta se marca en el gráfico. */
 .plan-gen.abierta .plan-nombre { font-weight: 700; color: var(--sage-dark); }
@@ -1552,7 +1608,7 @@ button.peligro { color: var(--peligro); border-color: #f0c9c3; }
   border-radius: 10px;
   padding: 10px 12px;
   margin: 2px 0 10px;
-  background: #fff;
+  background: var(--blanco);
 }
 .editar-gen-botones { display: flex; gap: 8px; margin-top: 8px; }
 .editar-gen-botones button { margin: 0; }
@@ -1623,17 +1679,17 @@ details.desplegable[open] > summary { margin-bottom: 8px; }
 }
 .fin-temporada {
   position: absolute; top: 0; bottom: 0; width: 0;
-  border-left: 2px dashed #b9c2b2;
+  border-left: 2px dashed var(--linea-fuerte);
   pointer-events: none;
 }
-.plan-meses .mes.fuera { color: #aab3a4; font-style: italic; }
+.plan-meses .mes.fuera { color: var(--tenue); font-style: italic; }
 /* Al desplazarse de costado, el nombre del cultivo queda a la vista. */
 .plan-nombre {
   position: sticky; left: 0; z-index: 4;
-  background: #fff;
+  background: var(--blanco);
   /* Tapa también el margen del gráfico a la izquierda y el hueco hasta la
      barra: si no, asoma un pedazo de las barras que pasan por detrás. */
-  box-shadow: -16px 0 0 #fff, 8px 0 0 #fff;
+  box-shadow: -16px 0 0 var(--blanco), 8px 0 0 var(--blanco);
 }
 .plan-zoom { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .plan-zoom .secundario { width: auto; margin: 0; padding: 4px 11px; font-size: .95rem; line-height: 1.2; }

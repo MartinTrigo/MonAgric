@@ -66,6 +66,16 @@ Apps Script. Atiende a las cinco chacras. Es una fragilidad conocida: si esa
 planilla se rompe, se cae la app para todos. Mover el script a un proyecto
 propio está pendiente y no es urgente.
 
+**Estilo (10/10):** letra **Figtree** (en `docs/fuentes/`, licencia OFL; la
+misma que AMA Economía), verdes claros hacia el lima, y **modo claro y
+oscuro**: el oscuro sigue al teléfono salvo que se elija a mano en Ajustes
+(`monagric_tema` → `data-tema` en `<html>`, aplicado en el `<head>` antes de
+dibujar). **Todo color va por las variables de `:root` en `styles.css`**, que
+se redefinen para el oscuro: un color escrito a mano en el CSS o en el
+JavaScript no cambia con el modo y queda ilegible. Las barras de cultivos
+(`colorEtapa`) son la excepción a propósito: se leen en los dos modos.
+AMA Economía tiene su propia paleta (vino), con la misma letra.
+
 **Publicación:** GitHub Pages sirve desde `/docs`. Cada push publica. Al
 cambiar archivos hay que subir `CACHE` en `sw.js` y `VERSION_APP` en
 `js/base.js`. Un archivo nuevo en `docs/js/` va en `index.html`, en la lista

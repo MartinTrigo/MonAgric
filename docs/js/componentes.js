@@ -432,7 +432,7 @@ function tarjetaSinConfig() {
 }
 
 const cifraClara = (valor, etq) =>
-  `<div class="cifra" style="background:#E7EFE6;color:var(--sage-dark)">
+  `<div class="cifra" style="background:var(--sage-suave);color:var(--sage-dark)">
      <b>${valor}</b><span style="color:var(--sage)">${etq}</span></div>`;
 
 // Mientras no haya planilla conectada, la app muestra lo de este teléfono.

@@ -810,7 +810,7 @@ const plantillas = {
       <p class="nota">Se carga en <b>bancales</b>, que es como se planifica en el campo.
       Los metros, los kilos esperados y las plantas los calcula solo. Los cultivos salen
       de una lista común a todas las chacras: si falta alguno, escribime y lo agregamos.</p>
-      ${bancalM2() ? "" : `<p class="nota" style="color:#b06a00">Primero cargá las medidas
+      ${bancalM2() ? "" : `<p class="nota" style="color:var(--amber-tx)">Primero cargá las medidas
         del bancal, acá arriba: sin eso no se puede pasar de bancales a metros.</p>`}
       <div id="lista-plan">
         ${plan.length ? plan.map((p, i) => filaPlan(p, i)).join("")
@@ -839,6 +839,17 @@ const plantillas = {
       tira y vuelve a bajar todo.</p>
       <p class="nota">Tenés la <b>${esc(VERSION_APP)}</b></p>
       <button class="secundario" id="btn-actualizar-app">Buscar actualización</button>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Apariencia</h2>
+      <div class="pestanas" id="aj-tema">
+        ${[["", "Como el teléfono"], ["claro", "Claro"], ["oscuro", "Oscuro"]].map(([v, t]) =>
+          `<button type="button" class="pestana${(leer(LS.tema, "") || "") === v ? " activa" : ""}"
+                   data-tema="${v}">${t}</button>`).join("")}
+      </div>
+      <p class="nota" style="margin-top:8px">«Como el teléfono» se pone oscura sola
+      cuando el teléfono está en modo oscuro.</p>
     </div>
 
     <div class="tarjeta">

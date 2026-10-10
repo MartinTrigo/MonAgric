@@ -13,6 +13,7 @@
 document.querySelectorAll(".tab[data-vista]").forEach((t) =>
   t.addEventListener("click", () => render(t.dataset.vista)));
 $("#btn-ajustes").addEventListener("click", () => render("ajustes"));
+aplicarTema(leer(LS.tema, ""));
 window.addEventListener("online", () => sincronizar());
 
 (async function iniciar() {
