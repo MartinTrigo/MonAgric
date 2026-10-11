@@ -4,8 +4,8 @@
   "description": "Monitoreo agrícola agroecológico: siembras, trasplantes, cosechas y horas de trabajo",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#EEF2EC",
-  "theme_color": "#5C7A5E",
+  "background_color": "#F1F6E7",
+  "theme_color": "#5E8C34",
   "lang": "es",
   "icons": [
     {
