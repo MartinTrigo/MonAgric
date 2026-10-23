@@ -33,7 +33,6 @@ almácigo queda atrasado. Lo que salió al revisar los 38 que esperan:
   catálogo: sus almácigos no tienen fecha de trasplante prevista. Completar
   C (y N, O) en «AMA - Catálogo de cultivos».
 - Sigue **«ZZ Prueba»** en el catálogo compartido.
-- Ya son **seis** chacras (Tierra Linda): `CLAUDE.md` todavía dice cinco.
 
 ## Revisión de datos del 29/09 — para Martín
 
@@ -92,7 +91,7 @@ por atado y la presentación no dice cuánto pesa (poner, por ejemplo,
 
 ## Propuestas para la planificación, desde el análisis de Heirloom (28/09)
 
-Del documento `C:\MARTO\INFORMATICA\AMA\heirloom-analisis-para-melga.md`.
+Del documento `C:\MARTO\INFORMATICA\AMA\documentos\heirloom-analisis-para-melga.md`.
 Buena parte ya está en AMA (generaciones con fechas encadenadas, Gantt con tres
 tonos y línea de hoy, color por cultivo, mapa de bancales, ficha, "Para
 sembrar" que se apaga al registrar). Lo que queda, en el orden sugerido:

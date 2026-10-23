@@ -4,8 +4,26 @@
     {
       "name": "monagric-web",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "docs"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8080",
+        "--directory",
+        "docs"
+      ],
       "port": 8080
+    },
+    {
+      "name": "bioma-economia",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8642",
+        "--directory",
+        "C:/MARTO/INFORMATICA/AMA/economia"
+      ],
+      "port": 8642
     }
   ]
 }

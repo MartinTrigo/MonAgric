@@ -8,8 +8,8 @@ son como son).
 ## Qué es
 
 App de monitoreo productivo para emprendimientos agroecológicos, usada por
-**cinco chacras de la Comarca Andina**: Chacra Tica, Huerma, Foco Verde,
-La Milpa y La Huertota. Cada una tiene su planilla, su configuración y su
+**seis chacras de la Comarca Andina**: Chacra Tica, Huerma, Foco Verde,
+La Milpa, La Huertota y Tierra Linda. Cada una tiene su planilla, su configuración y su
 gente; comparten el catálogo de cultivos y las áreas de trabajo.
 
 - **App publicada:** <https://martintrigo.github.io/MonAgric/>
@@ -22,17 +22,21 @@ gente; comparten el catálogo de cultivos y las áreas de trabajo.
 
 ## El ecosistema
 
-| Proyecto | Qué hace | Relación |
-|---|---|---|
-| **AMA** (esta) | Producción: siembras, trasplantes, cosechas, tareas, horas | — |
-| **Bioma/movimientos** (`bioma-mov`) | Economía de Proyecto Bioma | Calcula las cuentas y el resumen que AMA muestra |
-| **Bioma/registro-horas** | Planilla histórica de horas | Tica sigue cargando ahí |
-| **Cocina Viva** | Ventas y stock de fermentos | Misma arquitectura, más madura |
+Desde el 23/10/2026 todo AMA vive en `C:\MARTO\INFORMATICA\AMA\`. El mapa del
+sistema y las reglas comunes están en `AMA\CLAUDE.md`. Esta app es
+`AMA\produccion` (el repositorio sigue llamándose `MonAgric`).
 
-**Las dos apps se gestionan desde la misma conversación** (desde el 15/9/2026).
-Antes eran dos y había que llevar mensajes entre ellas. El contexto de
-bioma-mov está en `C:\MARTO\INFORMATICA\Bioma\movimientos\CLAUDE.md`, que es
-tan importante como este archivo: leerlo antes de tocar economía.
+| Proyecto | Carpeta | Qué hace | Relación |
+|---|---|---|---|
+| **AMA Producción** (esta) | `AMA\produccion` | Siembras, trasplantes, cosechas, tareas, horas | — |
+| **AMA Economía** (`bioma-mov`) | `AMA\economia` | Economía de Proyecto Bioma | Calcula las cuentas y el resumen que AMA muestra |
+| **Planilla de horas** (`bioma-horas`) | `AMA\_archivo\horas-bioma` | Planilla histórica de horas | Tica sigue cargando ahí, ahora por `Code.gs` |
+| **Cocina Viva** | `INFORMATICA\Cocina Viva` | Ventas y stock de fermentos | Misma arquitectura, más madura |
+
+**Las dos apps se gestionan desde la misma conversación** (desde el 15/9/2026),
+abierta en la carpeta `AMA`. El contexto de Economía está en
+`AMA\economia\CLAUDE.md`, que es tan importante como este archivo: leerlo antes
+de tocar economía.
 
 ## Arquitectura
 
@@ -54,7 +58,7 @@ docs/ayuda/         la guía de uso (botón «Ayuda» de la barra): página apar
                     capturas son de una chacra inventada: rehacerlas con
                     ayuda/capturas/datos-ejemplo.js (instrucciones adentro).
                     Nunca capturas con datos de una chacra real: el repo es público
-apps-script/Code.gs            el "servidor" de las cinco chacras
+apps-script/Code.gs            el "servidor" de las seis chacras
 apps-script/Codigo-horas-bioma.gs  script aparte, vive en la planilla de horas
                     (Web App archivado el 30/09: Code.gs escribe esas horas)
 tools/*.py          herramientas de administración (usan clave de admin)
@@ -62,7 +66,7 @@ tools/*.py          herramientas de administración (usan clave de admin)
 
 **Dónde vive el servidor:** `Code.gs` está dentro de la planilla
 **MonAgric Datos 2026-27** (que es también la de Chacra Tica), en Extensiones →
-Apps Script. Atiende a las cinco chacras. Es una fragilidad conocida: si esa
+Apps Script. Atiende a las seis chacras. Es una fragilidad conocida: si esa
 planilla se rompe, se cae la app para todos. Mover el script a un proyecto
 propio está pendiente y no es urgente.
 
@@ -187,7 +191,7 @@ temporada, tener un catálogo con fechas reales.
 
 ## Multi-chacra: lo que no hay que romper
 
-Cuatro de las cinco chacras no tienen nada que ver con la economía de Bioma.
+Cinco de las seis chacras no tienen nada que ver con la economía de Bioma.
 
 - Las direcciones de los endpoints viven en propiedades **con el código de
   chacra adelante**: `CUENTAS_URLS`, `ECONOMIA_URLS`. Si una chacra no figura,

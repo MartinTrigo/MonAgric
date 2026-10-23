@@ -42,7 +42,7 @@ invisible no da error: hace que el servicio se cuelgue.
 > de la chacra y el id de su planilla, y queda hecho y publicado. Chacra Tica,
 > La Milpa y Foco Verde ya están cargadas.
 
-Si querés hacerlo vos, es en `C:\MARTO\INFORMATICA\MonAgric\docs\js\base.js`, arriba
+Si querés hacerlo vos, es en `C:\MARTO\INFORMATICA\AMA\produccion\docs\js\base.js`, arriba
 de todo:
 
 ```js
