@@ -558,6 +558,42 @@ almacenamiento del teléfono.</p>
       [ds.kg, ds.disponible, ds.sector, ds.bancal, ds.lugar], [6, "2026-10-26", "", "", "Cámara"]);
   }
 
+  // --- stock por semana ---
+  {
+    igual("semana de calendario: el lunes de un viernes y de un domingo",
+      [lunesDe("2026-10-23"), lunesDe("2026-10-25"), lunesDe("2026-10-26")], ["2026-10-19", "2026-10-19", "2026-10-26"]);
+    igual("en qué semana cae: esta, la próxima, dentro de tres",
+      [semanaDe("2026-10-25", "2026-10-19"), semanaDe("2026-10-26", "2026-10-19"), semanaDe("2026-11-12", "2026-10-19")], [0, 1, 3]);
+    const r = (id, fecha, cultivo, kg, extra = {}) => ({ id, fecha, tipo: "En campo", sector: "Verano",
+      bancal: 3, cultivo, kg, cantidad: kg, formato: "kg", disponible: fecha, ...extra });
+    const barras = barrasRelevadas([
+      r("a", "2026-10-23", "Acelga", 40), r("b", "2026-10-23", "Acelga", 10, { bancal: 4 }),
+      r("c", "2026-10-23", "Acelga", 5, { disponible: "2026-11-03" }),
+      r("d", "2026-10-22", "Chucrut", 9, { tipo: "Elaborado", sector: "", bancal: "", lugar: "Cámara" }),
+      r("e", "2026-10-23", "Ajo", 30, { disponible: "2027-02-01" })], "2026-10-23");
+    igual("barras: los bancales que entran juntos van en una; lo que entra después, aparte; lo lejano no",
+      barras.map((b) => [b.cultivo, b.desde, b.regs.length]), [["Acelga", 0, 2], ["Acelga", 2, 1], ["Chucrut", 0, 1]]);
+    igual("barras: lo elaborado dura hasta el final del gráfico", barras[2].hasta, SEMANAS_STOCK - 1);
+    igual("carriles: dos barras que se pisan van en dos renglones",
+      enCarriles([{ desde: 0, hasta: 3 }, { desde: 2, hasta: 4 }, { desde: 4, hasta: 5 }]).map((c) => c.length), [2, 1]);
+
+    const g = { id: "g1", cultivo: "Repollo bco", generacion: 1, fecha_almacigo: "2026-08-01",
+                fecha_campo: "2026-09-01", sector: "Verano", bancales: "3, 4", camas: 2 };
+    const t = tramosDe(g);
+    const enCosecha = t.inicioCosecha;
+    const delPlan = (ultimos) => conGeneraciones([g], () => barrasDelPlan(ultimos, enCosecha));
+    igual("plan: sin relevar, una barra punteada con los kg estimados (2 bancales × 24 m² × 5 kg/m²)",
+      delPlan([]).map((b) => [b.cultivo, b.desde, b.kg]), [["Repollo bco", 0, 240]]);
+    igual("plan: si se relevó en uno de sus bancales, ya no va",
+      delPlan([r("x", enCosecha, "Repollo bco", 30, { bancal: 4 })]).length, 0);
+    igual("plan: marcado agotado también cuenta como relevado",
+      delPlan([r("x", enCosecha, "Repollo bco", 0)]).length, 0);
+    igual("plan: un relevamiento de antes de que fuera al campo es de otra generación",
+      delPlan([r("x", "2026-08-20", "Repollo bco", 30)]).length, 1);
+    igual("plan: lo relevado en otro sector no la tapa",
+      delPlan([r("x", enCosecha, "Repollo bco", 30, { sector: "Primavera" })]).length, 1);
+  }
+
   Storage.prototype.setItem = setReal;
   const mal = casos.filter((c) => !c.ok);
   const res = document.getElementById("resultado");

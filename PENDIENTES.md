@@ -32,6 +32,25 @@ en CSV; comparte el resumen por WhatsApp; corregir, borrar y «Agotado».
   el stock es una foto y la cosecha se registra aparte).
 - Sumar Stock a la guía de uso (`docs/ayuda/`).
 
+## Stock por semana (24/10) — falta implementar el servicio
+
+Vista nueva en Stock → Disponible → **Por semana** (v83): semanas de
+calendario, una barra por cultivo con su color, llena si se relevó y
+punteada si es lo que el plan dice que entra en cosecha y nadie relevó (kg
+estimados: bancales × m² × rinde). Debajo, semana por semana lo que entra.
+«Por lugar» es la lista de antes, con Agotado.
+
+**Hace falta otra Nueva versión de `Code.gs`**: `?stock=1` ahora manda
+también `agotados`. Sin eso, un bancal marcado agotado puede volver a
+aparecer como barra punteada del plan. `python tools/version_servicio.py`
+lo revisa.
+
+Para mirar después de usarlo una o dos semanas:
+- Cuánto dura cada barra relevada sale de «días en cosecha» del catálogo
+  (14 si no lo tiene). Si queda corto o largo, se corrige en el catálogo.
+- Si conviene estimar cuántos kg salen por semana (hoy se muestra lo
+  anotado, sin repartir: decisión del 24/10).
+
 ## Limpieza de la mudanza a AMA (23/10)
 
 Quedan dos copias viejas, ya comprobadas idénticas a las nuevas:

@@ -144,6 +144,13 @@ def main() -> None:
     else:
         print("  [ANTERIOR] el stock (la pestaña no aparece en la app)")
         viejas.append("el stock")
+    # 24/10: los agotados, para que la vista por semanas no muestre de nuevo
+    # como "lo que dice el plan" un bancal que ya se marco sin stock.
+    if "agotados" in st:
+        print("  [al dia]   el stock manda los agotados (vista por semanas)")
+    else:
+        print("  [ANTERIOR] el stock no manda los agotados (lo agotado vuelve como barra del plan)")
+        viejas.append("los agotados del stock")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")

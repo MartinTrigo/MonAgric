@@ -72,15 +72,17 @@ function calcularStock(d) {
 
 /* Lo vigente a una fecha: el último registro de cada lugar hasta ese día.
    Los que quedaron en cero se relevaron como agotados y no se muestran. En
-   la lista, lo de igual fecha va en el orden en que se cargó: gana lo último. */
-function stockVigente(registros, fecha) {
+   la lista, lo de igual fecha va en el orden en que se cargó: gana lo último.
+   conAgotados: también los que quedaron en cero (la vista por semanas los
+   necesita para saber qué bancales ya se relevaron). */
+function stockVigente(registros, fecha, conAgotados = false) {
   const ultimo = new Map();
   registros
     .map((r, i) => ({ r, i }))
     .filter(({ r }) => r.fecha && r.fecha <= fecha)
     .sort((a, b) => (a.r.fecha < b.r.fecha ? -1 : a.r.fecha > b.r.fecha ? 1 : a.i - b.i))
     .forEach(({ r }) => ultimo.set(claveStock(r), r));
-  return [...ultimo.values()].filter((r) => Number(r.kg) > 0 || Number(r.cantidad) > 0);
+  return [...ultimo.values()].filter((r) => conAgotados || Number(r.kg) > 0 || Number(r.cantidad) > 0);
 }
 
 /* Lo que se muestra a una fecha: lo del servicio, más lo de este teléfono que
@@ -97,7 +99,9 @@ function stockGuardado(fecha, desde = null) {
 function stockAl(fecha) {
   const delServicio = stockGuardado(fecha);
   const base = (delServicio?.vigente || []).map(deFilaStock);
-  const conocidos = new Set(base.map((r) => r.id)
+  // Los agotados los manda el servicio desde el 24/10; uno anterior, no.
+  const agotados = (delServicio?.agotados || []).map(deFilaStock);
+  const conocidos = new Set(base.concat(agotados).map((r) => r.id)
     .concat((delServicio?.registros || []).map((f) => String(f.Id))));
   const leido = delServicio?.leido || "";
   const locales = pendientes.map((r) => ({ r, porEnviar: true }))
@@ -105,7 +109,8 @@ function stockAl(fecha) {
     .filter(({ r }) => r.tipo === "stock" && !conocidos.has(String(r.id)))
     .sort((a, b) => String(a.r.creado_en).localeCompare(String(b.r.creado_en)))
     .map(({ r, porEnviar }) => ({ ...r.datos, id: String(r.id), porEnviar }));
-  return { lista: stockVigente(base.concat(locales), fecha), delServicio };
+  return { lista: stockVigente(base.concat(locales), fecha),
+           ultimos: stockVigente(agotados.concat(base, locales), fecha, true), delServicio };
 }
 
 // En qué grupo cae, mirado desde la fecha que se está viendo.
@@ -266,10 +271,211 @@ function tarjetaFormStock() {
   </div>`;
 }
 
+// ---- Por semana (24/10) ----
+// Semanas de calendario, de lunes a domingo: es como se arma la oferta. Cada
+// cultivo es un renglón con barras, como el plan: llenas las relevadas en el
+// campo, punteadas lo que el plan dice que entra en cosecha y nadie relevó
+// todavía. Las dos cosas nunca se suman.
+const SEMANAS_STOCK = 8;
+let modoStock = "semanas";       // "semanas" o "lugares"
+
+function lunesDe(iso) {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return isoDe(d);
+}
+// En qué semana cae una fecha, contando desde la de lunes0 (la 0).
+const semanaDe = (iso, lunes0) => Math.floor(diasEntre(lunes0, iso) / 7);
+
+function semanasStock(fecha, n = SEMANAS_STOCK) {
+  const lunes0 = lunesDe(fecha);
+  return Array.from({ length: n }, (_, i) => {
+    const desde = sumarDias(lunes0, 7 * i) || lunes0;
+    const hasta = sumarDias(desde, 6);
+    const nombre = i === 0 ? "Esta semana" : i === 1 ? "Semana que viene" : `Semana del ${diaMes(desde)}`;
+    // "Semana del 2/11" ya dice cuándo: el rango solo va en las dos primeras.
+    return { i, desde, hasta, nombre, rango: i < 2 ? `${diaMes(desde)}–${diaMes(hasta)}` : "" };
+  });
+}
+
+// Hasta cuándo se puede cosechar, según el catálogo. Lo que ya está en la
+// cámara o elaborado sigue disponible hasta que alguien lo marque agotado.
+const DIAS_COSECHA_SIN_DATO = 14;
+function hastaCuandoStock(d) {
+  if (!esDeCampo(d) && d.tipo !== "Fruta") return null;
+  const p = perfil(d.cultivo) || {};
+  const dura = Number(p.dias_en_cosecha_max || p.dias_en_cosecha) || DIAS_COSECHA_SIN_DATO;
+  return sumarDias(d.disponible || d.fecha, dura);
+}
+
+// Las barras de lo relevado. Del mismo cultivo, lo que empieza y termina las
+// mismas semanas va en una sola barra (los bancales juntos); lo demás, aparte.
+function barrasRelevadas(lista, fecha, n = SEMANAS_STOCK) {
+  const lunes0 = lunesDe(fecha);
+  const grupos = new Map();
+  lista.forEach((d) => {
+    const desde = Math.max(0, semanaDe(d.disponible || d.fecha, lunes0));
+    if (desde >= n) return;
+    const fin = hastaCuandoStock(d);
+    // Si ya pasó su tiempo de cosecha y nadie lo marcó agotado, sigue
+    // estando: se muestra al menos esta semana.
+    const hasta = fin === null ? n - 1 : Math.min(n - 1, Math.max(desde, semanaDe(fin, lunes0)));
+    const k = `${claveArea(d.cultivo)}|${desde}|${hasta}`;
+    if (!grupos.has(k)) grupos.set(k, { tipo: "relevado", cultivo: d.cultivo, desde, hasta, regs: [] });
+    grupos.get(k).regs.push(d);
+  });
+  return [...grupos.values()];
+}
+
+// ¿Esa generación ya se relevó? Un registro del mismo cultivo en uno de sus
+// bancales, hecho después de que fue al campo (uno anterior es de otra
+// generación). Cuenta también lo marcado agotado: ya se miró y no hay.
+function generacionRelevada(g, ultimos, campo) {
+  const k = claveArea(g.cultivo);
+  const bancales = bancalesDe(g);
+  return ultimos.some((d) => claveArea(d.cultivo) === k && esDeCampo(d)
+    && (!campo || d.fecha >= campo)
+    && (!g.sector || !bancales.length || (d.sector === g.sector && bancales.includes(Number(d.bancal)))));
+}
+
+// Las barras punteadas: las generaciones del plan que entran en cosecha en
+// estas semanas y nadie relevó. Los kg son una estimación: bancales × m² del
+// bancal × rinde del plan (o el de referencia del catálogo).
+function barrasDelPlan(ultimos, fecha, n = SEMANAS_STOCK) {
+  const lunes0 = lunesDe(fecha);
+  const finVentana = sumarDias(lunes0, 7 * n - 1);
+  return (leer(LS.generaciones, []) || []).flatMap((g) => {
+    const t = tramosDe(g);
+    if (!t || !t.inicioCosecha || t.fin < fecha || t.inicioCosecha > finVentana) return [];
+    if (generacionRelevada(g, ultimos, t.campo)) return [];
+    const rinde = Number(enPlan(g.cultivo)?.rinde_kg_m2) || Number(perfil(g.cultivo)?.rinde_ref_kg_m2) || 0;
+    const kg = Math.round((Number(g.camas) || 0) * bancalM2(g.sector) * rinde);
+    return [{ tipo: "plan", cultivo: g.cultivo, gen: g, kg,
+              desde: Math.max(0, semanaDe(t.inicioCosecha, lunes0)),
+              hasta: Math.min(n - 1, semanaDe(t.fin, lunes0)) }];
+  });
+}
+
+// Las barras de un cultivo en renglones que no se pisen: cada barra va en el
+// primero donde entra.
+function enCarriles(barras) {
+  const carriles = [];
+  barras.slice()
+    .sort((a, b) => a.desde - b.desde || (a.tipo === "plan") - (b.tipo === "plan"))
+    .forEach((b) => {
+      let c = carriles.find((x) => x.every((o) => o.hasta < b.desde || o.desde > b.hasta));
+      if (!c) { c = []; carriles.push(c); }
+      c.push(b);
+    });
+  return carriles;
+}
+
+const lugaresCortos = (regs) => [...new Set(regs.map((d) => (esDeCampo(d)
+  ? `${d.sector}${d.bancal ? " " + d.bancal : ""}` : d.lugar)))].filter(Boolean).join(", ");
+const textoBarra = (b) => (b.tipo === "plan"
+  ? `plan G${b.gen.generacion || 1}${b.kg ? " · ~" + num(b.kg) + " kg" : ""}`
+  : `${totalStock(b.regs)}${lugaresCortos(b.regs) ? " · " + lugaresCortos(b.regs) : ""}`);
+
+function graficoSemanas(barras, semanas) {
+  const porCultivo = new Map();
+  barras.forEach((b) => {
+    const k = claveArea(b.cultivo);
+    if (!porCultivo.has(k)) porCultivo.set(k, { cultivo: b.cultivo, barras: [] });
+    porCultivo.get(k).barras.push(b);
+  });
+  // Primero lo que está antes; entre iguales, por nombre.
+  const cultivos = [...porCultivo.values()].sort((a, b) =>
+    Math.min(...a.barras.map((x) => x.desde)) - Math.min(...b.barras.map((x) => x.desde))
+    || a.cultivo.localeCompare(b.cultivo));
+  let fila = 2;
+  const celdas = [];
+  cultivos.forEach((c) => {
+    const carriles = enCarriles(c.barras);
+    celdas.push(`<div class="stock-sem-cultivo" style="grid-row:${fila} / span ${carriles.length}">${esc(c.cultivo)}</div>`);
+    carriles.forEach((carril, i) => carril.forEach((b) => {
+      const color = colorEtapa(b.cultivo, b.tipo === "plan" ? "campo" : "cosecha");
+      celdas.push(`<div class="stock-barra${b.tipo === "plan" ? " plan" : ""}"
+        style="grid-row:${fila + i};grid-column:${b.desde + 2} / ${b.hasta + 3};${
+          b.tipo === "plan" ? `border-color:${color}` : `background:${color}`}"
+        title="${esc(`${b.cultivo}: ${textoBarra(b)}`)}">${esc(textoBarra(b))}</div>`);
+    }));
+    fila += carriles.length;
+  });
+  return `<div class="plan-scroll stock-sem-scroll">
+    <div class="stock-semanas" style="grid-template-columns:6.5rem repeat(${semanas.length}, minmax(4.6rem, 1fr))">
+      <div class="stock-sem-cab"></div>
+      ${semanas.map((s) => `<div class="stock-sem-cab${s.i === 0 ? " hoy" : ""}">${
+        s.i === 0 ? "esta sem." : s.i === 1 ? "la próxima" : "sem."}<small>${diaMes(s.desde)}</small></div>`).join("")}
+      ${semanas.map((s) => `<div class="stock-sem-col${s.i === 0 ? " hoy" : ""}"
+        style="grid-column:${s.i + 2};grid-row:2 / ${fila}"></div>`).join("")}
+      ${celdas.join("")}
+    </div>
+  </div>`;
+}
+
+/* Debajo del gráfico, semana por semana. Esta semana: todo lo que hay, con
+   sus kilos. Las siguientes: solo lo que ENTRA esa semana con sus kilos, y lo
+   que sigue de antes nombrado sin kilos. Repetir "Acelga 38 kg" en las ocho
+   semanas que dura su cosecha se leía como 38 kg por semana, y los totales
+   sumaban lo mismo una y otra vez. Lo del plan va aparte y con "~": es una
+   estimación. */
+function listaSemanas(barras, semanas) {
+  const renglon = (nombre, cuanto, esPlan) => `<div class="stock-sem-item${esPlan ? " plan" : ""}">
+    <span>${esc(nombre)}</span><span>${esc(cuanto)}</span></div>`;
+  const porCultivo = (lista) => {
+    const m = new Map();
+    lista.forEach((b) => {
+      const k = claveArea(b.cultivo);
+      m.set(k, { cultivo: b.cultivo, regs: (m.get(k)?.regs || []).concat(b.regs) });
+    });
+    return [...m.values()].sort((a, b) => a.cultivo.localeCompare(b.cultivo));
+  };
+  return semanas.map((s) => {
+    const deEsta = barras.filter((b) => b.desde <= s.i && s.i <= b.hasta);
+    const rel = deEsta.filter((b) => b.tipo === "relevado");
+    const entran = s.i === 0 ? rel : rel.filter((b) => b.desde === s.i);
+    const siguen = porCultivo(rel.filter((b) => !entran.includes(b)))
+      .filter((c) => !entran.some((b) => claveArea(b.cultivo) === claveArea(c.cultivo)));
+    const plan = deEsta.filter((b) => b.tipo === "plan" && (s.i === 0 || b.desde === s.i));
+    if (!entran.length && !plan.length) return "";
+    const kgRel = entran.flatMap((b) => b.regs).reduce((a, d) => a + (Number(d.kg) || 0), 0);
+    const kgPlan = plan.reduce((a, b) => a + b.kg, 0);
+    return `<div class="stock-sem-bloque">
+      <h3 class="sub">${s.nombre} <small>${[s.rango,
+        kgRel ? `${num(kgRel, 1)} kg ${s.i === 0 ? "relevados" : "entran"}` : "",
+        kgPlan ? `~${num(kgPlan)} kg del plan` : ""].filter(Boolean).join(" · ")}</small></h3>
+      ${porCultivo(entran).map((c) => renglon(c.cultivo, totalStock(c.regs), false)).join("")}
+      ${plan.sort((a, b) => a.cultivo.localeCompare(b.cultivo))
+        .map((b) => renglon(`${b.cultivo} G${b.gen.generacion || 1}`, b.kg ? `~${num(b.kg)} kg · plan` : "plan", true)).join("")}
+      ${siguen.length ? `<p class="nota">Sigue de antes: ${esc(siguen.map((c) => c.cultivo).join(", "))}.</p>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function cuerpoSemanas(lista, ultimos, fecha) {
+  const semanas = semanasStock(fecha);
+  const barras = barrasRelevadas(lista, fecha).concat(barrasDelPlan(ultimos, fecha));
+  const despues = lista.filter((d) => semanaDe(d.disponible || d.fecha, lunesDe(fecha)) >= SEMANAS_STOCK);
+  if (!barras.length && !despues.length) {
+    return `<p class="nota">No hay nada relevado ni planificado para cosechar en las próximas ${SEMANAS_STOCK} semanas.</p>`;
+  }
+  return `${barras.length ? graficoSemanas(barras, semanas) : ""}
+    <div class="stock-sem-leyenda">
+      <span><i class="stock-muestra"></i>relevado en el campo</span>
+      <span><i class="stock-muestra plan"></i>lo que dice el plan, sin relevar</span>
+    </div>
+    ${listaSemanas(barras, semanas)}
+    ${despues.length ? `<p class="nota">Más adelante: ${esc([...new Set(despues.map((d) => d.cultivo))].join(", "))}.</p>` : ""}
+    <p class="nota">Cada barra dura lo que dura la cosecha de ese cultivo según el catálogo,
+      con la cantidad que se anotó: no son esos kilos cada semana. Para marcar algo
+      agotado, en «Por lugar».</p>`;
+}
+
 function tarjetaDisponible() {
   const fecha = fechaStock();
-  const { lista, delServicio } = stockAl(fecha);
+  const { lista, ultimos, delServicio } = stockAl(fecha);
   const grupos = stockAgrupado(lista, fecha);
+  const porSemana = modoStock === "semanas";
   const esHoy = fecha === hoy();
   const kgListo = (grupos.find((g) => g.hasta === 0)?.lista || []).reduce((a, d) => a + (Number(d.kg) || 0), 0);
   const kgMes = grupos.filter((g) => g.hasta <= 30).flatMap((g) => g.lista)
@@ -290,7 +496,7 @@ function tarjetaDisponible() {
     </div>`;
   };
 
-  const cuerpo = grupos.length ? grupos.map((g) => `
+  const cuerpo = porSemana ? cuerpoSemanas(lista, ultimos, fecha) : grupos.length ? grupos.map((g) => `
     <h3 class="sub">${g.nombre} <small>${esc(totalStock(g.lista))}</small></h3>
     ${g.cultivos.map((c) => {
       const clave = `stock:${g.nombre}:${claveArea(c.cultivo)}`;
@@ -304,6 +510,10 @@ function tarjetaDisponible() {
 
   return `<div class="tarjeta" id="tarjeta-disponible">
     <h2>Disponible <small>${esHoy ? "hoy" : "al " + fechaCorta(fecha)}</small></h2>
+    <div class="pestanas-tareas">
+      <button type="button" class="pestana${porSemana ? " activa" : ""}" data-modo-stock="semanas">Por semana</button>
+      <button type="button" class="pestana${porSemana ? "" : " activa"}" data-modo-stock="lugares">Por lugar</button>
+    </div>
     ${!delServicio && navigator.onLine === false ? `<p class="nota alerta">Sin señal: se ve lo último
       que bajó este teléfono y lo que cargó acá.</p>` : ""}
     ${lista.length ? `<div class="cifras">
@@ -312,7 +522,7 @@ function tarjetaDisponible() {
       <div class="cifra"><b>${cultivos}</b><span>cultivos</span></div>
     </div>` : ""}
     ${cuerpo}
-    ${esHoy && lista.length ? `<p class="nota"><b>Agotado</b> lo deja en cero: ya no queda (por
+    ${!porSemana && esHoy && lista.length ? `<p class="nota"><b>Agotado</b> lo deja en cero: ya no queda (por
       ejemplo, porque se cosechó todo).</p>` : ""}
   </div>`;
 }
@@ -405,14 +615,32 @@ function descargarStock(cual) {
 }
 
 // El texto para mandar por WhatsApp a quien arma la venta de la semana.
+// El texto para mandar por WhatsApp a quien arma la venta de la semana. Va
+// por la semana en que entra cada cosa, y solo lo relevado: lo del plan es una
+// estimación y no se ofrece.
 function textoStock() {
   const fecha = fechaStock();
-  const grupos = stockAgrupado(stockAl(fecha).lista, fecha);
-  if (!grupos.length) return "";
+  const lista = stockAl(fecha).lista;
+  if (!lista.length) return "";
   const nombre = chacraActual()?.nombre || "la chacra";
-  return [`Stock de ${nombre} ${fecha === hoy() ? "hoy" : "al"} ${fechaCorta(fecha)}`,
-    ...grupos.map((g) => [``, `*${g.nombre.toUpperCase()}*`,
-      ...g.cultivos.map((c) => `• ${c.cultivo}: ${totalStock(c.lugares)}`)].join("\n"))].join("\n");
+  const lunes0 = lunesDe(fecha);
+  const bloques = semanasStock(fecha).map((s) => {
+    const deEsta = lista.filter((d) => Math.max(0, semanaDe(d.disponible || d.fecha, lunes0)) === s.i);
+    if (!deEsta.length) return "";
+    const porCultivo = new Map();
+    deEsta.forEach((d) => {
+      const k = claveArea(d.cultivo);
+      porCultivo.set(k, { cultivo: d.cultivo, regs: (porCultivo.get(k)?.regs || []).concat(d) });
+    });
+    return [``, `*${s.nombre.toUpperCase()}*${s.rango ? ` (${s.rango})` : ""}`,
+      ...[...porCultivo.values()].sort((a, b) => a.cultivo.localeCompare(b.cultivo))
+        .map((c) => `• ${c.cultivo}: ${totalStock(c.regs)}`)].join("\n");
+  }).filter(Boolean);
+  const despues = lista.filter((d) => semanaDe(d.disponible || d.fecha, lunes0) >= SEMANAS_STOCK);
+  if (despues.length) {
+    bloques.push(["", "*MÁS ADELANTE*", ...despues.map((d) => `• ${d.cultivo}: ${totalStock([d])}`)].join("\n"));
+  }
+  return [`Stock de ${nombre} ${fecha === hoy() ? "hoy" : "al"} ${fechaCorta(fecha)}`, ...bloques].join("\n");
 }
 
 async function compartirStock() {
@@ -448,9 +676,11 @@ async function traerStock(forzar = false) {
     // Si mientras tanto se pidió otra fecha, esta respuesta ya no sirve.
     if (d.fecha !== fechaStock()) return;
     const antes = leer(LS.stock, null);
-    const nuevo = { chacra: chacraCodigo(), fecha: d.fecha, desde: d.desde, vigente: d.vigente, registros: d.registros || [], leido };
-    const igual = antes && antes.chacra === nuevo.chacra && JSON.stringify([antes.fecha, antes.desde, antes.vigente, antes.registros])
-      === JSON.stringify([nuevo.fecha, nuevo.desde, nuevo.vigente, nuevo.registros]);
+    const nuevo = { chacra: chacraCodigo(), fecha: d.fecha, desde: d.desde, vigente: d.vigente,
+                    agotados: d.agotados || [], registros: d.registros || [], leido };
+    const igual = antes && antes.chacra === nuevo.chacra
+      && JSON.stringify([antes.fecha, antes.desde, antes.vigente, antes.agotados || [], antes.registros])
+      === JSON.stringify([nuevo.fecha, nuevo.desde, nuevo.vigente, nuevo.agotados, nuevo.registros]);
     escribir(LS.stock, nuevo);
     if (!igual && vistaActual === "stock") redibujarConDatos("stock");
   } catch { /* sin señal: queda lo último que se bajó */ }
@@ -460,6 +690,7 @@ async function traerStock(forzar = false) {
 function prepararStock() {
   prepararResumenStock();
   engancharAgotados();
+  engancharModoStock();
   const f = $("#form-stock");
   if (!f) return;
   enlazarBuscadores(f);
@@ -592,6 +823,12 @@ function prepararResumenStock() {
 
 // "Agotado" en una línea de lo disponible: se terminó. Es un relevamiento más, con
 // cantidad cero, del mismo cultivo en el mismo lugar.
+function engancharModoStock() {
+  document.querySelectorAll("[data-modo-stock]").forEach((b) => {
+    b.onclick = () => { modoStock = b.dataset.modoStock; redibujarConDatos("stock"); };
+  });
+}
+
 function engancharAgotados() {
   document.querySelectorAll("[data-stock-agotado]").forEach((b) => {
     b.onclick = () => {

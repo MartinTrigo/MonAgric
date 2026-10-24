@@ -137,7 +137,7 @@ function engancharPartes(vista) {
   engancharFilas();
   if (vista === "tareas") prepararTareas();
   if (vista === "inicio") prepararInicio();
-  if (vista === "stock") { engancharAgotados(); prepararResumenStock(); }
+  if (vista === "stock") { engancharAgotados(); engancharModoStock(); prepararResumenStock(); }
   if (vista === "plan") { prepararEdicionCultivos(); if (recalcularSerie) recalcularSerie(); }
 }
 

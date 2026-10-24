@@ -202,6 +202,12 @@ temporada, tener un catálogo con fechas reales.
 - Los días a cosecha se guardan también como fecha («Disponible desde»):
   "7 días" cargado hace dos semanas ya es "listo".
 - El servicio avisa `cfg.stock`; sin eso la pestaña no se muestra.
+- **Por semana** (24/10): semanas de lunes a domingo. Una barra relevada
+  dura los «días en cosecha» del catálogo con la cantidad anotada, que **no
+  se reparte** entre semanas: la lista muestra kilos solo la semana en que
+  algo entra. Las barras punteadas del plan son generaciones en cosecha sin
+  relevar (un registro del cultivo en sus bancales posterior a su ida al
+  campo, agotado incluido, las tapa). Relevado y plan nunca se suman.
 - Comercialización lo va a pedir por endpoint con token (versión 2), igual
   que la proyección. Nunca copias de la planilla.
 

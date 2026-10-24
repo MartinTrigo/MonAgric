@@ -1719,3 +1719,82 @@ button.enlace {
   cursor: pointer;
 }
 .stock-agotado:active { background: var(--sage-suave); }
+
+/* Por semana: un renglón por cultivo, una columna por semana. Las barras
+   llevan el color del cultivo (colorEtapa), como en el plan. */
+.plan-scroll.stock-sem-scroll { min-height: 0; max-height: none; margin-top: 4px; }
+.stock-semanas { display: grid; row-gap: 2px; font-size: .78rem; }
+.stock-sem-cab {
+  grid-row: 1;
+  padding: 4px 2px 5px;
+  text-align: center;
+  color: var(--tenue);
+  border-bottom: 1px solid var(--sage-light);
+}
+.stock-sem-cab small { display: block; font-size: .66rem; }
+.stock-sem-cab.hoy { color: var(--sage-dark); font-weight: 700; }
+.stock-sem-col { border-left: 1px solid var(--sage-light); }
+.stock-sem-col.hoy { background: var(--sage-suave); }
+.stock-sem-cultivo {
+  grid-column: 1;
+  align-self: center;
+  padding: 3px 6px 3px 0;
+  font-weight: 600;
+  color: var(--sage-dark);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--crema);
+}
+.stock-barra {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  margin: 1px 2px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: .72rem;
+  font-weight: 600;
+  color: #fff;               /* sobre el color del cultivo, en los dos modos */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stock-barra.plan {
+  background: transparent;
+  border: 1.5px dashed;
+  color: var(--tenue);
+  font-weight: 500;
+}
+.stock-sem-leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 4px; font-size: .76rem; color: var(--tenue); }
+.stock-muestra {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  border-radius: 3px;
+  background: var(--sage);
+}
+.stock-muestra.plan { background: transparent; border: 1.5px dashed var(--tenue); }
+.stock-sem-bloque { margin-top: 6px; }
+.stock-sem-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--sage-light);
+  font-size: .88rem;
+}
+.stock-sem-item:last-child { border-bottom: none; }
+.stock-sem-item.plan { color: var(--tenue); font-style: italic; }
+.stock-entra {
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: .68rem;
+  font-style: normal;
+  color: var(--amber-tx);
+  background: var(--amber-suave);
+}

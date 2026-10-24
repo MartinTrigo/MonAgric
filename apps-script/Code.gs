@@ -1439,7 +1439,7 @@ function stockDe(chacra, fecha, desde) {
   var esFecha = function (t) { return /^\d{4}-\d{2}-\d{2}$/.test(String(t || "")); };
   var hasta = esFecha(fecha) ? fecha : Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
   var inicio = esFecha(desde) && desde <= hasta ? desde : hasta;
-  var vacio = { ok: true, fecha: hasta, desde: inicio, vigente: [], registros: [] };
+  var vacio = { ok: true, fecha: hasta, desde: inicio, vigente: [], agotados: [], registros: [] };
 
   var def = HOJAS.stock;
   var hoja = planillaDe(chacra).getSheetByName(def.nombre);
@@ -1462,12 +1462,16 @@ function stockDe(chacra, fecha, desde) {
   var ultima = {};
   filas.forEach(function (o) { ultima[claveDeStock_(o)] = o; });
   var limpia = function (o) { var c = Object.assign({}, o); delete c._orden; return c; };
-  var vigente = Object.keys(ultima).map(function (k) { return ultima[k]; })
-    .filter(function (o) { return Number(o.Kg) > 0 || Number(o.Cantidad) > 0; })
-    .map(limpia);
+  var hayAlgo = function (o) { return Number(o.Kg) > 0 || Number(o.Cantidad) > 0; };
+  var ultimas = Object.keys(ultima).map(function (k) { return ultima[k]; });
+  var vigente = ultimas.filter(hayAlgo).map(limpia);
+  // Lo ultimo de un lugar que quedo en cero (24/10): la vista por semanas lo
+  // necesita para no volver a mostrar ese bancal como "lo que dice el plan".
+  var agotados = ultimas.filter(function (o) { return !hayAlgo(o); }).map(limpia);
   var registros = filas.filter(function (o) { return o.Fecha >= inicio; })
     .reverse().slice(0, 1000).map(limpia);
-  return { ok: true, fecha: hasta, desde: inicio, vigente: vigente, registros: registros };
+  return { ok: true, fecha: hasta, desde: inicio, vigente: vigente, agotados: agotados,
+           registros: registros };
 }
 
 // ---------- Corregir y borrar registros ----------
