@@ -136,6 +136,14 @@ def main() -> None:
         print("  [ANTERIOR] plan contra real (la barra no se corre con el trasplante real "
               "y no se guarda la diferencia con el plan)")
         viejas.append("plan contra real")
+    # 23/10: la seccion Stock. La app muestra la pestaña solo si la
+    # configuracion lo anuncia; lo vigente lo calcula ?stock=1.
+    st = pedir("stock=1&chacra=tica")
+    if cf.get("stock") and "vigente" in st:
+        print(f"  [al dia]   el stock ({len(st['vigente'])} lugares con stock vigente hoy en Tica)")
+    else:
+        print("  [ANTERIOR] el stock (la pestaña no aparece en la app)")
+        viejas.append("el stock")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")
