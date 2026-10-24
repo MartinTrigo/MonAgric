@@ -6,13 +6,11 @@ que falta hacer.
 
 ---
 
-## Stock, versión 1 (23/10) — falta implementar el servicio
+## Stock, versión 1 (23/10) — servicio implementado
 
-La sección está hecha y publicada (v82), pero **la pestaña no aparece hasta
-actualizar el Apps Script**: copiar `apps-script/Code.gs` en el editor y
-Implementar → Administrar implementaciones → ✏ → **Nueva versión**. La app
-la muestra cuando la configuración trae `stock: true`. Después, cargar un
-registro de verdad en una chacra y mirar que aparezca la hoja **Stock**.
+Publicada (v82) y con el servicio implementado (verificado el 24/10): la
+pestaña ya aparece. Falta mirar, con el primer registro de verdad, que la
+hoja **Stock** se cree bien en la planilla de esa chacra.
 
 Lo que hace: registrar qué hay (en campo por sector y bancal; cosechado,
 elaborado, fruta u otro por lugar), en kg o por unidad/atado/frasco con su
@@ -32,7 +30,7 @@ en CSV; comparte el resumen por WhatsApp; corregir, borrar y «Agotado».
   el stock es una foto y la cosecha se registra aparte).
 - Sumar Stock a la guía de uso (`docs/ayuda/`).
 
-## Stock por semana (24/10) — falta implementar el servicio
+## Stock por semana (24/10) — servicio implementado
 
 Vista nueva en Stock → Disponible → **Por semana** (v83): semanas de
 calendario, una barra por cultivo con su color, llena si se relevó y
@@ -40,10 +38,8 @@ punteada si es lo que el plan dice que entra en cosecha y nadie relevó (kg
 estimados: bancales × m² × rinde). Debajo, semana por semana lo que entra.
 «Por lugar» es la lista de antes, con Agotado.
 
-**Hace falta otra Nueva versión de `Code.gs`**: `?stock=1` ahora manda
-también `agotados`. Sin eso, un bancal marcado agotado puede volver a
-aparecer como barra punteada del plan. `python tools/version_servicio.py`
-lo revisa.
+`?stock=1` manda también `agotados` (implementado y verificado el 24/10 con
+`python tools/version_servicio.py`).
 
 Para mirar después de usarlo una o dos semanas:
 - Cuánto dura cada barra relevada sale de «días en cosecha» del catálogo
