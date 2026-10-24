@@ -32,9 +32,11 @@ function renglonBancal(i) {
 // Buscador para listas largas: se escribe para filtrar y se toca para ver todo.
 // El valor elegido queda en un campo oculto, así el formulario lo lee como
 // cualquier otro campo.
+// libre: lo escrito vale aunque no esté en la lista (un producto elaborado del
+// Stock, que no es un cultivo del catálogo).
 function buscador(nombre, opciones, { placeholder = "Buscá o tocá para ver la lista…",
-                                      valor = "", destacadas = [] } = {}) {
-  return `<div class="buscador" data-buscador="${nombre}">
+                                      valor = "", destacadas = [], libre = false } = {}) {
+  return `<div class="buscador" data-buscador="${nombre}"${libre ? " data-libre" : ""}>
     <input type="text" class="buscador-texto" autocomplete="off" enterkeyhint="done"
            placeholder="${esc(placeholder)}" value="${esc(valor)}">
     <input type="hidden" name="${nombre}" value="${esc(valor)}">
@@ -215,6 +217,8 @@ function enlazarBuscadores(form) {
         ? hallados.map((o, i) => `<div class="buscador-op${i === 0 ? " marcada" : ""}" data-valor="${esc(o)}">
              ${esc(o)}${destacadas.has(o) ? '<span class="del-plan">del plan</span>' : ""}
            </div>`).join("")
+        : caja.hasAttribute("data-libre") && f
+          ? `<div class="buscador-vacio">No está en la lista: se guarda como «${esc(filtro.trim())}».</div>`
         : `<div class="buscador-vacio">No hay ningún cultivo con ese nombre.${
             // Si en la pantalla está el formulario para sumar uno, se ofrece.
             f && document.querySelector("#alta-cultivo")
@@ -266,6 +270,7 @@ function enlazarBuscadores(form) {
         if (!oculto.value) {
           const exacta = opciones.find((o) => plano(o) === plano(texto.value));
           if (exacta) elegir(exacta);
+          else if (caja.hasAttribute("data-libre") && texto.value.trim()) elegir(texto.value.trim());
           else texto.value = "";
         }
       }, 150);

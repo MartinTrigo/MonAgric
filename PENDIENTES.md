@@ -6,6 +6,41 @@ que falta hacer.
 
 ---
 
+## Stock, versión 1 (23/10) — falta implementar el servicio
+
+La sección está hecha y publicada (v82), pero **la pestaña no aparece hasta
+actualizar el Apps Script**: copiar `apps-script/Code.gs` en el editor y
+Implementar → Administrar implementaciones → ✏ → **Nueva versión**. La app
+la muestra cuando la configuración trae `stock: true`. Después, cargar un
+registro de verdad en una chacra y mirar que aparezca la hoja **Stock**.
+
+Lo que hace: registrar qué hay (en campo por sector y bancal; cosechado,
+elaborado, fruta u otro por lugar), en kg o por unidad/atado/frasco con su
+peso, con días a cosecha (se guarda la fecha «disponible desde»). Muestra lo
+disponible agrupado en Listo / Esta semana / Próximas semanas / Más
+adelante, a cualquier fecha; descarga la lista y los registros de un período
+en CSV; comparte el resumen por WhatsApp; corregir, borrar y «Agotado».
+
+**Versión 2**, lo que quedó afuera a propósito:
+- **Modo recorrida**: un sector con todos sus bancales en una lista, y los kg
+  sugeridos por el rinde del plan, para corregir y no escribir.
+- **Endpoint para comercialización**: `?stock=1` con un token por chacra,
+  como la proyección (`PROYECCION_TOKENS`), para que el script de Economía
+  arme la hoja «stock» de la planilla de comercialización sin copias a mano.
+  Solo las chacras que comercializan con Bioma.
+- Que una cosecha registrada baje el stock de su cultivo (hoy no se tocan:
+  el stock es una foto y la cosecha se registra aparte).
+- Sumar Stock a la guía de uso (`docs/ayuda/`).
+
+## Limpieza de la mudanza a AMA (23/10)
+
+Quedan dos copias viejas, ya comprobadas idénticas a las nuevas:
+`INFORMATICA\MonAgric` y `INFORMATICA\Bioma\movimientos` (y la carpeta
+`Bioma`, que queda vacía). No se pudieron borrar porque estaban en uso.
+Borrarlas a mano con Claude, VS Code y Drive en reposo; después borrar
+también `AMA\limpiar-copias-viejas.ps1` y `AMA\mover-a-AMA.ps1`. **No abrir
+ni editar nada en las copias viejas**: lo vigente está en `AMA`.
+
 ## Lo que viene, acordado el 10/10
 
 1. **Estilo de AMA Economía**: la misma letra (Figtree) y paleta vino (los
@@ -15,8 +50,7 @@ que falta hacer.
    "relojes" de indicadores de sustentabilidad. El "% de lo esperado" en kg
    queda en 0 hasta la primera cosecha: sumar uno que se mueva desde el
    principio (p. ej. % de generaciones ya sembradas).
-3. **Stock**: sección nueva. Pensar bien el sistema de registro antes de
-   programar (qué entra, qué sale, en qué unidad, quién lo carga).
+3. ~~**Stock**~~: versión 1 hecha el 23/10 (ver arriba).
 
 ## Revisión de datos del 10/10 — para Martín
 
@@ -499,7 +533,7 @@ lee bioma-db antes de borrarlas.
 - **Identificadores por persona** en lugar del nombre como llave. Ya falló una
   vez. Conviene hacerlo antes de que entren las cinco personas del verano.
 - **Secciones que faltan** de la app original: Sanidad (aplicaciones y
-  monitoreo), Riego y Stock.
+  monitoreo) y Riego. (Stock, hecho el 23/10.)
 - **Mover `Code.gs` a un proyecto propio**, fuera de la planilla de Tica. Hoy
   si esa planilla se rompe se cae la app para las cinco chacras.
 - **La Milpa** sigue sin sus códigos pegados en la hoja Invitaciones.

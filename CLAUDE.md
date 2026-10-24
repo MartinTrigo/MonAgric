@@ -189,6 +189,22 @@ temporada, tener un catálogo con fechas reales.
   "atrasada 31 días" del 03/10 salió de ahí.)
 - `generaciones` trae `trasplantada_el` del servicio (`cfg.seguimiento`).
 
+## Stock: una foto, no una cuenta (23/10)
+
+- Cada registro dice "esto había acá, este día". **Lo vigente de un lugar es
+  su último registro, nunca la suma** (la app vieja sumaba y contaba dos veces
+  lo relevado el lunes y el jueves). Lugar = tipo + sector y bancal (en
+  campo) o lugar (cámara…) + cultivo + variedad. Cantidad 0 = agotado.
+- **Lo vigente lo calcula el servicio** sobre la hoja entera (`stockDe`,
+  `?stock=1&fecha=&desde=`), no el teléfono con sus últimas 15 filas. La app
+  le suma encima solo lo que cargó y el servicio todavía no tenía al pedirlo
+  (`stockAl`): sumar lo ya enviado resucitaba lo que otro marcó agotado.
+- Los días a cosecha se guardan también como fecha («Disponible desde»):
+  "7 días" cargado hace dos semanas ya es "listo".
+- El servicio avisa `cfg.stock`; sin eso la pestaña no se muestra.
+- Comercialización lo va a pedir por endpoint con token (versión 2), igual
+  que la proyección. Nunca copias de la planilla.
+
 ## Multi-chacra: lo que no hay que romper
 
 Cinco de las seis chacras no tienen nada que ver con la economía de Bioma.
@@ -302,10 +318,9 @@ pide con `UrlFetchApp` y la app de Economía le pone los precios.
 ## Estado actual
 
 Secciones que andan: Inicio, Horas, Tareas, Siembras, Trasplantes, Cosechas,
-Plan/Configuración, Cuentas (solo Tica) y el juego.
+Stock (desde el 23/10), Plan/Configuración, Cuentas (solo Tica) y el juego.
 
-Faltan del original: **Sanidad** (aplicaciones y monitoreo), **Riego** y
-**Stock**. También **editar y borrar registros**, que es lo que hoy obliga a
+Faltan del original: **Sanidad** (aplicaciones y monitoreo) y **Riego**. También **editar y borrar registros**, que es lo que hoy obliga a
 compartir las planillas como Lector.
 
 **Lo que sigue está en `PENDIENTES.md`** — leerlo antes de proponer nada.

@@ -181,6 +181,27 @@ var HOJAS = {
               d.operador || "", r.dispositivo || "", new Date()];
     },
   },
+  // Stock (23/10): una FOTO de lo que hay, no una cuenta de entradas y
+  // salidas. Cada fila dice "esto habia aca, este dia"; lo vigente de un
+  // lugar es su ultima fila, nunca la suma (sumar contaba dos veces lo que se
+  // relevo el lunes y el jueves). Ver stockDe. Los kilos y "Disponible desde"
+  // los calcula la app al cargarlo: los dias a cosecha se vuelven fecha, que
+  // no envejece ("7 dias" cargado hace dos semanas ya es "listo").
+  stock: {
+    nombre: "Stock",
+    encabezados: ["Id", "Temporada", "Fecha", "Tipo", "Cultivo", "Variedad",
+                  "Sector", "Bancal", "Lugar", "Formato", "Cantidad", "Peso unidad kg",
+                  "Kg", "Días a cosecha", "Disponible desde", "Observaciones", "Relevó",
+                  "Cargado por", "Recibido"],
+    fila: function (r) {
+      var d = r.datos;
+      return [r.id, r.temporada || "", d.fecha, d.tipo || "En campo", d.cultivo, d.variedad || "",
+              d.sector || "", d.bancal || "", d.lugar || "", d.formato || "kg",
+              numeroOVacio(d.cantidad), numeroOVacio(d.peso_unidad), numeroOVacio(d.kg),
+              numeroOVacio(d.dias), d.disponible || d.fecha, d.observaciones || "",
+              d.operador || "", r.dispositivo || "", new Date()];
+    },
+  },
   horas: {
     nombre: "Horas",
     encabezados: ["Id", "Temporada", "Fecha", "Integrante", "Horas", "Actividad",
@@ -379,7 +400,7 @@ function atender(p) {
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
-      || p.catalogo || p.almacigos || p.ficha || p.generaciones || p.columnas) {
+      || p.catalogo || p.almacigos || p.ficha || p.generaciones || p.columnas || p.stock) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -415,6 +436,8 @@ function atender(p) {
       return respuesta({ ok: true, generaciones: recordado_("plan", chacra, generacionesDelPlan) });
     }
 
+    if (p.stock) return respuesta(stockDe(chacra, p.fecha, p.desde));
+
     // Diagnostico para las herramientas: las hojas cuyas columnas no estan
     // donde el codigo las espera (ver revisarColumnas).
     if (p.columnas) {
@@ -440,6 +463,9 @@ function atender(p) {
       // Plan contra real (03/10): las generaciones traen su trasplante real y
       // Siembras / Trasplantes guardan la fecha planificada y el origen.
       cfg.seguimiento = true;
+      // Tiene la hoja Stock y sabe responder ?stock=1 (23/10). Sin esto la
+      // app no muestra la seccion: lo cargado quedaria en la cola para siempre.
+      cfg.stock = true;
       // Los encabezados de cada hoja, como los escribe este codigo. La app
       // lee los datos por esos nombres: si alguno que usa no esta, avisa en
       // vez de mostrar huecos en silencio.
@@ -1396,6 +1422,54 @@ function ultimosDeHoja(chacra, cual, cuantos) {
   }).reverse();          // el más nuevo primero
 }
 
+// ---------- Stock ----------
+//
+// Lo vigente a una fecha: la ULTIMA fila de cada lugar hasta ese dia (ver
+// HOJAS.stock). Se calcula aca, sobre la hoja entera: el telefono recibe solo
+// las ultimas filas de cada hoja, y contar sobre esa ventana ya rompio dos
+// funciones en silencio. Lo que quedo en cero se relevo como agotado y no se
+// devuelve. Ademas van los registros de desde..fecha, para descargarlos.
+function claveDeStock_(o) {
+  return [o["Tipo"] || "En campo", o["Sector"], o["Bancal"], claveNombre(o["Lugar"]),
+          claveCultivo(o["Cultivo"]), claveNombre(o["Variedad"])].join("|");
+}
+
+function stockDe(chacra, fecha, desde) {
+  var tz = Session.getScriptTimeZone();
+  var esFecha = function (t) { return /^\d{4}-\d{2}-\d{2}$/.test(String(t || "")); };
+  var hasta = esFecha(fecha) ? fecha : Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  var inicio = esFecha(desde) && desde <= hasta ? desde : hasta;
+  var vacio = { ok: true, fecha: hasta, desde: inicio, vigente: [], registros: [] };
+
+  var def = HOJAS.stock;
+  var hoja = planillaDe(chacra).getSheetByName(def.nombre);
+  if (!hoja || hoja.getLastRow() < 2) return vacio;
+  var filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length).getValues()
+    .map(function (f, i) {
+      var o = { _orden: i };
+      def.encabezados.forEach(function (c, j) {
+        var v = f[j];
+        o[c] = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v;
+      });
+      return o;
+    })
+    .filter(function (o) { return o.Id && esFecha(o.Fecha) && o.Fecha <= hasta; });
+
+  // Por fecha y, el mismo dia, en el orden en que llegaron: gana lo ultimo.
+  filas.sort(function (a, b) {
+    return a.Fecha < b.Fecha ? -1 : a.Fecha > b.Fecha ? 1 : a._orden - b._orden;
+  });
+  var ultima = {};
+  filas.forEach(function (o) { ultima[claveDeStock_(o)] = o; });
+  var limpia = function (o) { var c = Object.assign({}, o); delete c._orden; return c; };
+  var vigente = Object.keys(ultima).map(function (k) { return ultima[k]; })
+    .filter(function (o) { return Number(o.Kg) > 0 || Number(o.Cantidad) > 0; })
+    .map(limpia);
+  var registros = filas.filter(function (o) { return o.Fecha >= inicio; })
+    .reverse().slice(0, 1000).map(limpia);
+  return { ok: true, fecha: hasta, desde: inicio, vigente: vigente, registros: registros };
+}
+
 // ---------- Corregir y borrar registros ----------
 //
 // Antes, para arreglar una siembra mal cargada habia que abrir la planilla.
@@ -1404,7 +1478,7 @@ function ultimosDeHoja(chacra, cual, cuantos) {
 // Nada se pierde: cada cambio deja la fila COMO ESTABA en la hoja "Cambios"
 // de la chacra, con quien lo hizo y cuando. Si alguien borra algo por error,
 // se recupera copiando esa fila de vuelta.
-var CORREGIBLES = { siembras: 1, trasplantes: 1, cosechas: 1, horas: 1 };
+var CORREGIBLES = { siembras: 1, trasplantes: 1, cosechas: 1, horas: 1, stock: 1 };
 var CAMBIOS = { nombre: "Cambios",
                 encabezados: ["Cuándo", "Hoja", "Id", "Qué", "Quién", "Cómo estaba"] };
 

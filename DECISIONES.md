@@ -170,6 +170,27 @@ converse antes, porque entonces el copyright pasa a ser compartido.
 
 ---
 
+## Por qué el stock es una foto y no una cuenta de entradas y salidas (23/10)
+
+Un stock "de verdad" entra por cosecha y sale por venta o merma. Para eso
+hacen falta ventas con detalle por producto, y eso vive en AMA Economía y
+todavía no está (sus fases 4 y 6). Lo que la chacra sí puede hacer hoy es lo
+que comercialización hace a mano: **recorrer y anotar qué hay**. Así que cada
+registro es una foto de un lugar, y lo vigente es la última foto. Cuando
+Economía tenga ventas, la cuenta corriente se arma allá con estas fotos como
+punto de partida.
+
+**Dónde vive la planilla.** En la planilla de cada chacra, hoja Stock, como
+todo lo demás: cada chacra es dueña de lo suyo y nadie la edita a mano.
+Comercialización no recibe una copia: la pide por un endpoint con token
+(versión 2), servidor a servidor, como la proyección. Si algún día AMA sale
+de las planillas a una base de datos, cambia solo dónde se guarda; la app y
+el contrato con comercialización quedan iguales. La computadora de Martín
+**no** es el servidor de AMA: se apaga, no tiene dirección pública y habría
+que abrirla a internet. El servidor es Google (Apps Script + Drive).
+
+---
+
 ## Decisiones menores que costaron tiempo
 
 **Escala fraccionaria en pantallas chicas.** El pixel art queda perfecto con

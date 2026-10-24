@@ -124,7 +124,7 @@ async function sincronizarUnaVez(silencioso) {
   if (enviadosAhora.length) {
     // Lo recién enviado ya está en la planilla: se vuelve a pedir para que
     // aparezca en la lista de la chacra y no solo como "por enviar".
-    ["siembras", "cosechas", "horas", "trasplantes", "tareas"]
+    ["siembras", "cosechas", "horas", "trasplantes", "tareas", "stock"]
       .filter((t) => tipos.has(t)).forEach((t) => traerUltimos(t, true));
     // Las generaciones tienen su propio pedido: el plan entero.
     if (tipos.has("generaciones") || tipos.has("generacion_borrar")) traerGeneraciones(true);
@@ -135,6 +135,7 @@ async function sincronizarUnaVez(silencioso) {
       .filter((r) => r.tipo === "registro_editar" || r.tipo === "registro_borrar")
       .map((r) => r.datos.hoja));
     corregidas.forEach((h) => traerUltimos(h, true));
+    if (tipos.has("stock") || corregidas.has("stock")) traerStock(true);
     if (corregidas.has("siembras") || corregidas.has("trasplantes")) {
       traerGeneraciones(true); traerAlmacigos(true);
     }

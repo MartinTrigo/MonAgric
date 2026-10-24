@@ -39,6 +39,7 @@ almacenamiento del teléfono.</p>
 <script src="js/registros.js"></script>
 <script src="js/cuentas.js"></script>
 <script src="js/tareas.js"></script>
+<script src="js/stock.js"></script>
 <script src="js/configuracion.js"></script>
 <script src="js/formularios.js"></script>
 <script src="js/vistas.js"></script>
@@ -521,6 +522,41 @@ almacenamiento del teléfono.</p>
     form.querySelector("form"));
   igual("corregir bandejas recalcula plantines y trasplante estimado",
     [d.bandejas, d.plantines, d.trasplante_estimado], [3, 384, "2026-11-18"]);
+
+  // --- stock: una foto por lugar, no una suma ---
+  {
+    const r = (id, fecha, cultivo, kg, extra = {}) => ({ id, fecha, tipo: "En campo", sector: "Verano",
+      bancal: 3, cultivo, kg, cantidad: kg, formato: "kg", disponible: fecha, ...extra });
+    const regs = [r("a", "2026-10-20", "Acelga", 40), r("b", "2026-10-23", "Acelga", 25),
+                  r("c", "2026-10-21", "Repollo bco", 30), r("d", "2026-10-22", "Repollo bco", 0),
+                  r("e", "2026-10-22", "Acelga", 10, { bancal: 4 })];
+    igual("stock vigente: gana el último del mismo lugar, sin sumar",
+      stockVigente(regs, "2026-10-23").map((x) => x.id).sort(), ["b", "e"]);
+    igual("stock vigente a una fecha anterior",
+      stockVigente(regs, "2026-10-21").map((x) => x.id).sort(), ["a", "c"]);
+    igual("stock: el mismo cultivo con otra forma de escribirlo es el mismo lugar",
+      stockVigente([r("a", "2026-10-20", "Acelgas", 40), r("b", "2026-10-20", "acelga", 5)], "2026-10-20")
+        .map((x) => x.id), ["b"]);
+    igual("stock: 25 unidades de 1,2 kg, listas en 7 días",
+      calcularStock({ fecha: "2026-10-23", formato: "unidad", cantidad: 25, peso_unidad: 1.2, dias: 7 }),
+      { kg: 30, dias: 7, disponible: "2026-10-30" });
+    igual("stock: por kg, listo ya", calcularStock({ fecha: "2026-10-23", formato: "kg", cantidad: 12.5, dias: "0" }),
+      { kg: 12.5, dias: 0, disponible: "2026-10-23" });
+    igual("stock: en grupos según cuándo está listo",
+      stockAgrupado([r("a", "2026-10-23", "Acelga", 4), r("b", "2026-10-23", "Kale", 2, { disponible: "2026-10-29" }),
+                     r("c", "2026-10-23", "Ajo", 9, { disponible: "2026-12-30" })], "2026-10-23").map((g) => g.nombre),
+      ["Listo", "Esta semana", "Más adelante"]);
+    const fs = document.createElement("div");
+    const fila = { Id: "s1", Fecha: "2026-10-23", Tipo: "Elaborado", Cultivo: "Chucrut", Sector: "Verano",
+      Bancal: 3, Lugar: "Cámara", Formato: "frasco", Cantidad: 10, "Peso unidad kg": 0.5, Kg: 5,
+      "Días a cosecha": 0, "Disponible desde": "2026-10-23" };
+    fs.innerHTML = formularioCorreccion("stock", fila);
+    fs.querySelector("form").elements.cantidad.value = "12";
+    fs.querySelector("form").elements.dias.value = "3";
+    const ds = datosCorregidos("stock", fila, fs.querySelector("form"));
+    igual("corregir stock recalcula kg y disponible, y saca el bancal si no es de campo",
+      [ds.kg, ds.disponible, ds.sector, ds.bancal, ds.lugar], [6, "2026-10-26", "", "", "Cámara"]);
+  }
 
   Storage.prototype.setItem = setReal;
   const mal = casos.filter((c) => !c.ok);

@@ -63,6 +63,7 @@ espacio global. El orden importa solo para lo que se evalúa al cargar
 | `ficha.js` | ficha del cultivo | ~165 |
 | `registros.js` | últimos movimientos, corregir y borrar | ~300 |
 | `cuentas.js` · `tareas.js` · `configuracion.js` | cada sección | ~230 · 185 · 270 |
+| `stock.js` | Stock (23/10): formulario, lo disponible a una fecha, descargas | ~600 |
 | `formularios.js` | `preparar*` de siembras, trasplantes, cosechas, horas, ajustes | ~630 |
 | `vistas.js` | `plantillas`: el HTML de cada sección | ~960 |
 | `render.js` | `render`, `redibujarConDatos`, enganches comunes | ~290 |

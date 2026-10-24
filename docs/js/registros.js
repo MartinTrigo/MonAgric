@@ -58,6 +58,11 @@ function filaEquipo(tipo, f) {
   } else if (tipo === "cosechas") {
     detalle = `${esc(f.Cultivo)} — ${num(f.Kg, 1)} kg`;
     extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
+  } else if (tipo === "stock") {
+    const d = deFilaStock(f);
+    detalle = `${esc(d.cultivo)}${d.variedad ? " " + esc(d.variedad) : ""} — ${esc(cantidadStock(d))}`;
+    extra = [esc(dondeStock(d)), esc(cuandoStock(d, d.fecha)), d.operador ? "por " + esc(d.operador) : ""]
+      .filter(Boolean).join(" · ");
   } else if (tipo === "horas") {
     detalle = `${esc(f.Integrante)} — ${num(f.Horas, 1)} h`;
     extra = [f["Área"] || f.Proyecto, f.Actividad, f.Observaciones]
@@ -93,6 +98,9 @@ function filaRegistro(r) {
   } else if (r.tipo === "cosechas") {
     titulo = "Cosecha";
     detalle = `${esc(d.cultivo)}: ${num(d.kg, 1)} kg`;
+  } else if (r.tipo === "stock") {
+    titulo = "Stock";
+    detalle = `${esc(d.cultivo)}: ${esc(cantidadStock(d))} · ${esc(dondeStock(d))}`;
   } else if (r.tipo === "siembras") {
     titulo = "Siembra";
     const cant = d.plantines ? `${num(d.plantines)} plantines`
@@ -121,7 +129,7 @@ function filaRegistro(r) {
   // Lo que todavía no salió se puede sacar de la cola: un error se arregla
   // antes de que llegue a la planilla.
   const cancelable = esperando && pendientes.some((x) => x.id === r.id)
-    && ["siembras", "trasplantes", "cosechas", "horas"].includes(r.tipo);
+    && ["siembras", "trasplantes", "cosechas", "horas", "stock"].includes(r.tipo);
   return `<div class="registro">
     <div><div class="detalle">${[titulo, detalle].filter(Boolean).join(" — ")}</div>
       <div class="cuando">${fechaCorta(d.fecha || d.hecha_el || "")}</div></div>
@@ -158,6 +166,14 @@ const CORRECCION = {
   horas: [["fecha", "Fecha", "fecha"], ["integrante", "Quién", "persona"],
     ["horas", "Horas", "numero"], ["area", "Área", "area"],
     ["actividad", "Actividad", "texto"], ["observaciones", "Qué se hizo", "texto"]],
+  // Los kilos y "disponible desde" no se corrigen: salen de la cuenta.
+  stock: [["fecha", "Fecha", "fecha"], ["tipo", "Qué es", "tipoStock"],
+    ["cultivo", "Cultivo o producto", "texto"], ["variedad", "Variedad", "texto"],
+    ["sector", "Sector (en campo)", "sector"], ["bancal", "Bancal (en campo)", "numero"],
+    ["lugar", "Dónde (si no es campo)", "texto"], ["formato", "Se vende por", "formato"],
+    ["cantidad", "Cantidad", "numero"], ["peso_unidad", "Peso por unidad (kg)", "numero"],
+    ["dias", "Días a cosecha", "numero"], ["operador", "Relevó", "persona"],
+    ["observaciones", "Observaciones", "texto"]],
 };
 // Todo lo que guarda la hoja de ese tipo: lo que no se corrige viaja como
 // estaba, porque el servicio rearma la fila entera. Son también los nombres
@@ -179,6 +195,10 @@ const DE_LA_HOJA = {
   cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó" },
   horas: { fecha: "Fecha", integrante: "Integrante", horas: "Horas", actividad: "Actividad",
     area: "Área", observaciones: "Observaciones" },
+  stock: { fecha: "Fecha", tipo: "Tipo", cultivo: "Cultivo", variedad: "Variedad",
+    sector: "Sector", bancal: "Bancal", lugar: "Lugar", formato: "Formato",
+    cantidad: "Cantidad", peso_unidad: "Peso unidad kg", kg: "Kg", dias: "Días a cosecha",
+    disponible: "Disponible desde", observaciones: "Observaciones", operador: "Relevó" },
 };
 const datosDeFila = (tipo, f) => Object.fromEntries(
   Object.entries(DE_LA_HOJA[tipo]).map(([k, c]) => [k, f[c] ?? ""]));
@@ -201,6 +221,8 @@ function campoCorreccion([k, rotulo, clase], v) {
   else if (clase === "sector") campo = `<select name="${k}"><option value="">—</option>${
     sectores().map((s) => `<option${s.sector === val ? " selected" : ""}>${esc(s.sector)}</option>`).join("")}</select>`;
   else if (clase === "area") campo = `<select name="${k}">${opcionesArea(val)}</select>`;
+  else if (clase === "tipoStock") campo = `<select name="${k}">${opciones(TIPOS_STOCK)}</select>`;
+  else if (clase === "formato") campo = `<select name="${k}">${opciones(FORMATOS_STOCK)}</select>`;
   else campo = `<input type="text" name="${k}" value="${esc(val)}">`;
   return `<div><label>${esc(rotulo)}</label>${campo}</div>`;
 }
@@ -263,6 +285,11 @@ function datosCorregidos(tipo, f, form) {
     d.dias_almacigo_real = real === null ? "" : real;
     d.diferencia_dias = real === null || !d.dias_almacigo_teorico ? "" : real - Number(d.dias_almacigo_teorico);
     contraPlan();
+  } else if (tipo === "stock") {
+    // En campo va sector y bancal; en otro lado, el lugar. Nunca los dos.
+    if (esDeCampo(d)) d.lugar = ""; else { d.sector = ""; d.bancal = ""; }
+    d.formato = d.formato || "kg";
+    Object.assign(d, calcularStock(d));
   }
   return d;
 }

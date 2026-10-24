@@ -137,6 +137,7 @@ function engancharPartes(vista) {
   engancharFilas();
   if (vista === "tareas") prepararTareas();
   if (vista === "inicio") prepararInicio();
+  if (vista === "stock") { engancharAgotados(); prepararResumenStock(); }
   if (vista === "plan") { prepararEdicionCultivos(); if (recalcularSerie) recalcularSerie(); }
 }
 
@@ -193,7 +194,7 @@ function render_(vista, conservarScroll, htmlListo) {
   ({ siembras: prepararSiembras, horas: prepararHoras, cosechas: prepararCosechas,
      tareas: prepararTareas, inicio: prepararInicio, ajustes: prepararAjustes,
      configuracion: prepararConfiguracion, plan: prepararPlan,
-     trasplantes: prepararTrasplantes, cuentas: prepararCuentas
+     trasplantes: prepararTrasplantes, cuentas: prepararCuentas, stock: prepararStock
    }[vista] || (() => {}))();
   if (este !== numeroDeRender) return;     // ya se volvió a dibujar desde adentro
 
@@ -201,7 +202,9 @@ function render_(vista, conservarScroll, htmlListo) {
   prepararCorrecciones();
 
   // Las secciones de registro muestran lo último de toda la chacra.
-  if (["siembras", "cosechas", "horas", "trasplantes"].includes(vista)) traerUltimos(vista);
+  if (["siembras", "cosechas", "horas", "trasplantes", "stock"].includes(vista)) traerUltimos(vista);
+  // Stock: lo vigente lo calcula el servicio, y el plan dice qué hay en cada bancal.
+  if (vista === "stock") { traerStock(); traerGeneraciones(); }
   // Para saber qué almácigos siguen pendientes hace falta la lista de siembras,
   // aunque la sección que se está mirando sea Trasplantes.
   if (vista === "trasplantes") { traerUltimos("siembras"); traerAlmacigos(); }
@@ -254,6 +257,9 @@ function render_(vista, conservarScroll, htmlListo) {
   // compartida. Hoy es solo Chacra Tica: las demás ni la ven.
   const tabCuentas = document.querySelector('[data-vista="cuentas"]');
   if (tabCuentas) tabCuentas.hidden = !hayCuentas();
+  // Stock aparece cuando el servicio de la chacra ya lo tiene (cfg.stock).
+  const tabStock = document.querySelector('[data-vista="stock"]');
+  if (tabStock) tabStock.hidden = !CFG?.stock;
 
   // Si la sección quedó fuera de la vista en la barra deslizable, se la acerca.
   const activa = document.querySelector(".tabs-medio .tab.activa");

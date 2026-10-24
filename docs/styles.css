@@ -1704,3 +1704,18 @@ button.enlace {
   background: none; border: none; padding: 0; margin: 0;
   font: inherit; color: var(--sage-dark); text-decoration: underline; cursor: pointer;
 }
+
+/* ---- stock ---- */
+.stock-agotado {
+  flex: none;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: .74rem;
+  font-weight: 600;
+  color: var(--tenue);
+  background: transparent;
+  border: 1px solid var(--sage-light);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.stock-agotado:active { background: var(--sage-suave); }

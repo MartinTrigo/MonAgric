@@ -509,6 +509,21 @@ const plantillas = {
     ${parte("historial", historialDe("cosechas"))}`;
   },
 
+  // Ver js/stock.js. Contra un servicio que todavía no tiene la hoja Stock no
+  // hay nada que cargar: lo guardado quedaría en la cola para siempre.
+  stock() {
+    if (!chacraActual()) return tarjetaElegirChacra();
+    if (!tieneAcceso()) return tarjetaCanje();
+    if (!hayConfig()) return tarjetaSinConfig();
+    if (!CFG.stock) return `<div class="tarjeta"><h2>&#128230; Stock</h2>
+      <p class="nota alerta">El servicio de la chacra todavía no tiene la sección Stock.
+      Hay que actualizar el Apps Script (Nueva versión). Avisá a quien mantiene AMA.</p></div>`;
+    return `${tarjetaFormStock()}
+    ${parte("stock-disponible", tarjetaDisponible())}
+    ${tarjetaResumenStock()}
+    ${parte("historial", historialDe("stock"))}`;
+  },
+
   plan() {
     if (!chacraActual()) return tarjetaElegirChacra();
     if (!tieneAcceso()) return tarjetaCanje();
