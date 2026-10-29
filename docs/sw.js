@@ -5,7 +5,7 @@
 // señal se sirve la última copia guardada, que es lo que importa en el campo.
 // Desde el 01/10, al abrir la app se espera a la red un máximo de 3 segundos:
 // con señal débil, la copia (ver abrir()).
-const CACHE = "monagric-v83";
+const CACHE = "monagric-v84";
 const ARCHIVOS = [
   ".",
   "index.html",
@@ -44,7 +44,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k.startsWith("monagric-") && k !== CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
