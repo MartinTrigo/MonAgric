@@ -6,6 +6,21 @@ que falta hacer.
 
 ---
 
+## BioSalud comparte el sitio con AMA (29/10) — HAY QUE SEPARARLO
+
+Producción, Economía y BioSalud se publican en `martintrigo.github.io`: para el
+navegador son UN sitio, con un solo localStorage y un solo juego de cachés.
+Borrar los "datos del sitio" para reiniciar BioSalud le borra a ese aparato la
+chacra, la credencial y lo pendiente de enviar de AMA.
+
+- Hecho (v84 / bioma-v43): cada service worker borra solo sus cachés
+  (`monagric-`, `bioma-`). Antes cada app, al actualizarse, borraba los de las otras.
+- Falta: mover **BioSalud** (no AMA: AMA tiene los teléfonos de seis chacras
+  activados) a otro dominio, por ejemplo una organización de GitHub propia.
+  Lo tiene que crear Martín en github.com. Su `sw.js` también borra cachés ajenos.
+- El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
+  `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
+
 ## Stock, versión 1 (23/10) — servicio implementado
 
 Publicada (v82) y con el servicio implementado (verificado el 24/10): la
