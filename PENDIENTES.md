@@ -111,9 +111,12 @@ almácigo queda atrasado. Lo que salió al revisar los 38 que esperan:
   con los registros reales. **Falta en la planilla «AMA - Catálogo de
   cultivos»**, que le gana a catalogo.json: si en Cultivos dice 60 en «Días
   de trasplante a cosecha», cambiarlo a 40 y poner 14 en «Días en cosecha».
-- **Sin días en cosecha** (la barra termina donde empieza la cosecha): Ajo de
-  verdeo, Cherry y Repollo col. **Sin ningún dato**: Ají, Cilantro, Mizuna,
-  Pepino y Pepinillo.
+- **Días en cosecha completados el 30/10 (v86)**: Cherry 100 (como Tomate),
+  Repollo col 30 (como Repollo bco), Ajo de verdeo 45 (supuesto, sin fuente:
+  corregirlo con lo que dure de verdad en el bancal). **Sin ningún dato**
+  siguen Ají, Cilantro, Mizuna, Pepino y Pepinillo.
+- Una celda vacía en la planilla del catálogo no borra: vale catalogo.json.
+  No hace falta llenarla entera, solo donde se quiera cambiar un número.
 - **Almácigos sin trasplante registrado**: el servicio cuenta 27 esperando,
   varios sembrados en agosto (Lechuga, Kale, Repollo, Acelga, Brócoli...).
   Seguro ya están en el campo: registrarlos desde "Para trasplantar" (el

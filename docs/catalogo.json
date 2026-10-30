@@ -74,6 +74,9 @@
   "Ajo de verdeo": {
    "dias_a_cosecha": 105,
    "dias_almacigo": 45,
+   "dias_en_cosecha": 45,
+   "dias_en_cosecha_max": 45,
+   "dias_en_cosecha_min": 14,
    "dias_trasplante_cosecha": 60,
    "distancia_cm": 20.0,
    "lineas_bancal": 4,
@@ -153,6 +156,9 @@
   "Cherry": {
    "dias_a_cosecha": 150,
    "dias_almacigo": 55,
+   "dias_en_cosecha": 100,
+   "dias_en_cosecha_max": 100,
+   "dias_en_cosecha_min": 30,
    "dias_trasplante_cosecha": 95,
    "distancia_cm": 45.0,
    "lineas_bancal": 2,
@@ -395,6 +401,9 @@
   "Repollo col": {
    "dias_a_cosecha": 140,
    "dias_almacigo": 35,
+   "dias_en_cosecha": 30,
+   "dias_en_cosecha_max": 30,
+   "dias_en_cosecha_min": 1,
    "dias_trasplante_cosecha": 105,
    "distancia_cm": 45.0,
    "lineas_bancal": 3,
