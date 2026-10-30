@@ -89,7 +89,12 @@ almacenamiento del teléfono.</p>
   const t2 = tramosDe({ cultivo: "Repollo bco", fecha_almacigo: "2026-10-19", fecha_campo: "2026-11-28" });
   igual("tramos con fecha a campo: manda la del plan",
     [t2.campo, t2.inicioCosecha, t2.fin], ["2026-11-28", "2027-03-13", "2027-04-12"]);
-  const t3 = tramosDe({ cultivo: "Pak choi", fecha_almacigo: "2026-09-28", fecha_campo: "" });
+  // Un cultivo inventado, con los datos que tenía el pak choi el 28/09: de
+  // almácigo, sin días en bandeja ni días en cosecha. Antes la prueba usaba
+  // el pak choi mismo, y dejó de servir el 30/10 al completarle el catálogo.
+  CAT.perfiles["Prueba sin datos"] = { tipo_siembra: "Almácigo", dias_almacigo: 0, dias_trasplante_cosecha: 60 };
+  const t3 = tramosDe({ cultivo: "Prueba sin datos", fecha_almacigo: "2026-09-28", fecha_campo: "" });
+  delete CAT.perfiles["Prueba sin datos"];
   igual("sin días en el catálogo: barra estimada, y dice qué falta",
     [t3.campo, t3.inicioCosecha, t3.faltan], ["2026-10-26", "2026-12-25", ["días de almácigo", "días en cosecha"]]);
 

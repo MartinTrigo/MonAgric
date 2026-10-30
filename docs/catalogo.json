@@ -311,9 +311,14 @@
    "tipo_siembra": "Almácigo"
   },
   "Pak choi": {
-   "dias_a_cosecha": 60,
-   "dias_almacigo": 0,
-   "dias_trasplante_cosecha": 60,
+   "dias_a_cosecha": 68,
+   "dias_almacigo": 28,
+   "dias_almacigo_oi": 30,
+   "dias_almacigo_pv": 25,
+   "dias_en_cosecha": 14,
+   "dias_en_cosecha_max": 14,
+   "dias_en_cosecha_min": 7,
+   "dias_trasplante_cosecha": 40,
    "distancia_cm": 25.0,
    "lineas_bancal": 3,
    "rinde_ref_kg_m2": 5.0,

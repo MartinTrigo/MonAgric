@@ -93,9 +93,9 @@ almácigo queda atrasado. Lo que salió al revisar los 38 que esperan:
   G2 a G8 una cada una: ¿alguna era de otra generación?
 - **Tomate G1** junta las tres siembras propias (10/09, 10/09, 12/09) con el
   encargado (17/08, llega el 20/10). ¿Las propias eran G2?
-- **Pak choi** y **Corredor Biológico** no tienen días de almácigo en el
-  catálogo: sus almácigos no tienen fecha de trasplante prevista. Completar
-  C (y N, O) en «AMA - Catálogo de cultivos».
+- **Corredor Biológico** no tiene días de almácigo en el catálogo: sus
+  almácigos no tienen fecha de trasplante prevista. Completar C (y N, O) en
+  «AMA - Catálogo de cultivos». (El pak choi se completó el 30/10, ver abajo.)
 - Sigue **«ZZ Prueba»** en el catálogo compartido.
 
 ## Revisión de datos del 29/09 — para Martín
@@ -105,8 +105,15 @@ almácigo queda atrasado. Lo que salió al revisar los 38 que esperan:
 - **Habas**: el plan dice 4 líneas a 15 cm (3.200 plantas en 4 bancales) y el
   catálogo 1 línea. No se tocó: decidir cuál es y corregirlo en Cultivos →
   Marco y rinde, o en el catálogo.
-- **Pak choi**: al catálogo le faltan los días de almácigo y de cosecha (su
-  barra sale estimada, rayada).
+- **Pak choi** (completado el 30/10, v85, en `catalogo.json`): almácigo 28
+  (30 otoño-invierno, 25 primavera-verano), trasplante a cosecha 40 (antes
+  60), 14 días en cosecha. Sale de ensayos de climas más cálidos: calibrar
+  con los registros reales. **Falta en la planilla «AMA - Catálogo de
+  cultivos»**, que le gana a catalogo.json: si en Cultivos dice 60 en «Días
+  de trasplante a cosecha», cambiarlo a 40 y poner 14 en «Días en cosecha».
+- **Sin días en cosecha** (la barra termina donde empieza la cosecha): Ajo de
+  verdeo, Cherry y Repollo col. **Sin ningún dato**: Ají, Cilantro, Mizuna,
+  Pepino y Pepinillo.
 - **Almácigos sin trasplante registrado**: el servicio cuenta 27 esperando,
   varios sembrados en agosto (Lechuga, Kale, Repollo, Acelga, Brócoli...).
   Seguro ya están en el campo: registrarlos desde "Para trasplantar" (el
