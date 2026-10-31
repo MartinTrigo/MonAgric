@@ -396,6 +396,16 @@ function atender(p) {
     return respuesta(proyeccionDe(chacra));
   }
 
+  // El stock de la chacra para armar la oferta de la semana en AMA Economia
+  // (31/10). Lo pide el mismo servidor y con la misma clave que la proyeccion.
+  // Sale sin quien relevo ni quien cargo: alla no hace falta saberlo.
+  if (p.stockcomercial) {
+    if (!esAdmin(p.clave) && !tokenDeProyeccionValido(chacra, p.token)) {
+      return respuesta(rechazo("Esta clave no abre el stock de esta chacra."));
+    }
+    return respuesta(stockParaComercializar(chacra, p.fecha));
+  }
+
   // Todo lo que entregue datos de una chacra exige credencial de esa chacra.
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
@@ -2022,6 +2032,28 @@ function proyeccionDe(chacra) {
     bancal_m2: m2Bancal,
     plan: plan,
     actualizado: new Date().toISOString(),
+  };
+}
+
+// Lo vigente del stock (la ultima foto de cada lugar, ver stockDe), para que
+// AMA Economia arme la oferta de la semana. Solo lo que sirve para vender:
+// que hay, cuanto y desde cuando. Ni quien lo relevo ni el registro completo.
+function stockParaComercializar(chacra, fecha) {
+  var s = stockDe(chacra, fecha, "");
+  var numero = function (v) { return v === "" || v == null ? "" : Number(v); };
+  return {
+    ok: true, api: 1, chacra: chacra, fecha: s.fecha,
+    vigente: s.vigente.map(function (o) {
+      return {
+        fecha: o["Fecha"], tipo: o["Tipo"] || "En campo",
+        cultivo: o["Cultivo"], variedad: o["Variedad"] || "",
+        sector: o["Sector"] || "", bancal: o["Bancal"] || "", lugar: o["Lugar"] || "",
+        formato: o["Formato"] || "kg", cantidad: numero(o["Cantidad"]),
+        peso_unidad: numero(o["Peso unidad kg"]), kg: numero(o["Kg"]),
+        disponible: o["Disponible desde"] || o["Fecha"],
+        observaciones: o["Observaciones"] || "",
+      };
+    }),
   };
 }
 

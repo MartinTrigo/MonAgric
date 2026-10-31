@@ -37,10 +37,11 @@ en CSV; comparte el resumen por WhatsApp; corregir, borrar y «Agotado».
 **Versión 2**, lo que quedó afuera a propósito:
 - **Modo recorrida**: un sector con todos sus bancales en una lista, y los kg
   sugeridos por el rinde del plan, para corregir y no escribir.
-- **Endpoint para comercialización**: `?stock=1` con un token por chacra,
-  como la proyección (`PROYECCION_TOKENS`), para que el script de Economía
-  arme la hoja «stock» de la planilla de comercialización sin copias a mano.
-  Solo las chacras que comercializan con Bioma.
+- ~~Endpoint para comercialización~~ **hecho el 31/10, falta Nueva versión**:
+  `?stockcomercial=1&chacra=&token=` con la clave de la proyección
+  (`stockParaComercializar`: lo vigente de `stockDe`, sin quién relevó). Lo
+  pide `Code.gs` de AMA Economía para su pestaña Semana. Implementar con
+  **Nueva versión** (pasos en `economia/apps-script/stock-proveedores/LEEME.md`).
 - Que una cosecha registrada baje el stock de su cultivo (hoy no se tocan:
   el stock es una foto y la cosecha se registra aparte).
 - Sumar Stock a la guía de uso (`docs/ayuda/`).

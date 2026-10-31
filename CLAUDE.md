@@ -208,8 +208,9 @@ temporada, tener un catálogo con fechas reales.
   algo entra. Las barras punteadas del plan son generaciones en cosecha sin
   relevar (un registro del cultivo en sus bancales posterior a su ida al
   campo, agotado incluido, las tapa). Relevado y plan nunca se suman.
-- Comercialización lo va a pedir por endpoint con token (versión 2), igual
-  que la proyección. Nunca copias de la planilla.
+- Comercialización lo pide por endpoint (31/10): `?stockcomercial=1` con la
+  clave de la proyección, servidor a servidor, para la pestaña Semana de AMA
+  Economía. Solo lo vigente, sin quién relevó. Nunca copias de la planilla.
 
 ## Multi-chacra: lo que no hay que romper
 
