@@ -2236,7 +2236,7 @@ function productosParaStock(chacra, forzar) {
   var c = {
     nombre: col(["producto", "nombre"]), presentacion: col(["presentacion"]),
     categoria: col(["categoria"]), sku: col(["sku"]), unidad: col(["unidad", "se vende por"]),
-    kg: col(["kg por unidad"]), activo: col(["activo"]),
+    kg: col(["kg por unidad", "kg x unidad"]), activo: col(["activo"]),
   };
   if (c.nombre < 0) return [];
   var leerCol = function (fila, k) { return c[k] < 0 ? "" : String(fila[c[k]] == null ? "" : fila[c[k]]).trim(); };
