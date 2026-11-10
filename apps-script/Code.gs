@@ -2195,8 +2195,9 @@ function claveNombre(n) {
 //
 // Una chacra que no figura no recibe lista y la app sigue como antes (texto
 // libre). Las columnas se buscan por su encabezado, no por posicion, para
-// que sirva con la hoja de bioma-db o con una planilla nueva que tenga
-// "producto", "presentación", "categoría", "SKU", "unidad" y "activo".
+// que sirva con la hoja de bioma-db ("producto", "presentación", "categoría",
+// "SKU", "unidad", "activo") o con la planilla AMA - Productos ("Se vende
+// por" y "Kg por unidad" en vez de unidad y presentación).
 //
 // NUNCA viajan los precios: quien trabaja en la chacra no ve plata por AMA
 // Produccion. Solo nombre, presentacion, categoria, SKU y unidad.
@@ -2234,8 +2235,8 @@ function productosParaStock(chacra, forzar) {
   };
   var c = {
     nombre: col(["producto", "nombre"]), presentacion: col(["presentacion"]),
-    categoria: col(["categoria"]), sku: col(["sku"]), unidad: col(["unidad"]),
-    activo: col(["activo"]),
+    categoria: col(["categoria"]), sku: col(["sku"]), unidad: col(["unidad", "se vende por"]),
+    kg: col(["kg por unidad"]), activo: col(["activo"]),
   };
   if (c.nombre < 0) return [];
   var leerCol = function (fila, k) { return c[k] < 0 ? "" : String(fila[c[k]] == null ? "" : fila[c[k]]).trim(); };
@@ -2251,6 +2252,7 @@ function productosParaStock(chacra, forzar) {
       nombre: nombre, presentacion: leerCol(f, "presentacion"),
       categoria: leerCol(f, "categoria").toLowerCase(), sku: leerCol(f, "sku"),
       unidad: leerCol(f, "unidad").toLowerCase(),
+      kg: c.kg < 0 ? "" : (Number(String(f[c.kg]).replace(",", ".")) || ""),
     });
   }
   try { cache.put(llave, JSON.stringify(salida), 600); } catch (e) { /* muy grande */ }

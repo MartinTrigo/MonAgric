@@ -43,6 +43,16 @@ Sin eso, Plantines anda igual (con los cultivos) y Elaborado queda en texto
 libre con lo ya registrado. Productos todavía no tiene categoría «plantín»:
 sumarla para que los plantines de la tienda entren a la lista.
 
+**bioma-db › productos (10/11)**: 291 filas. 95 son las originales (bien
+categorizadas). 196 entraron el 7-8/11 al importar la descarga de la tienda
+desde la app de Economía: todas como «hortaliza» y «kg», con precios que no
+son de chacra, y repiten productos que ya estaban. La tienda usa Pricing 1
+para Bariloche (2 y 3 serían Comarca y Esquel, sin uso todavía) y repite SKU
+(ME04, V02, V05). Se armó un borrador «AMA - Productos» (fuera del repo: tiene
+precios) con una fila por SKU; el servidor ya lee sus encabezados («Se vende
+por», «Kg por unidad»). Falta: que Martín lo revise y suba a Drive, y que
+bioma-db lea de ahí (cambio en su Code.gs) antes de borrar las 196 filas.
+
 **Propuesta de una planilla de productos única** (conversada el 10/11, sin
 decidir): hoy un producto está en tres lugares con tres precios (Productos de
 bioma-db, Precios de la planilla de Comercialización y la tienda). Ver la

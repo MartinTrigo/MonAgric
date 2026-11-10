@@ -883,7 +883,7 @@ function prepararStock() {
     if (!p) return;
     if (FORMATOS_STOCK.includes(p.unidad) && f.formato.value === "kg") f.formato.value = p.unidad;
     else if (p.unidad && p.unidad !== "kg" && f.formato.value === "kg") f.formato.value = "unidad";
-    const kg = kgDePresentacion(p.presentacion);
+    const kg = Number(p.kg) || kgDePresentacion(p.presentacion);
     if (kg && f.formato.value !== "kg" && !f.peso_unidad.value.trim()) f.peso_unidad.value = String(kg).replace(".", ",");
   };
 
