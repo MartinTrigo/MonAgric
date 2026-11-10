@@ -476,6 +476,13 @@ function atender(p) {
       // Tiene la hoja Stock y sabe responder ?stock=1 (23/10). Sin esto la
       // app no muestra la seccion: lo cargado quedaria en la cola para siempre.
       cfg.stock = true;
+      // Los productos que se venden, para el stock de elaborados, fruta y
+      // plantines (10/11). Sin precios. Solo si la chacra tiene su planilla
+      // en PRODUCTOS_PLANILLAS; si falla la lectura, la app sigue sin lista.
+      try {
+        var productos = productosParaStock(chacra);
+        if (productos) cfg.productos = productos;
+      } catch (e) { cfg.productos_error = String(e).slice(0, 200); }
       // Los encabezados de cada hoja, como los escribe este codigo. La app
       // lee los datos por esos nombres: si alguno que usa no esta, avisa en
       // vez de mostrar huecos en silencio.
@@ -2175,6 +2182,79 @@ function claveNombre(n) {
   return String(n || "").trim().toLowerCase()
     .replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i")
     .replace(/[óòö]/g, "o").replace(/[úùü]/g, "u").replace(/ñ/g, "n");
+}
+
+// ---------- Lista de productos para registrar stock (10/11) ----------
+//
+// Al registrar stock de algo Elaborado (o Fruta, Plantines, Otro) la app
+// ofrecia la lista de verduras. Los productos que se venden ya estan en una
+// planilla: la hoja "productos" de bioma-db (la que usa AMA Economia), o la
+// planilla de productos que la reemplace. Se lee de ahi, por chacra:
+//
+// Propiedad del script:  PRODUCTOS_PLANILLAS  {"tica":"<id de la planilla>"}
+//
+// Una chacra que no figura no recibe lista y la app sigue como antes (texto
+// libre). Las columnas se buscan por su encabezado, no por posicion, para
+// que sirva con la hoja de bioma-db o con una planilla nueva que tenga
+// "producto", "presentación", "categoría", "SKU", "unidad" y "activo".
+//
+// NUNCA viajan los precios: quien trabaja en la chacra no ve plata por AMA
+// Produccion. Solo nombre, presentacion, categoria, SKU y unidad.
+function planillaDeProductos_(chacra) {
+  try {
+    var p = PropertiesService.getScriptProperties().getProperty("PRODUCTOS_PLANILLAS");
+    if (!p) return "";
+    return JSON.parse(p)[String(chacra).toLowerCase()] || "";
+  } catch (e) { return ""; }
+}
+
+function productosParaStock(chacra, forzar) {
+  var id = planillaDeProductos_(chacra);
+  if (!id) return null;
+  var cache = CacheService.getScriptCache();
+  var llave = "productos_" + chacra;
+  if (!forzar) {
+    var guardado = cache.get(llave);
+    if (guardado) return JSON.parse(guardado);
+  }
+  var libro = SpreadsheetApp.openById(id);
+  var hoja = null;
+  libro.getSheets().forEach(function (h) {
+    if (!hoja && claveNombre(h.getName()) === "productos") hoja = h;
+  });
+  if (!hoja || hoja.getLastRow() < 2) return [];
+  var valores = hoja.getDataRange().getValues();
+  var cab = valores[0].map(claveNombre);
+  var col = function (nombres) {
+    for (var i = 0; i < nombres.length; i++) {
+      var j = cab.indexOf(nombres[i]);
+      if (j >= 0) return j;
+    }
+    return -1;
+  };
+  var c = {
+    nombre: col(["producto", "nombre"]), presentacion: col(["presentacion"]),
+    categoria: col(["categoria"]), sku: col(["sku"]), unidad: col(["unidad"]),
+    activo: col(["activo"]),
+  };
+  if (c.nombre < 0) return [];
+  var leerCol = function (fila, k) { return c[k] < 0 ? "" : String(fila[c[k]] == null ? "" : fila[c[k]]).trim(); };
+  var salida = [];
+  for (var i = 1; i < valores.length; i++) {
+    var f = valores[i];
+    var nombre = leerCol(f, "nombre");
+    if (!nombre) continue;
+    // Como normBool_ de bioma-db: vacio es activo.
+    var a = c.activo < 0 ? "" : f[c.activo];
+    if (a === false || /^(no|false|0|inactivo)$/i.test(String(a).trim())) continue;
+    salida.push({
+      nombre: nombre, presentacion: leerCol(f, "presentacion"),
+      categoria: leerCol(f, "categoria").toLowerCase(), sku: leerCol(f, "sku"),
+      unidad: leerCol(f, "unidad").toLowerCase(),
+    });
+  }
+  try { cache.put(llave, JSON.stringify(salida), 600); } catch (e) { /* muy grande */ }
+  return salida;
 }
 
 // ---------- Catalogo de cultivos que aportan las chacras ----------

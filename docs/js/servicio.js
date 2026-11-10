@@ -432,6 +432,13 @@ async function traerConfig(forzar = true) {
     if (Array.isArray(d.config.nombres_horas) && d.config.nombres_horas.length) {
       escribir(LS.nombresPlanilla, d.config.nombres_horas);
     }
+    // Los productos que se venden (10/11), para el stock de elaborados,
+    // fruta y plantines. Aparte de CFG: no tienen que viajar al guardar la
+    // configuración, y llegan aunque haya una configuración en la cola.
+    if (Array.isArray(d.config.productos)) {
+      escribir(LS.productos, { chacra: chacraCodigo(), lista: d.config.productos });
+    }
+    delete d.config.productos;
 
     // Si hay cosas esperando enviarse, lo del teléfono es más nuevo: no se pisa.
     if (!pendientes.some((r) => r.tipo === "config")) {

@@ -202,6 +202,12 @@ temporada, tener un catálogo con fechas reales.
 - Los días a cosecha se guardan también como fecha («Disponible desde»):
   "7 días" cargado hace dos semanas ya es "listo".
 - El servicio avisa `cfg.stock`; sin eso la pestaña no se muestra.
+- **Tipos** (10/11): En campo, Cosechado, Elaborado, Fruta, Plantines, Otro.
+  Los plantines se guardan como «Plantín de X»: Economía junta el stock por
+  nombre sin mirar el tipo y se sumaban a los kilos de la verdura. Elaborado,
+  Fruta y Otro ofrecen los productos de la chacra (`cfg.productos`, de la
+  planilla en `PRODUCTOS_PLANILLAS`, guardados en `monagric_productos`),
+  **nunca con precios**.
 - **Por semana** (24/10): semanas de lunes a domingo. Una barra relevada
   dura los «días en cosecha» del catálogo con la cantidad anotada, que **no
   se reparte** entre semanas: la lista muestra kilos solo la semana en que

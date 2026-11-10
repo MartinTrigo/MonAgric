@@ -217,8 +217,9 @@ function enlazarBuscadores(form) {
         ? hallados.map((o, i) => `<div class="buscador-op${i === 0 ? " marcada" : ""}" data-valor="${esc(o)}">
              ${esc(o)}${destacadas.has(o) ? '<span class="del-plan">del plan</span>' : ""}
            </div>`).join("")
-        : caja.hasAttribute("data-libre") && f
-          ? `<div class="buscador-vacio">No está en la lista: se guarda como «${esc(filtro.trim())}».</div>`
+        : caja.hasAttribute("data-libre")
+          ? `<div class="buscador-vacio">${f ? `No está en la lista: se guarda como «${esc(filtro.trim())}».`
+              : "Todavía no hay nada en la lista: escribí el nombre."}</div>`
         : `<div class="buscador-vacio">No hay ningún cultivo con ese nombre.${
             // Si en la pantalla está el formulario para sumar uno, se ofrece.
             f && document.querySelector("#alta-cultivo")

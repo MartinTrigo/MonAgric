@@ -21,6 +21,37 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## Stock: plantines y lista de productos (10/11) — FALTA NUEVA VERSIÓN
+
+Publicado en la app (v87): Stock tiene el tipo **Plantines** (se guardan como
+«Plantín de Brócoli», en unidades o bandejas, en Plantinera / Invernadero), y
+al elegir **Elaborado**, **Fruta** u **Otro** la lista de «¿Qué producto?» ya
+no son las verduras: son los productos que se venden más lo ya registrado con
+ese tipo. Elegir uno completa «Se vende por» y el peso («Kimchi 360 g» → frasco
+de 0,36 kg).
+
+La lista la manda el servicio (`productosParaStock`, en `?config=1`), **sin
+precios**. Para que llegue:
+1. Pegar `Code.gs` en MonAgric Datos 2026-27.
+2. Propiedad `PRODUCTOS_PLANILLAS` = `{"tica":"<id de bioma-db>"}` (la planilla
+   que tiene la hoja `productos`; cuando exista la planilla de productos
+   propia, va su id). Lee las columnas por encabezado: producto, presentación,
+   categoría, SKU, unidad, activo.
+3. Implementar → Administrar implementaciones → ✏ → **Nueva versión**.
+
+Sin eso, Plantines anda igual (con los cultivos) y Elaborado queda en texto
+libre con lo ya registrado. Productos todavía no tiene categoría «plantín»:
+sumarla para que los plantines de la tienda entren a la lista.
+
+**Propuesta de una planilla de productos única** (conversada el 10/11, sin
+decidir): hoy un producto está en tres lugares con tres precios (Productos de
+bioma-db, Precios de la planilla de Comercialización y la tienda). Ver la
+respuesta de esa conversación; el resumen: planilla propia «AMA - Productos»
+(no dentro de bioma-db, que tiene sueldos y deudas y no se puede compartir con
+comercialización), con el **SKU de la tienda como llave**, precio por kg ×
+kg de la presentación, y de ahí salen Precios (por fórmula), la tienda (hoja
+con su formato de importación) y las dos apps.
+
 ## Stock, versión 1 (23/10) — servicio implementado
 
 Publicada (v82) y con el servicio implementado (verificado el 24/10): la
