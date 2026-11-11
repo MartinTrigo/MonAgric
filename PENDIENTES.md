@@ -21,6 +21,35 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## Resiembras y generación sugerida (11/11) — PUBLICADO, FALTA NUEVA VERSIÓN
+
+Publicado en la app (v89): al elegir el cultivo la app propone la generación
+que sigue y no deja cargar dos veces la misma; repetirla se dice a propósito
+en «Esta siembra es» (otra tanda o resiembra con su motivo). Probado con la
+chacra de ejemplo y el servidor contra una planilla simulada.
+
+Para que aparezca el campo:
+1. Pegar `Code.gs` en MonAgric Datos 2026-27.
+2. Implementar → Administrar implementaciones → ✏ → **Nueva versión**.
+3. `python tools/version_servicio.py` (desde `produccion`) tiene que decir
+   «resiembras y generación sugerida».
+
+Después, en la app, con ✎ en Siembras → Últimos movimientos:
+- **Zapallito G1 del 30/10**: marcarla «Resiembra: germinó poco» y cargar la
+  siembra original del 29/09.
+- **Zucchini G1**: cargar la resiembra del 30/10.
+- **Tomate**: ver la respuesta del 11/11 sobre variedades (una generación es
+  una fecha de siembra; las tres variedades serían una generación con tres
+  tandas).
+
+**Pedido el 11/11, sin diseñar todavía: cerrar una generación.** Poder decir
+que una siembra falló (albahaca) o que un bancal se levantó sin cosechar o
+antes de tiempo (rúcula G1 tapada de yuyos, hakusai que se fue en flor,
+brócolis con plaga), con el motivo: cosecha normal, plaga o enfermedad,
+malezas, floración, clima, germinación, otro. Que la app pregunte el motivo
+al cerrar y avise si es prematuro. En el tablero, lo cerrado deja de
+reclamar como pendiente y las pérdidas se cuentan aparte.
+
 ## El Tablero: plan contra real — ETAPA 1 PUBLICADA E IMPLEMENTADA (11/11)
 
 **Servicio implementado y verificado el 11/11** con `version_servicio.py`:

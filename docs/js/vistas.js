@@ -105,6 +105,9 @@ const plantillas = {
           </div>
         </div>
 
+        ${CFG?.repeticion ? `<label>Esta siembra es</label>
+        <select name="repeticion">${opcionesRepeticion()}</select>` : ""}
+
         <label>Tipo</label>
         <select name="tipo" required>
           ${tiposSiembra().map((t) => `<option${t === "Siembra almácigo" ? " selected" : ""}>${esc(t)}</option>`).join("")}

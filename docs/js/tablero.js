@@ -215,7 +215,7 @@ function datosParaRevisar({ etapas, vencidos = [], seg = null, ventanas = [], ho
   });
   ((seg && seg.repetidas) || []).forEach((r) => {
     senales.push({ ir: "siembras", texto: `${r.cultivo} G${r.generacion}: tiene ${r.veces
-      } siembras, del ${diaMes(r.desde)} al ${diaMes(r.hasta)}. ¿Alguna era de otra generación?` });
+      } siembras, del ${diaMes(r.desde)} al ${diaMes(r.hasta)}. Si alguna era de otra generación, una resiembra u otra tanda, corregila con ✎ en Siembras.` });
     marcar(r.cultivo, r.generacion);
   });
   ((seg && seg.futuras) || []).forEach((x) => {

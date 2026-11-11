@@ -220,6 +220,29 @@ etapa 1 de `PROMPT-TABLERO.md`.
 - **Falta decidir** qué es «la temporada vigente» cuando la configuración no
   se actualizó: por eso `calcularResumen` sigue sumando las hojas enteras.
 
+## Una generación, una siembra (11/11)
+
+- **La app no deja cargar dos veces la misma generación por error.** Al
+  elegir el cultivo propone la que sigue (`generacionQueSigue`: la primera del
+  plan sin sembrar) y, si esa generación ya tiene siembra, no guarda. Así
+  entraron dos Coliflor G1 cuando la segunda era la G2.
+- **Repetir una generación se dice a propósito**, en «Esta siembra es»
+  (columna **Repetición** de Siembras, al final):
+  - *Otra tanda*: otra variedad o más bandejas. Es parte de la siembra.
+  - *Resiembra: motivo*: se repuso lo que falló. No corre la fecha de siembra
+    de la generación ni se mide contra el plan.
+- **La siembra de una generación es la más temprana de las suyas, sin contar
+  resiembras** (`laPrimera`, en `generacionesDelPlan`). Antes era la primera
+  fila de la hoja: el Zapallito G1, sembrado el 29/09 y resembrado el 30/10,
+  figuraba un mes atrasado.
+- Qué generaciones ya tienen siembra lo dice el servicio sobre la hoja entera
+  (`sembradas`, en `?seguimiento=1`), también para cultivos fuera del plan.
+- Una resiembra en bandeja espera trasplante como cualquier almácigo: aparece
+  en «Para trasplantar» con la marca «(resiembra)».
+- El campo aparece solo si el servicio lo guarda (`cfg.repeticion`).
+- Una generación es una **fecha de siembra**, no una variedad: tres variedades
+  sembradas el mismo día son una generación con tres tandas.
+
 ## Stock: una foto, no una cuenta (23/10)
 
 - Cada registro dice "esto había acá, este día". **Lo vigente de un lugar es

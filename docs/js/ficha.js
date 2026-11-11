@@ -69,7 +69,8 @@ function fichaCultivo(cultivo) {
       : (s.sector ? `${s.sector} ${s.bancal}` : "");
     return `<div class="registro">
       <div>
-        <div class="detalle">G${s.generacion}${s.variedad ? " · " + esc(s.variedad) : ""}
+        <div class="detalle">G${s.generacion}${s.variedad ? " · " + esc(s.variedad) : ""}${
+          s.repeticion ? ` · ${esc(String(s.repeticion).toLowerCase())}` : ""}
           ${donde ? `<small>${esc(donde)}</small>` : ""}</div>
         <div class="cuando">${esPropio(s.origen)
             ? `sembrado el ${fechaCorta(s.fecha)}${s.diferencia_plan !== "" && s.diferencia_plan != null

@@ -34,6 +34,7 @@ function almacigosPendientes() {
     generacion: Number(f["Generación"]) || 1, tipo: f.Tipo,
     plantines: Number(f.Plantines) || 0, fecha: f.Fecha,
     estimado: f["Trasplante estimado"] || "", origen: f.Origen || "",
+    repeticion: f["Repetición"] || "",
   }));
   const locales = pendientes.concat(enviados)
     .filter((r) => r.tipo === "siembras")
@@ -42,6 +43,7 @@ function almacigosPendientes() {
       generacion: Number(r.datos.generacion) || 1, tipo: r.datos.tipo,
       plantines: Number(r.datos.plantines) || 0, fecha: r.datos.fecha,
       estimado: r.datos.trasplante_estimado || "", origen: r.datos.origen || "",
+      repeticion: r.datos.repeticion || "",
     }));
 
   /* Primero lo de la planilla: si el mismo almácigo está en los dos lados,
@@ -180,6 +182,7 @@ function etiquetaAlmacigo(s) {
   const partes = [s.cultivo];
   if (s.variedad) partes.push(s.variedad);
   partes.push(`G${s.generacion}`);
+  if (esResiembra(s.repeticion)) partes.push("(resiembra)");
   if (s.plantines) partes.push(`${num(s.plantines)} plantines`);
   return `${partes.join(" ")} · ${estadoAlmacigo(s).texto}`;
 }
@@ -198,7 +201,7 @@ function siembrasPendientes(dias = DIAS_AVISO) {
 
   // Lo cargado en este teléfono y todavía sin viajar también cuenta como hecho.
   const enLaCola = new Set(pendientes.concat(enviados)
-    .filter((r) => r.tipo === "siembras")
+    .filter((r) => r.tipo === "siembras" && !esResiembra(r.datos.repeticion))
     .map((r) => `${claveArea(r.datos.cultivo)}|${Number(r.datos.generacion) || 1}`));
 
   const limite = sumarDias(hoy(), dias);
@@ -212,6 +215,34 @@ function siembrasPendientes(dias = DIAS_AVISO) {
     })
     .filter((g) => g.cuando && !g.hecha && g.cuando <= limite)
     .sort((a, b) => String(a.cuando).localeCompare(String(b.cuando)));
+}
+
+/* Qué generaciones de un cultivo ya tienen su siembra (11/11): las del plan
+   que el servicio cruzó con Siembras, las que el servicio cuenta sobre la
+   hoja entera (también de cultivos fuera del plan) y lo cargado en este
+   teléfono. Una resiembra no cuenta: no es la siembra de la generación. */
+function generacionesSembradas(cultivo) {
+  const k = claveArea(cultivo);
+  const seg = typeof seguimiento === "function" ? seguimiento() : null;
+  return new Set([
+    ...(leer(LS.generaciones, []) || [])
+      .filter((g) => claveArea(g.cultivo) === k && esSembrada(g)).map((g) => Number(g.generacion) || 1),
+    ...(((seg && seg.sembradas) || {})[k] || []).map(Number),
+    ...pendientes.concat(enviados)
+      .filter((r) => r.tipo === "siembras" && claveArea(r.datos.cultivo) === k && !esResiembra(r.datos.repeticion))
+      .map((r) => Number(r.datos.generacion) || 1),
+  ]);
+}
+
+// La que toca sembrar: la primera del plan que no se sembró; si el plan no
+// tiene más (o el cultivo no está en el plan), la que sigue a la última.
+function generacionQueSigue(cultivo) {
+  const k = claveArea(cultivo);
+  const hechas = generacionesSembradas(cultivo);
+  const delPlan = [...new Set((leer(LS.generaciones, []) || [])
+    .filter((g) => claveArea(g.cultivo) === k).map((g) => Number(g.generacion) || 1))].sort((a, b) => a - b);
+  const libre = delPlan.find((n) => !hechas.has(n));
+  return libre || Math.max(0, ...hechas, ...delPlan) + 1;
 }
 
 // Varias generaciones del plan pueden salir de una sola siembra: el puerro son

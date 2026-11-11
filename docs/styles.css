@@ -1889,3 +1889,6 @@ button.secundario.chico { width: auto; margin: 0; padding: 5px 11px; font-size: 
 .pt-tarde { fill: var(--amber); background: var(--amber); }
 .pt-antes { fill: var(--tenue); background: var(--tenue); }
 .tira circle { stroke: var(--sage-suave); stroke-width: 1; }
+
+/* Un aviso dentro de un texto (una generación que ya está sembrada). */
+.texto-alerta { color: var(--peligro); }

@@ -65,6 +65,25 @@ const CAJON = "Cajón";
 // tarda el cultivo en la bandeja.
 const ORIGENES = ["Propio", "Encargado", "Comprado"];
 const esPropio = (origen) => !origen || origen === "Propio";
+
+/* Una segunda siembra de la MISMA generación (11/11) se dice a propósito, en
+   la columna «Repetición» de Siembras; vacía es la siembra de la generación.
+   - «Otra tanda»: otra variedad o más bandejas. Es parte de la siembra.
+   - «Resiembra: motivo»: se repuso lo que falló. No corre la fecha de
+     siembra de la generación ni se mide contra el plan (el Zapallito G1,
+     sembrado el 29/09 y resembrado el 30/10, figuraba un mes atrasado).
+   Sin decirlo, la app no deja cargar dos veces la misma generación: así
+   entraron dos Coliflor G1 cuando la segunda era la G2. */
+const OTRA_TANDA = "Otra tanda";
+const MOTIVOS_RESIEMBRA = ["Germinó poco", "Plaga o enfermedad", "Helada o clima", "Otro motivo"];
+const REPETICIONES = [OTRA_TANDA, ...MOTIVOS_RESIEMBRA.map((m) => `Resiembra: ${m}`)];
+const esResiembra = (v) => /^\s*resiembra/i.test(String(v || ""));
+const opcionesRepeticion = (elegido = "") => {
+  const lista = !elegido || REPETICIONES.includes(elegido) ? REPETICIONES : [elegido, ...REPETICIONES];
+  return `<option value="">La siembra de esta generación</option>`
+    + lista.map((r) => `<option value="${esc(r)}"${r === elegido ? " selected" : ""}>${
+      r === OTRA_TANDA ? "Otra tanda de la misma generación (otra variedad, más bandejas)" : esc(r)}</option>`).join("");
+};
 const tiposRiego = () => CAT?.tipos_riego || ["Aspersión", "Goteo"];
 const importancias = () => CAT?.importancias || ["Alta", "Media", "Baja"];
 

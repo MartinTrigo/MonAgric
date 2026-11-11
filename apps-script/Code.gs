@@ -88,14 +88,21 @@ var HOJAS = {
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Variedad", "Tipo", "Generación",
                   "Bandejas", "Alvéolos", "Plantines", "Sector", "Bancal",
                   "Trasplante estimado", "Cosecha estimada", "Operador", "Observaciones",
-                  "Cargado por", "Recibido", "Origen", "Fecha planificada", "Diferencia plan"],
+                  "Cargado por", "Recibido", "Origen", "Fecha planificada", "Diferencia plan",
+                  "Repetición"],
+    // "Repetición" (11/11), al final: vacia en la siembra de una generacion.
+    // Una segunda siembra de la MISMA generacion lo dice aca, a proposito:
+    // "Otra tanda" (otra variedad, mas bandejas: es parte de la siembra) o
+    // "Resiembra: <motivo>" (se repuso lo que fallo: no corre la fecha de
+    // siembra de la generacion ni se mide contra el plan). Ver esResiembra_.
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.variedad || "", d.tipo, d.generacion,
               d.bandejas || "", d.tipo_bandeja || "", d.plantines || "", d.sector || "", d.bancal || "",
               d.trasplante_estimado || "", d.cosecha_estimada || "", d.operador || "",
               d.observaciones || "", r.dispositivo || "", new Date(),
-              d.origen || "", d.fecha_planificada || "", numeroOVacio(d.diferencia_plan)];
+              d.origen || "", d.fecha_planificada || "", numeroOVacio(d.diferencia_plan),
+              d.repeticion || ""];
     },
   },
   tareas: {
@@ -484,6 +491,10 @@ function atender(p) {
       // Sabe responder ?seguimiento=1 (10/11): la cosecha semana por semana y
       // las senales de datos para revisar, para el tablero de Inicio.
       cfg.tablero = true;
+      // Siembras guarda "Repetición" (11/11): resiembras y otras tandas de una
+      // generacion. Contra una version anterior la app no ofrece el campo: la
+      // fila se guardaria como una siembra comun.
+      cfg.repeticion = true;
       // Los productos que se venden, para el stock de elaborados, fruta y
       // plantines (10/11). Sin precios. Solo si la chacra tiene su planilla
       // en PRODUCTOS_PLANILLAS; si falla la lectura, la app sigue sin lista.
@@ -1238,9 +1249,29 @@ function generacionesDelPlan(chacra) {
       .getValues().forEach(function (f) {
         if (!f[0] || !f[3] || !f[2]) return;
         siembras.push({ id: String(f[0]), cultivo: claveCultivo(f[3]),
-                        fecha: texto(f[2]), generacion: Number(f[6]) || 0 });
+                        fecha: texto(f[2]), generacion: Number(f[6]) || 0,
+                        resiembra: esResiembra_(f[21]) });
       });
   }
+  /* La siembra de una generacion es la MAS TEMPRANA de las suyas, sin contar
+     las resiembras (11/11). Antes era la primera fila de la hoja: el
+     Zapallito G1, sembrado el 29/09 y resembrado el 30/10 porque germino
+     poco, figuraba sembrado un mes tarde. Si solo hay resiembras cargadas
+     (falta la original), vale la mas temprana de esas: sembrada esta. */
+  var laPrimera = function (lista) {
+    var originales = lista.filter(function (s) { return !s.resiembra; });
+    var de = originales.length ? originales : lista;
+    var mejor = null;
+    de.forEach(function (s) { if (!mejor || (s.fecha && s.fecha < mejor.fecha)) mejor = s; });
+    return mejor;
+  };
+  var resiembras = {};
+  siembras.forEach(function (s) {
+    if (s.resiembra && s.generacion) {
+      var k = s.cultivo + "|" + s.generacion;
+      resiembras[k] = (resiembras[k] || 0) + 1;
+    }
+  });
   // De que cultivos se anoto al menos una generacion: ahi la fecha no decide.
   var conGeneracion = {};
   siembras.forEach(function (s) {
@@ -1251,14 +1282,13 @@ function generacionesDelPlan(chacra) {
     var k = claveCultivo(cultivo);
     var i;
     // 1) por numero de generacion, que es lo que alguien escribio a proposito
-    for (i = 0; i < siembras.length; i++) {
-      if (siembras[i].cultivo === k && siembras[i].generacion === gen) return siembras[i];
-    }
+    var suyas = siembras.filter(function (s) { return s.cultivo === k && s.generacion === gen; });
+    if (suyas.length) return laPrimera(suyas);
     // 2) si de este cultivo nadie anoto generacion, se cae en la fecha
     if (conGeneracion[k] || !cuando) return null;
     var objetivo = new Date(cuando + "T12:00:00").getTime();
     for (i = 0; i < siembras.length; i++) {
-      if (siembras[i].cultivo !== k || !siembras[i].fecha) continue;
+      if (siembras[i].cultivo !== k || !siembras[i].fecha || siembras[i].resiembra) continue;
       var d = (new Date(siembras[i].fecha + "T12:00:00").getTime() - objetivo) / 86400000;
       if (d >= -ANTES && d <= DESPUES) return siembras[i];
     }
@@ -1314,6 +1344,8 @@ function generacionesDelPlan(chacra) {
         sembrada_el: real ? real.fecha : "",
         // Solo en almacigo: en siembra directa la siembra ES la ida al campo.
         trasplantada_el: texto(f[5]) ? trasplantada : "",
+        // Cuantas veces se resembro (11/11).
+        resiembras: resiembras[claveCultivo(f[2]) + "|" + gen] || 0,
         variedad: String(f[13] || ""),
       };
     });
@@ -1351,6 +1383,7 @@ function fichaDeCultivo(chacra, cultivo) {
       cosecha_estimada: texto(f[13]), operador: String(f[14] || ""),
       origen: String(f[18] || ""), fecha_planificada: texto(f[19]),
       diferencia_plan: f[20] === "" ? "" : Number(f[20]),
+      repeticion: String(f[21] || ""),
     };
   });
 
@@ -1419,8 +1452,15 @@ function almacigosEsperando(chacra) {
         // Encargado o comprado: su fecha de siembra es teorica y el
         // trasplante no mide dias reales en bandeja.
         Origen: String(f[18] || ""),
+        // Una resiembra tambien espera en bandeja: se muestra como tal.
+        "Repetición": String(f[21] || ""),
       };
     });
+}
+
+// "Resiembra: Germinó poco" en la columna Repetición de Siembras.
+function esResiembra_(valor) {
+  return /^\s*resiembra/i.test(String(valor || ""));
 }
 
 // ---------- Seguimiento: los hechos de la temporada para el tablero ----------
@@ -1451,7 +1491,12 @@ function temporadaDe_(libro, chacra) {
    - no_propias: los ids de las siembras encargadas o compradas. Su fecha de
      siembra es teorica y no sirve para medir si se sembro en fecha.
    - repetidas: generaciones con siembras separadas por mas de una semana
-     (seguramente alguna era de otra generacion).
+     (seguramente alguna era de otra generacion). No cuentan las que dicen a
+     proposito que repiten la generacion (columna Repetición).
+   - sembradas: por cultivo, los numeros de generacion que ya tienen siembra.
+     Con esto la app propone la generacion que sigue y no deja cargar dos
+     veces la misma por error, tambien en cultivos que no estan en el plan.
+   - resiembras: cada resiembra, con su motivo.
    - futuras: registros con fecha posterior a hoy (un mes mal tipeado).
    - ultimo: el ultimo dia con algo cargado en cada hoja.
    Solo cuenta lo fechado dentro de la temporada. */
@@ -1484,7 +1529,8 @@ function seguimientoDe(chacra) {
   };
 
   var res = { ok: true, desde: t.desde, hasta: t.hasta, hoy: t.hoy, cosechas: [],
-              kg_cosechados: 0, no_propias: [], repetidas: [], futuras: [], ultimo: {} };
+              kg_cosechados: 0, no_propias: [], repetidas: [], futuras: [], ultimo: {},
+              sembradas: {}, resiembras: [] };
   var anotar = function (hoja, cultivo, fecha) {
     if (fecha > t.hoy) {
       if (res.futuras.length < 20) res.futuras.push({ hoja: hoja, cultivo: cultivo, fecha: fecha });
@@ -1524,6 +1570,17 @@ function seguimientoDe(chacra) {
     if (!ajena && !anotar("siembras", cultivo, fecha)) return;
     var gen = Number(f[6]) || 0;
     if (!gen) return;
+    var repite = String(f[21] || "").trim();
+    if (esResiembra_(repite)) {
+      res.resiembras.push({ cultivo: cultivo, generacion: gen, fecha: fecha,
+                            motivo: repite.replace(/^\s*resiembra\s*:?\s*/i, "") });
+      return;
+    }
+    var kc = claveCultivo(cultivo);
+    if (!res.sembradas[kc]) res.sembradas[kc] = [];
+    if (res.sembradas[kc].indexOf(gen) < 0) res.sembradas[kc].push(gen);
+    // Otra tanda de la misma generacion, dicha a proposito: no es para revisar.
+    if (repite) return;
     var k = claveCultivo(cultivo) + "|" + gen;
     var g = porGeneracion[k] || (porGeneracion[k] = { cultivo: cultivo, generacion: gen,
                                                       veces: 0, desde: fecha, hasta: fecha });

@@ -97,6 +97,15 @@ function prepararSiembras() {
   }
   f.tipo_bandeja.addEventListener("change", sugerirBandejas);
 
+  // Al elegir el cultivo, la generación que toca: la primera sin sembrar. Si
+  // la persona escribió otra, o vino elegida desde "Para sembrar", no se pisa.
+  let generacionTocada = false;
+  let cultivoVisto = f.cultivo.value;
+  f.generacion.addEventListener("input", (e) => { if (e.isTrusted) generacionTocada = true; });
+  const repite = () => (f.repeticion ? f.repeticion.value : "");
+  const yaSembrada = () => !!f.cultivo.value && !repite()
+    && generacionesSembradas(f.cultivo.value).has(parseInt(f.generacion.value, 10) || 1);
+
   // Cajón: no tiene alvéolos, los plantines se cuentan o se estiman.
   const enCajon = () => f.tipo_bandeja.value === CAJON;
   const plantinesDe = () => (enCajon()
@@ -113,8 +122,20 @@ function prepararSiembras() {
     const propio = !conBandeja || esPropio(f.origen.value);
     $("#rotulo-fecha-siembra").textContent = propio ? "Fecha" : "Llegan listos para trasplantar el";
 
+    if (f.cultivo.value !== cultivoVisto) {
+      cultivoVisto = f.cultivo.value;
+      if (cultivoVisto && !generacionTocada) f.generacion.value = generacionQueSigue(cultivoVisto);
+    }
     const fs = fechasDeSiembra(f);
     const partes = [];
+    // Dos veces la misma generación: se avisa acá y no se deja guardar.
+    if (yaSembrada()) {
+      partes.push(`<b class="texto-alerta">${esc(f.cultivo.value)} G${esc(f.generacion.value)} ya tiene una siembra cargada.</b>
+        La que sigue es la <b>G${generacionQueSigue(f.cultivo.value)}</b>${f.repeticion
+          ? "; si es una reposición o más bandejas de la misma, elegilo en «Esta siembra es»" : ""}`);
+    } else if (esResiembra(repite())) {
+      partes.push(`<b>Resiembra de la G${esc(f.generacion.value)}</b>: no cambia la fecha de siembra de la generación ni se mide contra el plan`);
+    }
     if (conBandeja) {
       partes.push(`<b>${num(plantinesDe())}</b> plantines`);
       // Lo que pide el plan, para que la cuenta de las bandejas se vea.
@@ -132,7 +153,7 @@ function prepararSiembras() {
       }
     }
     // Contra lo planificado: la diferencia que queda guardada con la siembra.
-    if (fs.planificada) {
+    if (fs.planificada && !esResiembra(repite())) {
       partes.push(`planificada para el ${fechaCorta(fs.planificada)}: <b>${textoDiferencia(fs.diferencia)}</b>`);
     }
     if (fs.cosecha) partes.push(`cosecha prevista: <b>${fechaCorta(fs.cosecha)}</b>`);
@@ -154,6 +175,14 @@ function prepararSiembras() {
     const gen = parseInt(f.generacion.value, 10);
     if (!f.cultivo.value) return aviso("Elegí el cultivo.", true);
     if (!(gen >= 1)) return aviso("La generación debe ser 1 o mayor.", true);
+    // La misma generación dos veces solo a propósito (resiembra u otra
+    // tanda). Contra un servicio que no guarda «Repetición» no hay cómo
+    // decirlo: ahí se avisa arriba y se deja pasar.
+    if (f.repeticion && yaSembrada()) {
+      return aviso(`${f.cultivo.value} G${gen} ya tiene una siembra. Si es la que sigue, es la G${
+        generacionQueSigue(f.cultivo.value)}; si no, elegí qué es en «Esta siembra es».`, true);
+    }
+    const resiembra = esResiembra(repite());
 
     const fs = fechasDeSiembra(f);
     if (!fs.siembra) return aviso("No hay días en bandeja para calcular la siembra: cargala como propia con su fecha.", true);
@@ -169,7 +198,10 @@ function prepararSiembras() {
       bandejas: 0, tipo_bandeja: 0, plantines: 0, sector: "", bancal: 0,
       // Plan contra real: lo planificado queda congelado en el registro.
       origen: conBandeja ? f.origen.value : "Propio",
-      fecha_planificada: fs.planificada, diferencia_plan: fs.diferencia,
+      // Una resiembra no se mide contra el plan: la fecha del plan era la de
+      // la siembra original.
+      repeticion: repite(),
+      fecha_planificada: resiembra ? "" : fs.planificada, diferencia_plan: resiembra ? "" : fs.diferencia,
       trasplante_estimado: fs.trasplante, cosecha_estimada: fs.cosecha,
     };
 

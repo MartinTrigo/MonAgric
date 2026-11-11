@@ -682,6 +682,23 @@ almacenamiento del teléfono.</p>
     igual("para revisar: almácigo vencido, fecha futura y cosecha sin cargar se suman",
       [rev2.senales.map((x) => x.ir), rev2.limpias], [["trasplantes", "siembras", "cosechas", "cosechas"], 0]);
 
+    // No cargar dos veces la misma generación (11/11).
+    igual("generación que sigue: la primera del plan sin sembrar",
+      conGeneraciones(gens, () => [[...generacionesSembradas("Repollo bco")], generacionQueSigue("Repollo bco")]),
+      [[1], 2]);
+    igual("generación que sigue: con todo el plan sembrado, la siguiente a la última",
+      conGeneraciones(gens.map((x) => ({ ...x, sembrada: true })), () => generacionQueSigue("Repollo bco")), 4);
+    igual("generación que sigue: un cultivo sin plan ni siembras arranca en la 1",
+      conGeneraciones(gens, () => generacionQueSigue("Rabanito")), 1);
+    pendientes = [{ id: "p1", tipo: "siembras", datos: { cultivo: "Repollo bco", generacion: 2, repeticion: "" } },
+                  { id: "p2", tipo: "siembras", datos: { cultivo: "Repollo bco", generacion: 3, repeticion: "Resiembra: Germinó poco" } }];
+    igual("generación que sigue: lo cargado en el teléfono cuenta, una resiembra no",
+      conGeneraciones(gens, () => [[...generacionesSembradas("Repollo bco")].sort(), generacionQueSigue("Repollo bco")]),
+      [[1, 2], 3]);
+    pendientes = [];
+    igual("resiembra: se reconoce por la palabra, con su motivo; otra tanda no lo es",
+      ["Resiembra: Germinó poco", "resiembra", "Otra tanda", ""].map(esResiembra), [true, true, false, false]);
+
     igual("tablero: sin generaciones en el plan no se dibuja",
       conGeneraciones([], () => tarjetaTablero()), "");
     const html = conGeneraciones(gens, () => tarjetaTablero());

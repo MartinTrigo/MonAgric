@@ -161,6 +161,14 @@ def main() -> None:
     else:
         print("  [ANTERIOR] el tablero de Inicio (la curva no muestra lo cosechado semana a semana)")
         viejas.append("el tablero de Inicio")
+    # 11/11: resiembras y otras tandas (columna Repeticion de Siembras), y las
+    # generaciones ya sembradas de cada cultivo, para no cargar dos veces la misma.
+    if cf.get("repeticion") and "sembradas" in sg:
+        print(f"  [al dia]   resiembras y generacion sugerida "
+              f"({len(sg.get('resiembras') or [])} resiembras anotadas en Tica)")
+    else:
+        print("  [ANTERIOR] resiembras y generacion sugerida (el formulario no ofrece «Esta siembra es»)")
+        viejas.append("las resiembras")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")
