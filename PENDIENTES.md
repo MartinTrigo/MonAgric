@@ -176,8 +176,15 @@ ni editar nada en las copias viejas**: lo vigente está en `AMA`.
 Con la regla nueva (lo sembrado se prevé con los días del catálogo) ningún
 almácigo queda atrasado. Lo que salió al revisar los 38 que esperan:
 
-- **Zapallito G1** (`mur7ttsr866r78`) tiene fecha de siembra **30/10**, en el
-  futuro: ¿era el 30/09? Corregir desde Últimos movimientos.
+- **Zapallito G1** (`mur7ttsr866r78`) tiene fecha de siembra **30/10**.
+  **Aclarado el 11/11**: no era un error. Zapallito y Zucchini se sembraron
+  el 29/09 y se **resembraron el 30/10** porque germinó muy poco. Lo cargado
+  quedó a medias: del Zapallito está solo la resiembra (30/10; falta la del
+  29/09) y del Zucchini solo la original (29/09; falta la resiembra). Así el
+  tablero cuenta al Zapallito G1 como sembrado 31 días tarde. La app no tiene
+  cómo anotar una resiembra: propuesto el 11/11, sin hacer (una marca
+  «resiembra» con el motivo, que no cuente como siembra repetida ni corra la
+  fecha de siembra de la generación).
 - **Puerro G1** tiene cuatro siembras (04/09 dos veces, 15/09 y 30/09) y las
   G2 a G8 una cada una: ¿alguna era de otra generación?
 - **Tomate G1** junta las tres siembras propias (10/09, 10/09, 12/09) con el
