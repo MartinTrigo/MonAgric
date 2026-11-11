@@ -31,7 +31,7 @@
 // propiedad CHACRAS del Apps Script (ver docs/README.md).
 // Se muestra en Ajustes: sirve para saber por telefono si alguien quedo con
 // una copia vieja, que es dificil de adivinar de otro modo.
-const VERSION_APP = "versión 87 · 10/11/2026";
+const VERSION_APP = "versión 88 · 11/11/2026";
 
 const CHACRAS = [
   { codigo: "tica", nombre: "Chacra Tica", horasAparte: true },
@@ -87,6 +87,7 @@ const LS = {
   tema: "monagric_tema",                     // "" (el del teléfono), "claro" u "oscuro"
   stock: "monagric_stock",                   // lo vigente a una fecha (ver stock.js)
   productos: "monagric_productos",           // lo que se vende, sin precios (ver stock.js)
+  seguimiento: "monagric_seguimiento",       // los hechos de la temporada, para el tablero (tablero.js)
 };
 
 /* Claro u oscuro (10/10). Sin elegir, sigue al teléfono: lo resuelve

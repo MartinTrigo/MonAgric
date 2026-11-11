@@ -189,6 +189,37 @@ temporada, tener un catálogo con fechas reales.
   "atrasada 31 días" del 03/10 salió de ahí.)
 - `generaciones` trae `trasplantada_el` del servicio (`cfg.seguimiento`).
 
+## El tablero de Inicio: plan contra real (11/11)
+
+Cuatro relojes y la curva de cosecha acumulada, en `js/tablero.js`. Es la
+etapa 1 de `PROMPT-TABLERO.md`.
+
+- **Los hechos los cuenta el servicio** (`?seguimiento=1`, `seguimientoDe`):
+  cosecha sumada por semana y cultivo, siembras encargadas, generaciones con
+  siembras repetidas, fechas futuras. Solo lo fechado en la temporada (1/7 a
+  30/6, por la fecha de inicio de la configuración). El plan cruzado con las
+  siembras ya venía en `?generaciones=1`.
+- **Lo esperado lo calcula la app con `tramosDe`**, la cuenta que dibuja el
+  plan estratégico: el tablero y el plan no pueden decir cosas distintas.
+- **Lo esperado usa la fecha PLANIFICADA, no la prevista** (`ventanasDeCosecha`):
+  si una siembra se atrasó, lo esperado no se corre con ella. Los kilos de
+  cada generación se reparten parejo en sus días de cosecha.
+- **Cada reloj dice de qué está hecho** («8 de 19 etapas que tocaban») y al
+  tocarlo abre el detalle. Nunca un porcentaje solo.
+- **Ritmo**: etapas (siembra y trasplante de cada generación) fechadas hasta
+  hoy que ya se hicieron. Una generación partida cuenta una vez.
+  **Puntualidad**: mediana de días contra el plan y % dentro de ±7 días; la
+  siembra de plantines encargados no se mide. **Confianza del dato**: lo que
+  puede hacer mentir a un reloj (almácigo vencido sin trasplante cargado,
+  siembra del plan sin registro hace más de 30 días, siembras repetidas,
+  fechas futuras, cosecha sin cargar).
+- La proyección «a este ritmo» prolonga la proporción de hoy; no se calcula
+  hasta que el plan esperaba el 3 % de la temporada.
+- Sin generaciones en el plan no hay tablero: queda el Inicio de antes. Contra
+  un servicio sin `cfg.tablero`, anda todo menos la línea semanal de cosecha.
+- **Falta decidir** qué es «la temporada vigente» cuando la configuración no
+  se actualizó: por eso `calcularResumen` sigue sumando las hojas enteras.
+
 ## Stock: una foto, no una cuenta (23/10)
 
 - Cada registro dice "esto había acá, este día". **Lo vigente de un lugar es

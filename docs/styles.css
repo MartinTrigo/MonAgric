@@ -1798,3 +1798,94 @@ button.enlace {
   color: var(--amber-tx);
   background: var(--amber-suave);
 }
+
+/* ==========================================================
+   El tablero de Inicio (11/11): relojes y curva de cosecha.
+   Ver js/tablero.js. Todo color por variables: claro y oscuro.
+   ========================================================== */
+.tablero-pista { margin-top: 8px; text-align: center; }
+.relojes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+@media (min-width: 560px) { .relojes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Un reloj es un botón: se nota que se toca, y cuál está abierto. */
+.reloj {
+  --tono: var(--linea-fuerte);
+  width: auto; margin: 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 6px 11px;
+  background: var(--blanco);
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  color: var(--texto);
+  font-family: inherit; text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.reloj:hover { border-color: var(--sage-light); }
+.reloj:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.reloj.abierto { border-color: var(--sage); background: var(--sage-suave); }
+.reloj.tono-bien { --tono: var(--sage); }
+.reloj.tono-ojo { --tono: var(--amber); }
+.reloj.tono-flojo { --tono: var(--alerta); }
+.reloj svg { width: 100%; max-width: 132px; display: block; }
+.reloj-pista, .reloj-arco { fill: none; stroke-width: 10; stroke-linecap: round; }
+.reloj-pista { stroke: var(--linea); }
+.reloj.abierto .reloj-pista { stroke: var(--sage-light); }
+.reloj-arco { stroke: var(--tono); }
+.reloj b { font-size: 1.5rem; line-height: 1; margin-top: -27px; font-weight: 800; letter-spacing: -.5px; }
+.reloj b small { font-size: .82rem; font-weight: 700; letter-spacing: 0; }
+.reloj-titulo { font-size: .8rem; font-weight: 700; color: var(--sage-dark); margin-top: 9px; }
+.reloj-detalle { font-size: .72rem; color: var(--tenue); margin-top: 2px; line-height: 1.3; }
+
+/* El detalle del reloj abierto. */
+.reloj-panel {
+  margin-top: 10px;
+  padding: 11px 12px 6px;
+  background: var(--sage-suave);
+  border-radius: 12px;
+}
+.reloj-panel > .nota { margin-bottom: 6px; }
+.reloj-panel .senal { font-weight: 400; font-size: .86rem; line-height: 1.4; }
+.reloj-panel .registro { gap: 10px; }
+button.secundario.chico { width: auto; margin: 0; padding: 5px 11px; font-size: .78rem; flex: none; }
+
+/* Barra con marca: lo cosechado contra lo esperado a hoy, por cultivo. */
+.bala { margin: 9px 0; }
+.bala-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .86rem; }
+.bala-cab span { color: var(--tenue); font-size: .78rem; white-space: nowrap; }
+.bala-pista { position: relative; height: 10px; margin-top: 5px; background: var(--sage-light); border-radius: 5px; }
+.bala-pista i { display: block; height: 100%; background: var(--sage); border-radius: 5px; min-width: 2px; }
+.bala-pista u { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: var(--texto); border-radius: 2px; }
+
+/* La curva de cosecha acumulada. */
+.curva { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--linea); }
+.curva h3 { font-size: .92rem; color: var(--sage-dark); }
+.curva h3 small { font-weight: 600; font-size: .72rem; color: var(--tenue); }
+.curva-frase { font-size: .86rem; line-height: 1.45; margin: 4px 0 8px; }
+.curva svg, .tira { width: 100%; display: block; overflow: visible; }
+.curva-ejes line { stroke: var(--linea); stroke-width: 1; }
+.curva-ejes text, .tira-marcas text { fill: var(--tenue); font-size: 9.5px; }
+.curva-plan { fill: none; stroke: var(--tenue); stroke-width: 1.8; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.curva-real { fill: none; stroke: var(--sage); stroke-width: 2.8; stroke-linejoin: round; stroke-linecap: round; }
+.curva-area { fill: var(--sage); opacity: .16; }
+.curva-futuro { fill: none; stroke: var(--sage); stroke-width: 2; stroke-dasharray: 1 5; stroke-linecap: round; }
+.curva-hoy { stroke: var(--linea-fuerte); stroke-width: 1; }
+.curva-hoy-tx { fill: var(--texto); font-size: 10px; font-weight: 700; }
+.curva-punto { fill: var(--sage); stroke: var(--crema); stroke-width: 2; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: 5px 14px; font-size: .76rem; color: var(--tenue); margin-top: 6px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda i { display: inline-block; width: 20px; height: 0; }
+.ley-plan { border-top: 2px dashed var(--tenue); }
+.ley-real { border-top: 3px solid var(--sage); }
+.ley-futuro { border-top: 3px dotted var(--sage); }
+.leyenda i.ley-punto { width: 9px; height: 9px; border-radius: 50%; }
+
+/* La tira de puntualidad: un punto por etapa hecha. */
+.tira-franja { fill: var(--sage-light); opacity: .7; }
+.tira-eje { stroke: var(--linea-fuerte); stroke-width: 1; }
+.tira-cero { stroke: var(--sage); stroke-width: 1; stroke-dasharray: 2 3; }
+.pt-en-fecha { fill: var(--sage); background: var(--sage); }
+.pt-tarde { fill: var(--amber); background: var(--amber); }
+.pt-antes { fill: var(--tenue); background: var(--tenue); }
+.tira circle { stroke: var(--sage-suave); stroke-width: 1; }

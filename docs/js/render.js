@@ -213,6 +213,8 @@ function render_(vista, conservarScroll, htmlListo) {
   // Trasplantes, y mostraban datos de días atrás (10/10). Con freno de 20 s y
   // redibujo solo si cambió: no hace lazo.
   if (vista === "inicio" || vista === "plan") traerAlmacigos();
+  // El tablero de Inicio: los hechos de la temporada, con el mismo freno.
+  if (vista === "inicio") traerSeguimiento();
 
   engancharFilas();
   const volver = $("#volver-plan");
@@ -413,6 +415,7 @@ function prepararComunes() {
 }
 
 function prepararInicio() {
+  prepararTablero();
   const b = $("#btn-enviar");
   if (b) b.onclick = () => sincronizar(false);
 

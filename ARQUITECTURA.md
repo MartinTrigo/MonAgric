@@ -58,6 +58,7 @@ espacio global. El orden importa solo para lo que se evalúa al cargar
 | `componentes.js` | buscadores, selects, colores por cultivo, tarjetas de estado | ~310 |
 | `pendientes.js` | "Para sembrar" / "Para trasplantar", bandejas del plan | ~270 |
 | `plan-grafico.js` | plan estratégico (`tramosDe`), panel, arrastrar fechas, barra de Plan | ~530 |
+| `tablero.js` | el tablero de Inicio (11/11): las cuentas de plan contra real y sus gráficos | ~440 |
 | `plan-mapa.js` | lienzo del mapa, zoom, arrastres | ~575 |
 | `plan-cultivos.js` | alta de series, editor de generaciones, partir, marco y rinde | ~620 |
 | `ficha.js` | ficha del cultivo | ~165 |

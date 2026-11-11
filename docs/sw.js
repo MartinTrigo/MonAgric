@@ -5,7 +5,7 @@
 // señal se sirve la última copia guardada, que es lo que importa en el campo.
 // Desde el 01/10, al abrir la app se espera a la red un máximo de 3 segundos:
 // con señal débil, la copia (ver abrir()).
-const CACHE = "monagric-v87";
+const CACHE = "monagric-v88";
 const ARCHIVOS = [
   ".",
   "index.html",
@@ -16,6 +16,7 @@ const ARCHIVOS = [
   "js/componentes.js",
   "js/pendientes.js",
   "js/plan-grafico.js",
+  "js/tablero.js",
   "js/plan-mapa.js",
   "js/plan-cultivos.js",
   "js/ficha.js",

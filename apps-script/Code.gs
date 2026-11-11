@@ -410,7 +410,8 @@ function atender(p) {
   // La clave de administracion tambien sirve: es la que usan las herramientas
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
-      || p.catalogo || p.almacigos || p.ficha || p.generaciones || p.columnas || p.stock) {
+      || p.catalogo || p.almacigos || p.ficha || p.generaciones || p.columnas || p.stock
+      || p.seguimiento) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -448,6 +449,10 @@ function atender(p) {
 
     if (p.stock) return respuesta(stockDe(chacra, p.fecha, p.desde));
 
+    // El tablero de Inicio (10/11): los hechos de la temporada que el telefono
+    // no puede contar con sus ultimas 15 filas. Ver seguimientoDe.
+    if (p.seguimiento) return respuesta(recordado_("seguimiento", chacra, seguimientoDe));
+
     // Diagnostico para las herramientas: las hojas cuyas columnas no estan
     // donde el codigo las espera (ver revisarColumnas).
     if (p.columnas) {
@@ -476,6 +481,9 @@ function atender(p) {
       // Tiene la hoja Stock y sabe responder ?stock=1 (23/10). Sin esto la
       // app no muestra la seccion: lo cargado quedaria en la cola para siempre.
       cfg.stock = true;
+      // Sabe responder ?seguimiento=1 (10/11): la cosecha semana por semana y
+      // las senales de datos para revisar, para el tablero de Inicio.
+      cfg.tablero = true;
       // Los productos que se venden, para el stock de elaborados, fruta y
       // plantines (10/11). Sin precios. Solo si la chacra tiene su planilla
       // en PRODUCTOS_PLANILLAS; si falla la lectura, la app sigue sin lista.
@@ -619,6 +627,8 @@ function doPost(e) {
       lock.releaseLock();
     }
     CacheService.getScriptCache().remove("resumen_" + chacra);
+    // El tablero cambia con cualquier siembra, trasplante o cosecha.
+    CacheService.getScriptCache().remove("seguimiento_" + String(chacra).toLowerCase());
     if (permiso.fila) marcarActividad(permiso.fila, guardados, permiso.huella);
     // El plan y los almacigos se recuerdan unos minutos (ver recordado_):
     // cualquier cosa que los cambie los borra para que el proximo pedido los
@@ -1411,6 +1421,129 @@ function almacigosEsperando(chacra) {
         Origen: String(f[18] || ""),
       };
     });
+}
+
+// ---------- Seguimiento: los hechos de la temporada para el tablero ----------
+//
+// La temporada va del 1 de julio al 30 de junio. Sale de la fecha de inicio
+// que cargo la chacra, igual que en la app (inicioDeTemporada, js/base.js); si
+// no la cargo, es la temporada de hoy.
+function temporadaDe_(libro, chacra) {
+  var tz = Session.getScriptTimeZone();
+  var hoy = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  var inicio = "";
+  try { inicio = String((leerConfigDe(libro, chacra).temporada || {}).inicio || ""); }
+  catch (e) { /* sin configuracion: la temporada de hoy */ }
+  var base = /^\d{4}-\d{2}/.test(inicio) ? inicio : hoy;
+  var anio = Number(base.slice(0, 4));
+  if (Number(base.slice(5, 7)) < 7) anio--;
+  return { desde: anio + "-07-01", hasta: (anio + 1) + "-07-01", hoy: hoy };
+}
+
+/* Lo que el tablero de Inicio necesita y el telefono no puede contar (10/11):
+   recibe las ultimas 15 filas de cada hoja, y esto mira la temporada entera.
+   Son HECHOS, chicos: lo esperado lo calcula la app con las mismas cuentas
+   que dibujan el plan, asi el tablero y el plan no pueden decir cosas
+   distintas.
+
+   - cosechas: [lunes de la semana, cultivo, kg], sumado por semana y cultivo.
+     Una cosecha con el id repetido cuenta una vez (01/10: hubo duplicadas).
+   - no_propias: los ids de las siembras encargadas o compradas. Su fecha de
+     siembra es teorica y no sirve para medir si se sembro en fecha.
+   - repetidas: generaciones con siembras separadas por mas de una semana
+     (seguramente alguna era de otra generacion).
+   - futuras: registros con fecha posterior a hoy (un mes mal tipeado).
+   - ultimo: el ultimo dia con algo cargado en cada hoja.
+   Solo cuenta lo fechado dentro de la temporada. */
+function seguimientoDe(chacra) {
+  var libro = planillaDe(chacra);
+  var tz = Session.getScriptTimeZone();
+  var t = temporadaDe_(libro, chacra);
+  var texto = function (v) {
+    return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+  };
+  var esFecha = function (f) { return /^\d{4}-\d{2}-\d{2}$/.test(f); };
+  var enTemporada = function (f) { return esFecha(f) && f >= t.desde && f < t.hasta; };
+  var lunesDe = function (iso) {
+    var d = new Date(iso + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  };
+  // Las filas de una hoja, una sola vez cada id.
+  var filasDe = function (def, ancho) {
+    var hoja = libro.getSheetByName(def.nombre);
+    if (!hoja || hoja.getLastRow() < 2) return [];
+    var vistos = {};
+    return hoja.getRange(2, 1, hoja.getLastRow() - 1, ancho).getValues()
+      .filter(function (f) {
+        var id = String(f[0] || "");
+        if (!id || vistos[id]) return false;
+        vistos[id] = true;
+        return true;
+      });
+  };
+
+  var res = { ok: true, desde: t.desde, hasta: t.hasta, hoy: t.hoy, cosechas: [],
+              kg_cosechados: 0, no_propias: [], repetidas: [], futuras: [], ultimo: {} };
+  var anotar = function (hoja, cultivo, fecha) {
+    if (fecha > t.hoy) {
+      if (res.futuras.length < 20) res.futuras.push({ hoja: hoja, cultivo: cultivo, fecha: fecha });
+      return false;
+    }
+    if (!res.ultimo[hoja] || fecha > res.ultimo[hoja]) res.ultimo[hoja] = fecha;
+    return true;
+  };
+
+  // Cosechas: Id, Temporada, Fecha, Cultivo, Kg.
+  var porSemana = {}, nombres = {};
+  filasDe(HOJAS.cosechas, 5).forEach(function (f) {
+    var fecha = texto(f[2]), cultivo = String(f[3] || "").trim(), kg = Number(f[4]) || 0;
+    if (!cultivo || !enTemporada(fecha) || !anotar("cosechas", cultivo, fecha) || !kg) return;
+    var k = claveCultivo(cultivo);
+    if (!nombres[k]) nombres[k] = cultivo;
+    var llave = lunesDe(fecha) + "|" + k;
+    porSemana[llave] = (porSemana[llave] || 0) + kg;
+    res.kg_cosechados += kg;
+  });
+  res.cosechas = Object.keys(porSemana).sort().map(function (llave) {
+    var p = llave.split("|");
+    return [p[0], nombres[p[1]], Math.round(porSemana[llave] * 100) / 100];
+  });
+  res.kg_cosechados = Math.round(res.kg_cosechados * 100) / 100;
+
+  // Siembras: Fecha 2, Cultivo 3, Generacion 6, Origen 18.
+  var porGeneracion = {};
+  filasDe(HOJAS.siembras, HOJAS.siembras.encabezados.length).forEach(function (f) {
+    var fecha = texto(f[2]), cultivo = String(f[3] || "").trim();
+    if (!cultivo || !enTemporada(fecha)) return;
+    var origen = String(f[18] || "").trim();
+    var ajena = origen && origen !== "Propio";
+    if (ajena) res.no_propias.push(String(f[0]));
+    // La fecha de una encargada es teorica (llegada menos dias de bandeja):
+    // puede caer adelante sin ser un error, y no dice cuando se cargo algo.
+    if (!ajena && !anotar("siembras", cultivo, fecha)) return;
+    var gen = Number(f[6]) || 0;
+    if (!gen) return;
+    var k = claveCultivo(cultivo) + "|" + gen;
+    var g = porGeneracion[k] || (porGeneracion[k] = { cultivo: cultivo, generacion: gen,
+                                                      veces: 0, desde: fecha, hasta: fecha });
+    g.veces++;
+    if (fecha < g.desde) g.desde = fecha;
+    if (fecha > g.hasta) g.hasta = fecha;
+  });
+  Object.keys(porGeneracion).forEach(function (k) {
+    var g = porGeneracion[k];
+    var dias = (new Date(g.hasta + "T12:00:00Z") - new Date(g.desde + "T12:00:00Z")) / 86400000;
+    if (g.veces > 1 && dias > 7) res.repetidas.push(g);
+  });
+
+  // Trasplantes: Fecha 2, Cultivo 8.
+  filasDe(HOJAS.trasplantes, 9).forEach(function (f) {
+    var fecha = texto(f[2]), cultivo = String(f[8] || "").trim();
+    if (cultivo && enTemporada(fecha)) anotar("trasplantes", cultivo, fecha);
+  });
+
+  return res;
 }
 
 function ultimosDeHoja(chacra, cual, cuantos) {

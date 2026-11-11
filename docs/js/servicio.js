@@ -142,6 +142,10 @@ async function sincronizarUnaVez(silencioso) {
     // Un trasplante recién subido saca su almácigo de la lista de pendientes,
     // y una siembra nueva puede sumar uno: las dos cosas cambian esa lista.
     if (tipos.has("trasplantes") || tipos.has("siembras")) traerAlmacigos(true);
+    // El tablero de Inicio cuenta siembras, trasplantes y cosechas.
+    if (["siembras", "trasplantes", "cosechas"].some((t) => tipos.has(t) || corregidas.has(t))) {
+      traerSeguimiento(true);
+    }
     const ids = new Set(enviadosAhora.map((r) => r.id));
     enviados = enviadosAhora.map((r) => ({ ...r, enviado_en: ahora() })).concat(enviados).slice(0, 60);
     pendientes = pendientes.filter((r) => !ids.has(r.id));

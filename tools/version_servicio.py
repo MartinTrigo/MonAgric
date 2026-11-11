@@ -151,6 +151,16 @@ def main() -> None:
     else:
         print("  [ANTERIOR] el stock no manda los agotados (lo agotado vuelve como barra del plan)")
         viejas.append("los agotados del stock")
+    # 11/11: el tablero de Inicio. La configuracion lo anuncia y ?seguimiento=1
+    # da la cosecha por semana y las senales de datos para revisar.
+    sg = pedir("seguimiento=1&chacra=tica")
+    if cf.get("tablero") and "cosechas" in sg:
+        print(f"  [al dia]   el tablero de Inicio ({sg.get('kg_cosechados', 0)} kg en la temporada, "
+              f"{len(sg.get('repetidas') or [])} generaciones con siembras repetidas, "
+              f"{len(sg.get('futuras') or [])} registros con fecha futura)")
+    else:
+        print("  [ANTERIOR] el tablero de Inicio (la curva no muestra lo cosechado semana a semana)")
+        viejas.append("el tablero de Inicio")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")

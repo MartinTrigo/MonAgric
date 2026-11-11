@@ -33,6 +33,7 @@ almacenamiento del teléfono.</p>
 <script src="js/componentes.js"></script>
 <script src="js/pendientes.js"></script>
 <script src="js/plan-grafico.js"></script>
+<script src="js/tablero.js"></script>
 <script src="js/plan-mapa.js"></script>
 <script src="js/plan-cultivos.js"></script>
 <script src="js/ficha.js"></script>
@@ -606,6 +607,86 @@ almacenamiento del teléfono.</p>
       delPlan([r("x", "2026-08-20", "Repollo bco", 30)]).length, 1);
     igual("plan: lo relevado en otro sector no la tapa",
       delPlan([r("x", enCosecha, "Repollo bco", 30, { sector: "Primavera" })]).length, 1);
+  }
+
+
+  // ---- El tablero de Inicio (11/11): plan contra real ----
+  {
+    const g = (id, n, alm, campo, camas, extra = {}) => ({
+      id, cultivo: "Repollo bco", generacion: n, fecha_almacigo: alm, fecha_campo: campo,
+      camas, sector: "Verano", sembrada: false, siembra_id: "", sembrada_el: "", trasplantada_el: "", ...extra });
+    const hecha = { sembrada: true, siembra_id: "s1", sembrada_el: "2026-08-04", trasplantada_el: "2026-09-20" };
+    const gens = [
+      g("a", 1, "2026-08-01", "2026-09-05", 2, hecha),
+      g("ab", 1, "2026-08-01", "2026-09-05", 1, hecha),      // la misma generación, partida
+      g("b", 2, "2026-09-01", "2026-10-06", 1),
+      g("c", 3, "2027-01-10", "2027-02-14", 1),
+    ];
+    const HOY = "2026-11-11";
+    const etapas = etapasDelPlan(gens);
+    igual("tablero: una generación partida es una sola siembra y un solo trasplante",
+      etapas.map((e) => `${e.generacion} ${e.tipo} ${e.plan} ${e.real || "-"} ${e.diferencia}`),
+      ["1 siembra 2026-08-01 2026-08-04 3", "1 trasplante 2026-09-05 2026-09-20 15",
+       "2 siembra 2026-09-01 - null", "2 trasplante 2026-10-06 - null",
+       "3 siembra 2027-01-10 - null", "3 trasplante 2027-02-14 - null"]);
+
+    const r = ritmoDelPlan(etapas, HOY);
+    igual("ritmo: de las 4 etapas que tocaban hasta hoy se hicieron 2 (lo de enero no cuenta)",
+      [r.tocaban, r.hechas, r.pct, r.faltan.map((e) => e.tipo)], [4, 2, 50, ["siembra", "trasplante"]]);
+    igual("ritmo: antes de la primera fecha del plan no hay porcentaje",
+      ritmoDelPlan(etapas, "2026-07-15").pct, null);
+
+    const p = puntualidadDe(etapas);
+    igual("puntualidad: mediana de +3 y +15, y una de dos dentro de los 7 días",
+      [p.mediana, p.enFecha, p.pct], [9, 1, 50]);
+    igual("puntualidad: la siembra de plantines encargados no se mide (el trasplante sí)",
+      puntualidadDe(etapasDelPlan(gens, new Set(["s1"]))).medidas.map((e) => e.tipo), ["trasplante"]);
+
+    const v = ventanasDeCosecha(gens, CFG.plan);
+    const t = tramosDe(gens[0]);
+    igual("cosecha esperada: los kilos de cada generación (2 bancales × 24 m² × 5 kg/m²)",
+      v.map((x) => x.kg), [240, 120, 120, 120]);
+    igual("cosecha esperada: cuenta desde la ida al campo PLANIFICADA, no desde la real",
+      diasEntre("2026-09-05", v[0].desde), diasEntre(t.campo, t.inicioCosecha));
+
+    const una = [{ cultivo: "Repollo bco", kg: 100, desde: "2026-10-01", hasta: "2026-10-11", dias: 10 }];
+    igual("esperado a una fecha: nada antes, parejo durante y todo después",
+      ["2026-09-30", "2026-10-01", "2026-10-05", "2026-10-20"].map((f) => esperadoAl(una, f)), [0, 10, 50, 100]);
+
+    const porSemana = [["2026-09-28", "Repollo bco", 30], ["2026-10-05", "Repollo bco", 20]];
+    const s = serieDeCosecha(una, porSemana, "2026-07-01", "2027-07-01", "2026-10-07");
+    igual("curva: a hoy, lo esperado y lo cosechado",
+      [s.hoy.plan, s.hoy.real, s.total], [70, 50, 100]);
+    igual("curva: el domingo 4/10 solo tiene la semana que ya cerró",
+      s.puntos.find((q) => q.fecha === "2026-10-04").real, 30);
+    igual("curva: va del 1 de julio al 30 de junio y lo que viene no tiene dato real",
+      [s.puntos[0].fecha, s.puntos[s.puntos.length - 1].fecha, s.puntos[s.puntos.length - 1].real],
+      ["2026-07-01", "2027-06-30", null]);
+    igual("proyección: lo que falta, en la misma proporción que hasta ahora (50 de 70)",
+      Math.round(s.proyeccion.fin * 10) / 10, 71.4);
+    igual("proyección: no se calcula cuando el plan casi no esperaba nada todavía",
+      serieDeCosecha(una, [], "2026-07-01", "2027-07-01", "2026-09-20").proyeccion, null);
+
+    igual("por cultivo: lo esperado a hoy, lo cosechado y el total",
+      cosechaPorCultivo(una, porSemana, "2026-10-07", "2027-06-30")
+        .map((x) => [x.cultivo, x.esperado, x.real, x.total]), [["Repollo bco", 70, 50, 100]]);
+
+    const rev = datosParaRevisar({ etapas, hoyISO: HOY });
+    igual("para revisar: una siembra del plan sin cargar hace más de 30 días",
+      [rev.senales.length, rev.enJuego, rev.limpias, rev.pct], [1, 2, 1, 50]);
+    const rev2 = datosParaRevisar({ etapas, hoyISO: HOY, ventanas: [
+        { cultivo: "Repollo bco", kg: 100, desde: "2026-11-01", hasta: "2026-11-21", dias: 20 }],
+      vencidos: [{ cultivo: "Repollo bco", generacion: 1, objetivo: "2026-10-20", dias: 22 }],
+      seg: { repetidas: [], futuras: [{ hoja: "cosechas", cultivo: "Lechuga", fecha: "2027-01-05" }],
+             ultimo: { cosechas: "2026-10-01" } } });
+    igual("para revisar: almácigo vencido, fecha futura y cosecha sin cargar se suman",
+      [rev2.senales.map((x) => x.ir), rev2.limpias], [["trasplantes", "siembras", "cosechas", "cosechas"], 0]);
+
+    igual("tablero: sin generaciones en el plan no se dibuja",
+      conGeneraciones([], () => tarjetaTablero()), "");
+    const html = conGeneraciones(gens, () => tarjetaTablero());
+    igual("tablero: con plan dibuja los cuatro relojes y la curva",
+      [(html.match(/data-reloj=/g) || []).length, html.includes('class="curva"')], [4, true]);
   }
 
   Storage.prototype.setItem = setReal;

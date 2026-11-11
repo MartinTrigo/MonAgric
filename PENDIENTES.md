@@ -21,7 +21,50 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
-## Stock: plantines y lista de productos (10/11) — FALTA NUEVA VERSIÓN
+## El Tablero: plan contra real — ETAPA 1 PUBLICADA (11/11), FALTA NUEVA VERSIÓN
+
+Las cuatro etapas están en `PROMPT-TABLERO.md`. Reemplaza y ordena el punto 2
+de «Lo que viene, acordado el 10/10» y el «0 quinquies» (pantalla Seguimiento).
+
+**Etapa 1, publicada en la app (v88)**: en Inicio, cuatro relojes (Ritmo del
+plan, Cosecha a hoy, Puntualidad, Confianza del dato), cada uno con su detalle
+al tocarlo, y la curva de cosecha acumulada con la proyección. Probado con la
+chacra de ejemplo (teléfono y notebook, claro y oscuro) y con 20 pruebas
+nuevas en `pruebas.html`. **No se probó todavía con los datos reales de
+ninguna chacra.**
+
+**Para que la curva muestre lo cosechado semana a semana** (sin esto anda todo
+lo demás, con el total cosechado en un solo punto):
+1. Pegar `Code.gs` en MonAgric Datos 2026-27.
+2. Implementar → Administrar implementaciones → ✏ → **Nueva versión**.
+3. `python tools/version_servicio.py` tiene que decir «el tablero de Inicio».
+
+Para mirar con los datos reales, después de la Nueva versión:
+- Si los relojes de Tica dicen algo razonable. El de Ritmo va a salir bajo si
+  quedan generaciones viejas sin sembrar en el plan: o se sacan, o se cargan.
+- La lista de «Confianza del dato»: debería traer el Zapallito con fecha
+  futura, el Puerro G1 y el Tomate G1 (revisión del 10/10).
+- Los umbrales (±7 días es «en fecha»; 14 días un almácigo vencido; 30 una
+  siembra sin cargar) están arriba de `js/tablero.js`.
+
+Lo que quedó afuera de la etapa 1:
+- **Filtrar por temporada los totales** (`calcularResumen` y
+  `generacionesDelPlan` leen las hojas enteras): en julio de 2027 se
+  mezclarían dos temporadas. Antes hay que decidir qué es «la temporada
+  vigente» si la configuración no se actualizó; el pedido nuevo usa la fecha
+  de inicio de la configuración.
+- La curva, tan temprano en la temporada, deja lo cosechado chico en una
+  esquina: ver si hace falta una vista de «las últimas semanas».
+- Sumar el tablero a la guía de uso (`docs/ayuda/`) y rehacer la captura de
+  Inicio; los datos de ejemplo ya traen cosechas por semana.
+- La araña se descartó (11/11, Martín): en la etapa 3 van relojes y barras.
+
+## Stock: plantines y lista de productos (10/11) — IMPLEMENTADO
+
+**Verificado el 10/11**: `?config=1` de Tica trae 262 productos (incluye 22
+plantines: la planilla que lee ya tiene esa categoría) y `?stockcomercial=1`
+responde bien. Los pasos de abajo quedan como registro. Del lado de
+Producción, la comercialización semanal ya no espera nada.
 
 Publicado en la app (v87): Stock tiene el tipo **Plantines** (se guardan como
 «Plantín de Brócoli», en unidades o bandejas, en Plantinera / Invernadero), y
@@ -78,11 +121,10 @@ en CSV; comparte el resumen por WhatsApp; corregir, borrar y «Agotado».
 **Versión 2**, lo que quedó afuera a propósito:
 - **Modo recorrida**: un sector con todos sus bancales en una lista, y los kg
   sugeridos por el rinde del plan, para corregir y no escribir.
-- ~~Endpoint para comercialización~~ **hecho el 31/10, falta Nueva versión**:
+- ~~Endpoint para comercialización~~ **hecho el 31/10, implementado (verificado 10/11)**:
   `?stockcomercial=1&chacra=&token=` con la clave de la proyección
   (`stockParaComercializar`: lo vigente de `stockDe`, sin quién relevó). Lo
-  pide `Code.gs` de AMA Economía para su pestaña Semana. Implementar con
-  **Nueva versión** (pasos en `economia/apps-script/stock-proveedores/LEEME.md`).
+  pide `Code.gs` de AMA Economía para su pestaña Semana.
 - Que una cosecha registrada baje el stock de su cultivo (hoy no se tocan:
   el stock es una foto y la cosecha se registra aparte).
 - Sumar Stock a la guía de uso (`docs/ayuda/`).

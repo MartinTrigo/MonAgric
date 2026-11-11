@@ -58,7 +58,7 @@
     integrantes: ["Ana", "Juan", "Lucía", "Pedro"],
     areas: [{ nombre: "Plantinera", estado: "activo" }],
     plan: [],
-    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true,
+    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true,
   };
 
   const siembra = (Id, Fecha, Cultivo, Variedad, g, Bandejas, Alveolos, Operador, planificada) => ({
@@ -126,8 +126,22 @@
   });
   poner(LS.config, CFG);
   configConfirmada = true;
-  resumen = { kg_cosechados: 38, siembras: 6, plantines: 1168, horas: 214.5,
-              kg_por_cultivo: { Habas: 38 },
+  // Lo que el servicio manda para el tablero de Inicio: la cosecha sumada
+  // por semana (el lunes de cada una) y las señales de datos para revisar.
+  const cosechasPorSemana = [
+    ["2026-09-21", "Habas", 7.5], ["2026-09-28", "Habas", 30.5], ["2026-10-05", "Habas", 42],
+    ["2026-10-12", "Habas", 38], ["2026-10-19", "Habas", 21], ["2026-11-02", "Lechuga", 11],
+    ["2026-11-02", "Acelga", 4], ["2026-11-09", "Lechuga", 9],
+  ];
+  const kgEjemplo = cosechasPorSemana.reduce((a, c) => a + c[2], 0);
+  poner(LS.seguimiento, { chacra: "ejemplo", datos: {
+    ok: true, desde: "2026-07-01", hasta: "2027-07-01", hoy: hoy(),
+    cosechas: cosechasPorSemana, kg_cosechados: kgEjemplo, no_propias: [],
+    repetidas: [{ cultivo: "Lechuga", generacion: 2, veces: 2, desde: "2026-09-09", hasta: "2026-09-21" }],
+    futuras: [], ultimo: { cosechas: "2026-11-06", siembras: "2026-09-15", trasplantes: "2026-09-30" },
+  } });
+  resumen = { kg_cosechados: kgEjemplo, siembras: 6, plantines: 1168, horas: 214.5,
+              kg_por_cultivo: { Habas: 139, Lechuga: 20, Acelga: 4 },
               horas_por_area: { "Hortícola": 132, "Mantenimiento": 41, "Comercialización": 23.5, "Administración": 18 } };
   pendientes = []; enviados = [];
   // Cuentas es solo de las chacras con economía compartida: no va en la ayuda.

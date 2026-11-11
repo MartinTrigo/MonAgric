@@ -22,6 +22,10 @@ const plantillas = {
     const local = totalesLocales();
     const kgLogrado = resumen ? resumen.kg_cosechados : local.kg;
     const pct = kgPlan ? (kgLogrado / kgPlan) * 100 : 0;
+    // Con plan cargado, el tablero dice cómo viene la temporada contra lo
+    // esperado A HOY. La barra de antes comparaba con la temporada entera: en
+    // noviembre daba 1 % aunque todo viniera bien.
+    const tablero = tarjetaTablero();
 
     return `
     ${parte("inicio-temporada", `<div class="tarjeta temporada-cab">
@@ -34,12 +38,13 @@ const plantillas = {
         <div class="cifra"><b>${num(kgPlan)}</b><span>kg esperados</span></div>
         <div class="cifra"><b>${num(kgLogrado)}</b><span>kg cosechados</span></div>
       </div>
-      ${barra(pct, true)}
+      ${tablero ? "" : barra(pct, true)}
       <div class="rango" style="margin-top:6px">
-        ${num(pct, 1)}% de lo esperado ·
-        ${resumen ? "datos de toda la chacra" : "solo este teléfono"}
+        ${tablero ? "" : `${num(pct, 1)}% de lo esperado · `}${resumen ? "datos de toda la chacra" : "solo este teléfono"}
       </div>
     </div>`)}
+
+    ${parte("tablero", tablero)}
 
     ${parte("para-hacer", tarjetaParaHacer())}
 
