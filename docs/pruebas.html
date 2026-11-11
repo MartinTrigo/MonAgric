@@ -545,6 +545,15 @@ almacenamiento del teléfono.</p>
     igual("stock: 25 unidades de 1,2 kg, listas en 7 días",
       calcularStock({ fecha: "2026-10-23", formato: "unidad", cantidad: 25, peso_unidad: 1.2, dias: 7 }),
       { kg: 30, dias: 7, disponible: "2026-10-30" });
+    igual("stock: el producto lleva su presentación, sin repetirla",
+      [nombreDeProducto({ nombre: "Kimchi", presentacion: "360 g" }),
+       nombreDeProducto({ nombre: "Miel 1 kg", presentacion: "1 kg" }),
+       nombreDeProducto({ nombre: "Yogurt", presentacion: "" })],
+      ["Kimchi 360 g", "Miel 1 kg", "Yogurt"]);
+    igual("stock: el peso sale de la presentación (los litros no)",
+      ["360 g", "1 kg", "1,5 kg", "0.5 L", ""].map(kgDePresentacion), [0.36, 1, 1.5, "", ""]);
+    igual("stock: los plantines llevan su nombre de plantín",
+      [nombrePlantin("Brócoli"), nombrePlantin("Plantín de Kale")], ["Plantín de Brócoli", "Plantín de Kale"]);
     igual("stock: por kg, listo ya", calcularStock({ fecha: "2026-10-23", formato: "kg", cantidad: 12.5, dias: "0" }),
       { kg: 12.5, dias: 0, disponible: "2026-10-23" });
     igual("stock: en grupos según cuándo está listo",

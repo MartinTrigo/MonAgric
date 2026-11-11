@@ -13,9 +13,14 @@
 // Los archivos se cargan en orden (ver index.html) y comparten el espacio
 // global: no son módulos.
 
-const TIPOS_STOCK = ["En campo", "Cosechado", "Elaborado", "Fruta", "Otro"];
-const FORMATOS_STOCK = ["kg", "unidad", "atado", "frasco", "caja"];
-const LUGARES_STOCK = ["Cámara", "Sala de lavado", "Depósito", "Biofábrica"];
+const TIPOS_STOCK = ["En campo", "Cosechado", "Elaborado", "Fruta", "Plantines", "Otro"];
+const FORMATOS_STOCK = ["kg", "unidad", "atado", "frasco", "caja", "bandeja"];
+const LUGARES_STOCK = ["Cámara", "Sala de lavado", "Depósito", "Biofábrica", "Plantinera", "Invernadero"];
+// Los plantines se guardan como «Plantín de Brócoli», no «Brócoli»: AMA
+// Economía junta el stock por nombre sin mirar el tipo, y cien plantines de
+// brócoli se sumaban a los kilos de brócoli para vender. Es además como se
+// llaman en la tienda.
+const PREFIJO_PLANTIN = "Plantín de ";
 // Un relevamiento de más de dos semanas ya no dice mucho de lo que hay: se
 // sigue mostrando, pero marcado.
 const DIAS_STOCK_VIEJO = 14;
@@ -120,7 +125,7 @@ function grupoStock(d, fecha) {
 }
 
 // ---- Textos ----
-const PLURALES = { unidad: "unidades", atado: "atados", frasco: "frascos", caja: "cajas" };
+const PLURALES = { unidad: "unidades", atado: "atados", frasco: "frascos", caja: "cajas", bandeja: "bandejas" };
 const enFormato = (n, formato) => `${num(n, n % 1 ? 1 : 0)} ${n === 1 ? formato : PLURALES[formato] || formato}`;
 
 function cantidadStock(d) {
@@ -179,6 +184,91 @@ function cultivosEnBancal(sector, bancal, fecha) {
     .sort((a, b) => Number(!!b.sembrada) - Number(!!a.sembrada));
 }
 
+// ---- Qué se ofrece en «¿Qué producto?» según el tipo (10/11) ----
+// En campo y Cosechado: los cultivos, como siempre. Elaborado, Fruta y Otro:
+// los productos que se venden (la hoja productos de la chacra, que manda el
+// servicio sin precios). Plantines: «Plantín de» cada cultivo. En todos, lo
+// que ya se registró antes con ese tipo, y se puede escribir uno nuevo.
+const CATEGORIAS_DE_TIPO = {
+  Elaborado: ["elaborado", "congelado"],
+  Fruta: ["fruta"],
+  Plantines: ["plantin", "plantines"],
+};
+
+function productosDeLaChacra() {
+  const g = leer(LS.productos, null);
+  return g && g.chacra === chacraCodigo() && Array.isArray(g.lista) ? g.lista : [];
+}
+
+// "Kimchi" con presentación "360 g" es «Kimchi 360 g»: en Productos son dos
+// productos distintos con el mismo nombre. Si el nombre ya la dice, no se repite.
+function nombreDeProducto(p) {
+  const pres = String(p.presentacion || "").trim();
+  return pres && !textoPlano(p.nombre).includes(textoPlano(pres)) ? `${p.nombre} ${pres}` : p.nombre;
+}
+
+const nombrePlantin = (cultivo) => (textoPlano(cultivo).startsWith("plantin")
+  ? cultivo : PREFIJO_PLANTIN + cultivo);
+
+function opcionesProductoStock(tipo) {
+  const { lista: cultivos, delPlan } = cultivosOrdenados();
+  if (tipo === "En campo" || tipo === "Cosechado") return { lista: cultivos, destacadas: delPlan };
+  const cats = CATEGORIAS_DE_TIPO[tipo];
+  const deCategoria = (p) => !cats || cats.includes(textoPlano(p.categoria));
+  const productos = productosDeLaChacra().filter(deCategoria).map(nombreDeProducto);
+  // Lo registrado antes con este tipo, aunque no esté en Productos.
+  const antes = stockAl(hoy()).ultimos.filter((d) => d.tipo === tipo).map((d) => d.cultivo);
+  let destacadas = [];
+  let base = [];
+  if (tipo === "Plantines") {
+    destacadas = delPlan.map(nombrePlantin);
+    base = cultivos.map(nombrePlantin);
+  } else if (tipo === "Otro") {
+    base = cultivos;
+  } else if (tipo === "Fruta" && !productos.length) {
+    base = cultivos;           // sin lista de productos, como antes
+  }
+  const vistos = new Set();
+  const lista = [...destacadas, ...productos, ...antes, ...base].filter((n) => {
+    const k = textoPlano(n);
+    if (!n || vistos.has(k)) return false;
+    vistos.add(k);
+    return true;
+  });
+  // Los productos de la lista y lo registrado, ordenados; los del plan, arriba.
+  const arriba = new Set(destacadas);
+  lista.sort((a, b) => (arriba.has(b) - arriba.has(a)) || a.localeCompare(b));
+  return { lista, destacadas };
+}
+
+// El producto elegido, si está en la lista de la chacra.
+function productoPorNombre(nombre) {
+  const k = textoPlano(nombre);
+  return productosDeLaChacra().find((p) => textoPlano(nombreDeProducto(p)) === k) || null;
+}
+
+// "360 g" → 0,36 · "1 kg" → 1 · "1,5 kg" → 1,5. Litros y lo demás, nada:
+// el peso queda para que lo escriba quien releva.
+function kgDePresentacion(pres) {
+  const m = String(pres || "").toLowerCase().replace(",", ".").match(/(\d+(?:\.\d+)?)\s*(kg|g|gr|grs)\b/);
+  if (!m) return "";
+  const n = Number(m[1]);
+  return m[2] === "kg" ? n : Math.round(n) / 1000;
+}
+
+const rotuloProductoStock = (tipo) => (tipo === "En campo" ? "¿Qué cultivo?"
+  : tipo === "Plantines" ? "¿Qué plantín?" : "¿Qué producto?");
+
+function buscadorProductoStock(tipo, valor = "") {
+  const { lista, destacadas } = opcionesProductoStock(tipo);
+  return buscador("cultivo", lista, {
+    placeholder: tipo === "Elaborado" && !productosDeLaChacra().length
+      ? "Escribí el producto (la lista de productos no llegó)…"
+      : "Elegí de la lista o escribí uno nuevo…",
+    valor, destacadas, libre: true,
+  });
+}
+
 // ---- Pantalla ----
 function tarjetaFormStock() {
   const yo = leer(LS.nombre, "");
@@ -189,7 +279,6 @@ function tarjetaFormStock() {
   const nBancales = (secs.find((s) => s.sector === sector) || {}).bancales || 0;
   // La recorrida va de un bancal al siguiente.
   const bancal = u.bancal ? Math.min(Number(u.bancal) + 1, nBancales) : 1;
-  const { lista, delPlan } = cultivosOrdenados();
   return `<div class="tarjeta" id="tarjeta-form-stock">
     <h2>&#128230; Registrar stock</h2>
     <p class="nota">Lo que hay hoy en un lugar. Un registro nuevo del mismo cultivo
@@ -227,9 +316,8 @@ function tarjetaFormStock() {
         <datalist id="lugares-stock">${LUGARES_STOCK.map((l) => `<option value="${esc(l)}">`).join("")}</datalist>
       </div>
 
-      <label id="rotulo-cultivo-stock">${tipo === "En campo" ? "¿Qué cultivo?" : "¿Qué producto?"}</label>
-      ${buscador("cultivo", lista, { placeholder: "Elegí de la lista o escribí uno nuevo…",
-                                    destacadas: delPlan, libre: true })}
+      <label id="rotulo-cultivo-stock">${rotuloProductoStock(tipo)}</label>
+      <div id="stock-producto">${buscadorProductoStock(tipo)}</div>
       <div class="nota" id="sugerencia-stock"></div>
 
       <div class="fila">
@@ -697,8 +785,10 @@ function prepararStock() {
 
   const calculo = $("#calculo-stock");
   const sugerencia = $("#sugerencia-stock");
-  const cultivoTexto = f.querySelector('[data-buscador="cultivo"] .buscador-texto');
-  let cultivoSugerido = "";       // lo que puso la app sola: se puede cambiar solo
+  // El buscador se rehace al cambiar el tipo: siempre el que está ahora.
+  const textoCultivo = () => f.querySelector('[data-buscador="cultivo"] .buscador-texto');
+  let cultivoSugerido = "";
+  let tipoDeLaLista = f.tipo.value;       // lo que puso la app sola: se puede cambiar solo
 
   const leerForm = () => ({
     fecha: f.fecha.value, tipo: f.tipo.value,
@@ -707,7 +797,7 @@ function prepararStock() {
     lugar: f.tipo.value === "En campo" ? "" : f.lugar.value.trim(),
     // Lo escrito y no elegido también vale (un producto nuevo): el buscador
     // lo toma recién un momento después de salir del campo.
-    cultivo: f.cultivo.value.trim() || cultivoTexto.value.trim(), variedad: f.variedad.value.trim(),
+    cultivo: f.cultivo.value.trim() || textoCultivo().value.trim(), variedad: f.variedad.value.trim(),
     formato: f.formato.value,
     cantidad: f.cantidad.value.trim() === "" ? "" : aNumero(f.cantidad.value),
     peso_unidad: f.peso_unidad.value.trim() === "" ? "" : aNumero(f.peso_unidad.value),
@@ -715,7 +805,7 @@ function prepararStock() {
   });
 
   const ponerCultivo = (nombre) => {
-    cultivoTexto.value = nombre;
+    textoCultivo().value = nombre;
     f.cultivo.value = nombre;
     cultivoSugerido = nombre;
   };
@@ -751,7 +841,7 @@ function prepararStock() {
     const deCampo = d.tipo === "En campo";
     $("#stock-en-campo").hidden = !deCampo;
     $("#stock-en-lugar").hidden = deCampo;
-    $("#rotulo-cultivo-stock").textContent = deCampo ? "¿Qué cultivo?" : "¿Qué producto?";
+    $("#rotulo-cultivo-stock").textContent = rotuloProductoStock(d.tipo);
     $("#rotulo-dias-stock").textContent = deCampo ? "Días a cosecha" : "Días hasta que esté listo";
     const porKg = d.formato === "kg";
     $("#rotulo-cantidad-stock").textContent = porKg ? "Kg disponibles" : `Cantidad (${PLURALES[d.formato]})`;
@@ -768,12 +858,45 @@ function prepararStock() {
       : `<b>${esc(cantidadStock(todo))}</b> · ${esc(cuandoStock(todo, d.fecha || hoy()))}`;
   };
 
+  // Otro tipo, otra lista: los elaborados no son las verduras. Lo escrito se
+  // conserva solo si está en la lista nueva.
+  const cambiarLista = () => {
+    const tipo = f.tipo.value;
+    if (tipo === tipoDeLaLista) return;
+    const antes = tipoDeLaLista;
+    tipoDeLaLista = tipo;
+    const actual = f.cultivo.value.trim() || textoCultivo().value.trim();
+    const { lista } = opcionesProductoStock(tipo);
+    const sigue = lista.find((n) => textoPlano(n) === textoPlano(actual)) || "";
+    $("#stock-producto").innerHTML = buscadorProductoStock(tipo, sigue);
+    enlazarBuscadores(f);
+    if (!sigue) cultivoSugerido = "";
+    // Los plantines se cuentan, no se pesan.
+    if (tipo === "Plantines" && f.formato.value === "kg") f.formato.value = "unidad";
+    else if (antes === "Plantines" && tipo !== "Plantines" && f.formato.value === "unidad") f.formato.value = "kg";
+  };
+
+  // Al elegir un producto de la lista: cómo se vende y cuánto pesa, si la
+  // hoja de productos lo dice. Solo completa lo que está sin tocar.
+  const completarDeProducto = () => {
+    const p = productoPorNombre(f.cultivo.value);
+    if (!p) return;
+    if (FORMATOS_STOCK.includes(p.unidad) && f.formato.value === "kg") f.formato.value = p.unidad;
+    else if (p.unidad && p.unidad !== "kg" && f.formato.value === "kg") f.formato.value = "unidad";
+    const kg = Number(p.kg) || kgDePresentacion(p.presentacion);
+    if (kg && f.formato.value !== "kg" && !f.peso_unidad.value.trim()) f.peso_unidad.value = String(kg).replace(".", ",");
+  };
+
   f.addEventListener("change", (e) => {
+    if (e.target.name === "tipo") cambiarLista();
+    if (e.target === f || e.target.name === "cultivo") completarDeProducto();
     if (["tipo", "sector", "bancal", "fecha", "lugar", "variedad"].includes(e.target.name)) mirarLugar();
     actualizar();
   });
   // Elegir un cultivo de la lista es elección de la persona: deja de ser sugerido.
-  cultivoTexto.addEventListener("input", () => { cultivoSugerido = ""; });
+  f.addEventListener("input", (e) => {
+    if (e.target.classList.contains("buscador-texto")) cultivoSugerido = "";
+  });
   f.addEventListener("input", actualizar);
   mirarLugar();
   actualizar();
