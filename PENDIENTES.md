@@ -21,7 +21,12 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
-## El Tablero: plan contra real — ETAPA 1 PUBLICADA (11/11), FALTA NUEVA VERSIÓN
+## El Tablero: plan contra real — ETAPA 1 PUBLICADA E IMPLEMENTADA (11/11)
+
+**Servicio implementado y verificado el 11/11** con `version_servicio.py`:
+en Tica, 315 kg cosechados en la temporada, 4 generaciones con siembras
+repetidas y ningún registro con fecha futura. Los pasos de abajo quedan como
+registro. Falta mirar los relojes en un teléfono con los datos reales.
 
 Las cuatro etapas están en `PROMPT-TABLERO.md`. Reemplaza y ordena el punto 2
 de «Lo que viene, acordado el 10/10» y el «0 quinquies» (pantalla Seguimiento).
