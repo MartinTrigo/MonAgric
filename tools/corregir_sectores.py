@@ -33,7 +33,7 @@ CHACRA = "tica"
 # bancal), y en que sectores nuevos se reparten los que quedan, de a cuantos.
 # Un registro cargado en un bancal quitado no se toca: sale en la lista de
 # "sin equivalencia" para mirarlo a mano.
-QUITADOS = [9, 21, 27]          # <-- A CONFIRMAR con quien conoce el campo
+QUITADOS = [1, 14, 27]          # las puntas y el del medio (Martin, 13/11)
 TABLA = {
     nombre: {"quitar": QUITADOS, "en": [f"{nombre} A", f"{nombre} B"], "de_a": 12}
     for nombre in ("Primavera", "Verano", "Otoño", "Invierno")

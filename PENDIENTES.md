@@ -53,6 +53,12 @@ Lo que mostraron los datos de Tica ese día:
 - `tools/corregir_sectores.py`: traduce los lugares viejos en Siembras,
   Trasplantes, Stock y el plan. Sin `--aplicar` solo muestra qué cambiaría.
 
+**RESUELTO el 13/11 por Martín: los corredores eran los bancales 1, 14 y 27,
+igual en los cuatro sectores** (ya está en `QUITADOS`). Y **donde la planilla
+y el mapa no coincidan, vale el mapa**: lo chequeó en el campo el 12/11. Eso
+último falta programarlo; cómo seguir está en `PROMPT-CONTINUAR.md`. Lo que
+sigue en este párrafo quedó viejo.
+
 **Para corregir la planilla de Tica falta un dato de Martín: qué tres
 bancales de la numeración vieja (1 a 27) eran los corredores biológicos**, y
 si eran los mismos en los cuatro sectores. En la herramienta está puesto
