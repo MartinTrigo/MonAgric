@@ -21,6 +21,18 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## Lo que sigue: La Recorrida (12/11) — PROPUESTA, sin empezar
+
+La próxima tarea grande está escrita como consigna en `PROMPT-RECORRIDA.md`:
+recorrer un sector bancal por bancal desde el teléfono y confirmar o corregir
+en dos toques lo que la app cree que hay (trasplante, cosecha estimada,
+cierre, observación de plaga o malezas). Sale de lo visto del 10 al 12/11:
+los relojes fallan por el dato que falta, no por la cuenta. Absorbe el «modo
+recorrida» de Stock y es la semilla de Sanidad. Para una conversación nueva.
+
+Antes hace falta la Nueva versión del Apps Script y reubicar en el mapa las
+23 generaciones de Tica (las dos cosas, más abajo).
+
 ## Sectores partidos en Tica (13/11) — reubicar en el mapa
 
 Tica partió Primavera, Otoño e Invierno en sectores A y B de 12 bancales
