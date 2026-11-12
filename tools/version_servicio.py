@@ -178,6 +178,12 @@ def main() -> None:
         viejas.append("terminar generaciones")
     # 13/11: el plan trae donde se planto de verdad cada generacion.
     con_lugar = sum(1 for g in pedir("generaciones=1&chacra=tica").get("generaciones", []) if g.get("lugar_real"))
+    if cf.get("lugar_verificado"):
+        verif = sum(1 for g in pedir("generaciones=1&chacra=tica").get("generaciones", []) if g.get("lugar_verificado"))
+        print(f"  [al dia]   el lugar verificado en el campo ({verif} generaciones verificadas en Tica)")
+    else:
+        print("  [ANTERIOR] el lugar verificado en el campo (el mapa no ofrece confirmar)")
+        viejas.append("el lugar verificado")
     if cf.get("lugar_real"):
         print(f"  [al dia]   el lugar donde se planto cada generacion ({con_lugar} con lugar registrado en Tica)")
     else:

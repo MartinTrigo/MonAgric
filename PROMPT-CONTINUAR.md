@@ -41,7 +41,30 @@ toca a las tareas de abajo (es posterior).
    en un teléfono real con datos reales.** Antes de construir La Recorrida
    hay que hacer la tarea 3 (una semana de uso). No la saltees.
 
-## Tarea 1 — El lugar verificado (decidida; falta programarla)
+## Tarea 1 — El lugar verificado: PROGRAMADA Y PUBLICADA (v93, 13/11)
+
+**Estado:** hecho y publicado el servidor (`verificarLugar`, columnas
+`Sector plantado`, `Bancales plantados`, `Lugar verificado`, bandera
+`cfg.lugar_verificado`) y el mapa (lo no verificado va rayado; botones «Está
+donde dice el plan», «Está en otro lado», «Quitar la verificación», y el
+aviso de arriba para confirmar todo junto con una fecha). Probado con la
+chacra inventada y el servidor simulado; 127 pruebas en verde. **No probado
+con datos reales.**
+
+**Lo que falta de esta tarea:**
+1. Que Martín haga la **Nueva versión** del Apps Script (se tocó `Code.gs`).
+   `python tools/version_servicio.py` tiene que decir «el lugar verificado».
+2. Que Martín abra Plan → Mapa en la notebook, ponga la fecha 12/11/2026 en
+   el aviso amarillo y toque «Confirmar que están donde dice el mapa».
+3. Mirar el mapa con datos reales: lo que ubicó tiene que quedar plantado y
+   verificado, sin contornos punteados; lo demás, rayado («sin verificar»).
+4. Correr `tools\corregir_sectores.py` sin `--aplicar`, mostrarle la lista
+   y aplicarla con su sí (traduce el stock y los registros de lo que no está
+   en el mapa).
+5. Documentar en `CLAUDE.md` (sección «El lugar: planificado y plantado»)
+   el lugar verificado: quedó sin escribir por falta de uso.
+
+Lo que sigue en esta sección es el análisis y el diseño, ya ejecutados.
 
 ### El problema, con los datos de Tica del 13/11
 

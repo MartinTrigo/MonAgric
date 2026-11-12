@@ -90,6 +90,17 @@ function textoDeLugares(lugares) {
    y número): si está partida en partes, se le cuenta a la primera y las
    otras no ocupan nada, para no contarlo dos veces. Se calcula una vez por
    lista de generaciones. */
+// Una generación con su lugar verificado puesto (o quitado, si viene vacío).
+function conLugarVerificado(g, it, fecha) {
+  const bs = String(it.bancales || "").split(",").map((b) => parseInt(b, 10)).filter((b) => b > 0);
+  const vale = it.sector && bs.length;
+  return { ...g, lugar_real: vale ? [{ sector: it.sector, bancales: bs }] : [],
+           lugar_verificado: vale ? (fecha || hoy()) : "" };
+}
+
+// Cuando se está eligiendo en el mapa dónde está de verdad una generación.
+let verificandoLugar = "";
+
 const lugaresMemo = new WeakMap();
 function plantadasDe(todas) {
   let m = lugaresMemo.get(todas);
@@ -100,7 +111,10 @@ function plantadasDe(todas) {
       .forEach((x) => { const k = claveGen(x.cultivo, x.generacion); if (!duenia.has(k)) duenia.set(k, x.id); });
     todas.forEach((x) => {
       const real = lugarReal(x);
-      if (real.length) m.set(x.id, duenia.get(claveGen(x.cultivo, x.generacion)) === x.id ? real : []);
+      if (!real.length) return;
+      // Verificado en el campo: cada parte tiene su propio lugar. Si sale de
+      // los registros, es de la generación entera y se le cuenta a la primera.
+      m.set(x.id, x.lugar_verificado || duenia.get(claveGen(x.cultivo, x.generacion)) === x.id ? real : []);
     });
     lugaresMemo.set(todas, m);
   }
@@ -270,12 +284,13 @@ function mapaDeCultivos() {
     return tramos.map(([a, z]) => {
       const ancho = (z - a + 1) * LZ.bancal;
       const acostado = ancho >= 2 * LZ.bancal;
-      return `<div class="lz-puesta sembrada real${acostado ? " acostada" : ""}${
+      return `<div class="lz-puesta sembrada real${g.lugar_verificado ? "" : " sin-verificar"}${acostado ? " acostada" : ""}${
         g.id === genSeleccionada ? " elegida" : ""}" data-real="${esc(g.id)}"
         style="left:${(a - 1) * LZ.bancal}px;width:${ancho - 1}px;top:${top}px;
                height:${fin - top}px;background:${colorEtapa(g.cultivo, "cosecha")}"
         title="${esc(g.cultivo)} ${nombreGen(g)} · plantada en bancal ${a === z ? a : `${a} a ${z}`} · ${
-          fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}">
+          fechaCorta(o.desde)} a ${fechaCorta(o.hasta)} · ${g.lugar_verificado
+            ? "verificado en el campo" : "según el registro, sin verificar"}">
         <span>${esc(g.cultivo)} ${nombreGen(g)}${acostado
           ? `<small>${fechaCorta(o.desde)} – ${fechaCorta(o.hasta)}</small>` : ""}</span>
       </div>`;
@@ -383,15 +398,34 @@ function mapaDeCultivos() {
                estaUbicada(sel) ? ` · el plan decía ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}` : ""}`
              : estaUbicada(sel) ? ` · planificada en ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}`
              : ubicacionPerdida(sel) ? ` · sin ubicar (estaba en ${esc(ubicacionPerdida(sel))}, que ya no existe)` : " · sin ubicar"}</span>
-         <span class="lz-ayuda">${plantadas.has(sel.id)
-           ? "Ya está en el campo: su lugar sale de lo registrado. Si está mal, se corrige con ✎ en Trasplantes (o Siembras) → Últimos movimientos."
-           : "En verde, los bancales libres en esas fechas: tocá uno o arrastrala."}</span>
+         <span class="lz-ayuda">${verificandoLugar === sel.id
+           ? "Tocá en el mapa el bancal donde está de verdad."
+           : plantadas.has(sel.id)
+             ? (sel.lugar_verificado ? `Verificado en el campo${/^\d{4}/.test(sel.lugar_verificado) ? " el " + fechaCorta(sel.lugar_verificado) : ""}.`
+                : "Este lugar sale de lo que se registró al plantar y nadie lo verificó.")
+             : "En verde, los bancales libres en esas fechas: tocá uno o arrastrala."}</span>
+         ${CFG?.lugar_verificado && esSembrada(sel) ? `
+           ${estaUbicada(sel) && !(sel.lugar_verificado && planCumplido(sel))
+             ? `<button type="button" class="secundario" id="verificar-plan">Está donde dice el plan</button>` : ""}
+           <button type="button" class="secundario" id="verificar-otro">Está en otro lado</button>
+           ${sel.lugar_verificado ? `<button type="button" class="secundario" id="verificar-quitar">Quitar la verificación</button>` : ""}` : ""}
          ${estaUbicada(sel) ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
          <button type="button" class="secundario" id="cancelar-eleccion">Listo</button>`
       : `<span class="lz-ayuda">Arrastrá un sector por su título para acomodarlo como está
          en el campo. Arrastrá una generación de la lista a un bancal, o una ya puesta a
          otro. La rueda del mouse acerca y aleja; arrastrando un lugar vacío se mueve el mapa.</span>`}
     </div>
+
+    ${(() => {
+      // Lo sembrado que tiene lugar en el mapa y nadie verificó: se confirma
+      // todo junto (lo que hace quien recorrió el campo y acomodó el mapa).
+      const sinVerificar = todas.filter((g) => esSembrada(g) && estaUbicada(g) && !g.lugar_verificado);
+      return CFG?.lugar_verificado && sinVerificar.length ? `<div class="lz-confirmar">
+        <span><b>${sinVerificar.length}</b> generaciones sembradas tienen lugar en el mapa y nadie confirmó que estén ahí.</span>
+        <label>Se vio en el campo el <input type="date" id="fecha-verificacion" value="${hoy()}" max="${hoy()}"></label>
+        <button type="button" class="secundario" id="verificar-todas">Confirmar que están donde dice el mapa</button>
+      </div>` : "";
+    })()}
 
     <div class="mapa-con-lista">
       <div class="mapa-panel">
@@ -435,7 +469,8 @@ function mapaDeCultivos() {
             <div>
               <div class="detalle">${nombreGen(g, todas)} <span class="gen">${
                 Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)</span></div>
-              <div class="cuando">${plantada ? `<b>plantada en ${esc(real)}</b> · `
+              <div class="cuando">${plantada ? `<b>plantada en ${esc(real)}</b>${
+                    g.lugar_verificado ? "" : ` <span class="lz-perdida">sin verificar</span>`} · `
                   : ubicada ? `<b>${esc(g.sector)} ${bancalesDe(g).join(", ")}</b> · ` : ""}${
                 oc ? `${ubicada || plantada ? "" : "ocupa "}del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
                 : "sin fechas suficientes"}${
@@ -740,7 +775,15 @@ function prepararMapa() {
       alTocar: (t) => {
         // Un toque sobre un bancal con una generación elegida: va ahí.
         const g = todas.find((x) => x.id === genSeleccionada);
-        const d = g && !plantadasDe(todas).has(g.id) && bancalBajo(t.clientX, t.clientY);
+        const donde = g && bancalBajo(t.clientX, t.clientY);
+        // Eligiendo dónde está de verdad: queda verificado ahí; el plan no cambia.
+        if (donde && verificandoLugar === g.id) {
+          const bs = bancalesQueOcuparia(g, donde.bancal, donde.b.n);
+          verificar([{ generacion_id: g.id, sector: donde.b.sector, bancales: bs.join(", ") }], hoy(),
+            `${g.cultivo} ${nombreGen(g)}: está en ${donde.b.sector} ${bs.join(", ")} ✓`);
+          return;
+        }
+        const d = g && !plantadasDe(todas).has(g.id) && donde;
         if (d) ubicar(g, d.b.sector, d.b.n, d.bancal);
       },
     });
@@ -773,6 +816,41 @@ function prepararMapa() {
     guardarPartesDeConfig({ sectores: lista }, movidos, `${nombre} movido ✓`, "plan");
   };
 
+  // ---- verificar dónde está plantada (ver LUGAR_VERIFICADO en Code.gs) ----
+  const verificar = (items, fecha, mensaje) => {
+    guardarRegistro("lugar_verificado", { items, fecha }, mensaje);
+    escribir(LS.generaciones, todas.map((x) => {
+      const it = items.find((i) => i.generacion_id === x.id);
+      return it ? conLugarVerificado(x, it, fecha) : x;
+    }));
+    verificandoLugar = "";
+    genSeleccionada = "";
+    render("plan", true);
+  };
+  const elegida = todas.find((x) => x.id === genSeleccionada);
+  const vPlan = $("#verificar-plan");
+  if (vPlan && elegida) vPlan.onclick = () => verificar(
+    [{ generacion_id: elegida.id, sector: elegida.sector, bancales: bancalesDe(elegida).join(", ") }], hoy(),
+    `${elegida.cultivo} ${nombreGen(elegida)}: está donde dice el plan ✓`);
+  const vOtro = $("#verificar-otro");
+  if (vOtro && elegida) vOtro.onclick = () => {
+    verificandoLugar = verificandoLugar === elegida.id ? "" : elegida.id;
+    render("plan", true);
+  };
+  const vQuitar = $("#verificar-quitar");
+  if (vQuitar && elegida) vQuitar.onclick = () => verificar(
+    [{ generacion_id: elegida.id, sector: "", bancales: "" }], "", "Verificación quitada ✓");
+  const vTodas = $("#verificar-todas");
+  if (vTodas) vTodas.onclick = () => {
+    const lista = todas.filter((g) => esSembrada(g) && estaUbicada(g) && !g.lugar_verificado);
+    const fecha = $("#fecha-verificacion").value || hoy();
+    if (!lista.length || fecha > hoy()) return aviso("Revisá la fecha.", true);
+    if (!confirm(`Vas a confirmar que ${lista.length} generaciones sembradas están plantadas donde dice el mapa, ` +
+                 `vistas en el campo el ${fechaCorta(fecha)}.\n\nEl plan no cambia. ¿Confirmar?`)) return;
+    verificar(lista.map((g) => ({ generacion_id: g.id, sector: g.sector, bancales: bancalesDe(g).join(", ") })),
+      fecha, `${lista.length} generaciones verificadas ✓`);
+  };
+
   // En la lista, sobre una generación ya ubicada: ✎ la elige para moverla
   // (se ven en verde los bancales libres) y ✕ la saca del mapa.
   const sacarDelMapa = (g) => {
@@ -792,7 +870,7 @@ function prepararMapa() {
   });
 
   const cancelar = $("#cancelar-eleccion");
-  if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; render("plan", true); };
+  if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; verificandoLugar = ""; render("plan", true); };
   const sacar = $("#sacar-del-mapa");
   if (sacar) sacar.onclick = () => sacarDelMapa(todas.find((x) => x.id === genSeleccionada));
 }

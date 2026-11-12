@@ -1929,3 +1929,16 @@ h3.subtitulo { font-size: .86rem; color: var(--sage-dark); margin: 14px 0 4px; }
 .ley-plantado { background: var(--sage); box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.28); }
 .ley-planificado { background: var(--sage-light); }
 .ley-fantasma { border: 1.5px dashed var(--tenue); }
+
+/* Mapa: lo plantado que nadie verificó en el campo va rayado (13/11). */
+.lz-puesta.real.sin-verificar {
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.34) 0 4px, transparent 4px 9px);
+}
+.lz-confirmar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  background: var(--amber-suave); color: var(--amber-tx);
+  border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: .88rem;
+}
+.lz-confirmar label { margin: 0; color: inherit; font-weight: 400; display: inline-flex; align-items: center; gap: 6px; }
+.lz-confirmar input { width: auto; padding: 5px 8px; font-size: .88rem; min-height: 0; }
+.lz-confirmar .secundario { width: auto; margin: 0; padding: 6px 12px; }

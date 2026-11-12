@@ -771,6 +771,14 @@ almacenamiento del teléfono.</p>
       igual("mapa: choca con lo PLANTADO (Primavera 7) y ya no con donde se había planificado (Verano 3)",
         [chocanCon(nueva, "Primavera", [7], lista).map((x) => x.id), chocanCon(nueva, "Verano", [3], lista).length,
          chocanCon(nueva, "Verano", [5], lista).map((x) => x.id)], [["g1"], 0, ["g2"]]);
+      // Lo verificado en el campo: cada parte con su lugar, y le gana al registro.
+      const v = conLugarVerificado(lista[1], { sector: "Verano", bancales: "4" }, "2026-11-12");
+      const conV = [lista[0], v, lista[2]];
+      igual("lugar verificado: la parte verificada ocupa su propio lugar; la otra sigue con el registro",
+        conV.map((x) => textoDeLugares(lugaresDe(x, conV))), ["Primavera 7, 8", "Verano 4", "Verano 5"]);
+      igual("lugar verificado: quitarlo la deja como estaba",
+        [conLugarVerificado(v, { sector: "", bancales: "" }, "").lugar_verificado,
+         conLugarVerificado(v, { sector: "", bancales: "" }, "").lugar_real.length], ["", 0]);
       igual("formularios: sin sector no hay bancales para elegir, y nada viene elegido",
         [opcionesBancal("").includes("<option>1</option>"), opcionesBancal("Verano").includes(" selected>Elegí"),
          opcionesBancal("Verano", 3).includes("<option selected>3</option>"), (opcionesBancal("Verano").match(/<option/g) || []).length],

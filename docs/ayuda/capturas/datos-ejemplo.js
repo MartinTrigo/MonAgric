@@ -60,7 +60,7 @@
     integrantes: ["Ana", "Juan", "Lucía", "Pedro"],
     areas: [{ nombre: "Plantinera", estado: "activo" }],
     plan: [],
-    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true, repeticion: true, cierres: true, lugar_real: true,
+    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true, repeticion: true, cierres: true, lugar_real: true, lugar_verificado: true,
   };
 
   const siembra = (Id, Fecha, Cultivo, Variedad, g, Bandejas, Alveolos, Operador, planificada) => ({

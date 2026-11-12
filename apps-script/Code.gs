@@ -526,6 +526,8 @@ function atender(p) {
       // Las generaciones traen donde se plantaron de verdad (13/11): el mapa
       // dibuja lo plantado sobre lo planificado.
       cfg.lugar_real = true;
+      // Y sabe guardar el lugar verificado en el campo (lugar_verificado).
+      cfg.lugar_verificado = true;
       // Los productos que se venden, para el stock de elaborados, fruta y
       // plantines (10/11). Sin precios. Solo si la chacra tiene su planilla
       // en PRODUCTOS_PLANILLAS; si falla la lectura, la app sigue sin lista.
@@ -602,6 +604,7 @@ function doPost(e) {
           // la misma generacion y nadie sabria cual vale.
           else if (r.tipo === "generaciones") { guardarGeneracion(libro, r); guardados++; }
           else if (r.tipo === "generacion_borrar") { borrarGeneracion(libro, r); guardados++; }
+          else if (r.tipo === "lugar_verificado") { verificarLugar(libro, r); guardados++; }
           // Corregir o borrar un registro ya cargado: desde la lista de
           // "ultimos movimientos" de cada seccion.
           else if (r.tipo === "registro_editar") { corregirRegistro(chacra, libro, r, false); guardados++; }
@@ -619,7 +622,7 @@ function doPost(e) {
       // escritura por hoja: o no tienen hoja propia, o se escriben distinto.
       var SIN_HOJA = { tareas_hecha: 1, tareas_reabrir: 1, config: 1,
                        puntaje: 1, sugerencia: 1, cultivo: 1,
-                       generaciones: 1, generacion_borrar: 1,
+                       generaciones: 1, generacion_borrar: 1, lugar_verificado: 1,
                        registro_editar: 1, registro_borrar: 1,
                        config_plan: 1, config_sector: 1 };
       var porTipo = {};
@@ -676,6 +679,7 @@ function doPost(e) {
     // cualquier cosa que los cambie los borra para que el proximo pedido los
     // lea de nuevo.
     var CAMBIAN_EL_PLAN = { siembras: 1, trasplantes: 1, generaciones: 1, generacion_borrar: 1,
+                            lugar_verificado: 1,
                             registro_editar: 1, registro_borrar: 1 };
     if (registros.some(function (r) { return CAMBIAN_EL_PLAN[r.tipo]; })) olvidarPlan_(chacra);
     return respuesta({ ok: true, recibidos: registros.length, guardados: guardados,
@@ -1200,6 +1204,48 @@ function rankingDelJuego(chacra) {
    semanas, cambiar los bancales, sacar una generacion. Si cada correccion
    agregara una fila, quedarian cinco versiones de la misma y ninguna manera de
    saber cual manda. */
+/* ---- El lugar plantado, verificado en el campo (13/11) ----
+   Tres columnas al final de "Plan generaciones", DESPUES de las que escribe
+   guardarGeneracion (que rearma solo las 14 primeras, asi que estas no las
+   toca): donde esta plantada la generacion y que dia alguien lo verifico.
+
+   Por que no se deduce de Trasplantes: en Tica, despues de partir los
+   sectores, de 24 generaciones con registro y lugar en el mapa coincidian 4.
+   Los bancales se habian contado mal al cargar, cada vez de una forma
+   distinta, y ninguna formula lo arreglaba. Martin recorrio el campo y lo
+   que vale es lo que vio. Sector y Bancales (columnas 9 y 10) siguen siendo
+   EL PLAN y no cambian al verificar: queda "planificado aca, plantado alla".
+   Es tambien lo que escribe La Recorrida al confirmar un bancal. */
+var LUGAR_VERIFICADO = { desde: 15, encabezados: ["Sector plantado", "Bancales plantados", "Lugar verificado"] };
+
+// r.datos: { fecha, items: [{ generacion_id, sector, bancales }] }. Un item
+// con sector vacio borra la verificacion. Toca solo esas tres celdas.
+function verificarLugar(libro, r) {
+  var d = r.datos || {};
+  var items = d.items || [];
+  var hoja = libro.getSheetByName(HOJAS.generaciones.nombre);
+  if (!hoja || hoja.getLastRow() < 2 || !items.length) return;
+  var c = LUGAR_VERIFICADO.desde;
+  if (!hoja.getRange(1, c).getValue()) {
+    hoja.getRange(1, c, 1, 3).setValues([LUGAR_VERIFICADO.encabezados])
+        .setFontWeight("bold").setBackground("#DCE9DD");
+  }
+  // Los bancales, como texto: "4, 5" a secas la planilla lo vuelve una fecha.
+  hoja.getRange(1, c + 1, hoja.getMaxRows(), 1).setNumberFormat("@");
+  var ids = hoja.getRange(2, 1, hoja.getLastRow() - 1, 1).getValues();
+  var fila = {};
+  ids.forEach(function (x, i) { if (x[0] && !fila[String(x[0])]) fila[String(x[0])] = i + 2; });
+  items.forEach(function (it) {
+    var n = fila[String(it.generacion_id)];
+    if (!n) return;
+    var sector = String(it.sector || "").trim();
+    var bancales = String(it.bancales || "").split(",")
+      .map(function (b) { return parseInt(b, 10); }).filter(function (b) { return b > 0; }).join(", ");
+    var vale = sector && bancales;
+    hoja.getRange(n, c, 1, 3).setValues([[vale ? sector : "", vale ? bancales : "", vale ? (d.fecha || "") : ""]]);
+  });
+}
+
 function guardarGeneracion(libro, r) {
   var def = HOJAS.generaciones;
   var hoja = obtenerHoja(libro, def);
@@ -1371,11 +1417,16 @@ function generacionesDelPlan(chacra) {
     });
   }
 
-  return hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length)
+  return hoja.getRange(2, 1, hoja.getLastRow() - 1, LUGAR_VERIFICADO.desde + 2)
     .getValues()
     .filter(function (f) { return f[0] && f[2]; })
     .map(function (f) {
       var gen = Number(f[3]) || 1;
+      // Lo verificado en el campo le gana a lo que dicen los registros.
+      var vSector = String(f[14] || "").trim();
+      var vBancales = String(f[15] instanceof Date ? "" : f[15] || "").split(",")
+        .map(function (b) { return parseInt(b, 10); }).filter(function (b) { return b > 0; });
+      var verificado = vSector && vBancales.length ? (texto(f[16]) || "sin fecha") : "";
       // El dia que toca sembrar: la bandeja si va por almacigo, el bancal si
       // es siembra directa.
       var real = buscarSiembra(String(f[2]), gen, texto(f[5]) || texto(f[6]));
@@ -1403,7 +1454,11 @@ function generacionesDelPlan(chacra) {
         // Cuantas veces se resembro (11/11).
         resiembras: resiembras[claveCultivo(f[2]) + "|" + gen] || 0,
         // Donde se planto (vacio si todavia no fue al campo).
-        lugar_real: lugarReal(claveCultivo(f[2]) + "|" + gen),
+        lugar_real: verificado ? [{ sector: vSector, bancales: vBancales }]
+                               : lugarReal(claveCultivo(f[2]) + "|" + gen),
+        // Que dia se verifico en el campo; vacio = lo de arriba sale de los
+        // registros y nadie lo confirmo.
+        lugar_verificado: verificado,
         variedad: String(f[13] || ""),
       };
     });

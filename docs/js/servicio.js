@@ -244,7 +244,14 @@ function conPendientesDelPlan(lista) {
   pendientes.forEach((r) => {
     const d = r.datos || {};
     const id = d.generacion_id;
-    if (!id) return;
+    if (!id && r.tipo !== "lugar_verificado") return;
+    // Un lugar verificado que todavía no viajó: se ve desde ya.
+    if (r.tipo === "lugar_verificado") {
+      (d.items || []).forEach((it) => {
+        out = out.map((x) => (x.id === it.generacion_id ? conLugarVerificado(x, it, d.fecha) : x));
+      });
+      return;
+    }
     if (r.tipo === "generacion_borrar") { out = out.filter((x) => x.id !== id); return; }
     if (r.tipo !== "generaciones") return;
     const previa = out.find((x) => x.id === id);
