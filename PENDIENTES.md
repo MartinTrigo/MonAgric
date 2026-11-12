@@ -21,6 +21,41 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## El lugar: planificado y real (12/11) — ANÁLISIS, va ANTES de La Recorrida
+
+Martín (12/11): el mapa es para **planificar** dónde y cuándo va cada
+generación y qué sigue en cada bancal cuando se libera; después se ejecuta, y
+lo que cambie se rectifica. No quiere reubicar a mano lo ya plantado.
+
+Lo que mostraron los datos de Tica ese día:
+- **El lugar tiene una sola casilla.** «Plan generaciones» guarda sector y
+  bancales, y el mapa dibuja eso. Dónde se plantó de verdad queda en
+  Trasplantes (y en Siembras, si es directa) y **el mapa no lo mira**. Con las
+  fechas ya hay planificado, real y previsto; con el lugar, no.
+- De 38 generaciones con lugar real, **1 coincide con el plan, 23 no y 14 no
+  tienen lugar en el plan**. Parte es el cambio de nombres (los registros
+  dicen «Primavera 14», el plan «Primavera B 5») y parte es que se plantó en
+  otro bancal.
+- **De 38 generaciones sin sembrar, solo 1 tiene lugar en el mapa.** El mapa
+  hoy tiene sobre todo lo ya plantado; la sucesión futura está sin planificar.
+- **Los formularios traen elegido el primer sector y el bancal 1.** Rabanito,
+  Rúcula y Perejil figuran sembrados en «Primavera 1» y el Mix de hojas G1 en
+  «Frutillar 1»: casi seguro nadie cambió el desplegable.
+- Renombrar o partir un sector en Configuración no migra nada: trasplantes,
+  siembras y stock (8 lugares vigentes) siguen diciendo el nombre viejo.
+
+Orden propuesto (falta el sí de Martín):
+1. **Que el bancal se elija siempre**: sin valor puesto de antemano en sector
+   y bancal. Chico, y corta el error en el origen.
+2. **El lugar real en el mapa**: el servidor arma, de Trasplantes y Siembras
+   enteras, dónde está cada generación; el mapa dibuja lo real (lleno) sobre
+   lo planificado (contorno) y calcula los bancales libres con lo real. Lo ya
+   plantado se ubica solo. Necesita la **tabla de equivalencias** de los
+   bancales viejos a los nuevos (la sabe Martín).
+3. **Planificar lo que falta**: las 37 generaciones sin lugar, con el mapa
+   mostrando qué bancal se libera y cuándo.
+4. **La Recorrida**, que ratifica o rectifica (abajo).
+
 ## Lo que sigue: La Recorrida (12/11) — PROPUESTA, sin empezar
 
 La próxima tarea grande está escrita como consigna en `PROMPT-RECORRIDA.md`:
@@ -30,8 +65,8 @@ cierre, observación de plaga o malezas). Sale de lo visto del 10 al 12/11:
 los relojes fallan por el dato que falta, no por la cuenta. Absorbe el «modo
 recorrida» de Stock y es la semilla de Sanidad. Para una conversación nueva.
 
-Antes hace falta la Nueva versión del Apps Script y reubicar en el mapa las
-23 generaciones de Tica (las dos cosas, más abajo).
+Antes hace falta la Nueva versión del Apps Script y el lugar real en el mapa
+(arriba). **No** hace falta reubicar a mano lo ya plantado.
 
 ## Sectores partidos en Tica (13/11) — reubicar en el mapa
 

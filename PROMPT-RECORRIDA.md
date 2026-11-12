@@ -78,7 +78,9 @@ Leé primero, en este orden: `AMA\CLAUDE.md`, `produccion\CLAUDE.md`
    - «Hay cosecha para sacar» → estimación de kilos (stock en campo), con el
      número sugerido por el rinde del plan para corregir y no escribir.
    - «Se terminó / se perdió» → el cierre que ya existe, con su motivo.
-   - «Acá hay otra cosa» o «está vacío» → corrige la ubicación del plan.
+   - «Acá hay otra cosa» o «está vacío» → corrige el lugar REAL de esa
+     generación. El plan no se toca: queda como lo que se había decidido, para
+     comparar.
 4. **Anotar lo que se ve**: una observación corta por bancal con categoría
    (plaga o enfermedad, malezas, falta de agua, se está yendo en flor, buen
    estado) y gravedad. Es la semilla de Sanidad, que falta desde la app
@@ -170,9 +172,12 @@ Preguntale a Martín si ya están; si no, ayudalo con eso primero.
 1. **La Nueva versión del Apps Script** con lo del 11 y 12/11 (resiembras,
    cierres, rinde logrado). `python tools/version_servicio.py`, desde
    `produccion`, tiene que decir todo «al día».
-2. **Las 23 generaciones de Tica reubicadas en el mapa** después de partir los
-   sectores (Plan → Mapa, en la notebook). La Recorrida muestra lo que el mapa
-   dice: con el mapa vacío no hay nada que recorrer.
+2. **El lugar real en el mapa** (ver «El lugar: planificado y real» en
+   `PENDIENTES.md`). El mapa es el PLAN de dónde va cada generación; dónde se
+   plantó de verdad sale de Trasplantes y Siembras. La Recorrida ratifica o
+   rectifica: «está donde decía el plan» o «se plantó en otro lado». Sin esa
+   distinción la Recorrida pisaría el plan con lo real, o al revés. Lo ya
+   plantado no se reubica a mano.
 
 ## Lo que queda afuera, a propósito
 
