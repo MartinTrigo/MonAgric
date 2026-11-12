@@ -35,6 +35,83 @@ function estaUbicada(g) {
 const ubicacionPerdida = (g) => (g.sector && bancalesDe(g).length && !estaUbicada(g)
   ? `${g.sector} ${bancalesDe(g).join(", ")}` : "");
 
+/* ---- Lo planificado y lo plantado (13/11) ----
+   «Plan generaciones» guarda dónde se PLANIFICÓ cada generación: eso es el
+   mapa, y sirve para decidir la sucesión de cada bancal. Dónde se PLANTÓ
+   sale de los registros (Trasplantes, y Siembras si es directa) y llega del
+   servicio en lugar_real. Son dos cosas, como con las fechas:
+   - lo plantado es un hecho: se dibuja lleno y no se arrastra (se corrige
+     el registro, con ✎ en Trasplantes);
+   - lo planificado se dibuja en contorno cuando la generación terminó en
+     otro lado, y queda para comparar.
+   Qué bancal está ocupado se calcula con lo plantado si ya fue al campo, y
+   con lo planificado si todavía no (lugaresDe). */
+const colaReciente = () => {
+  const hace10 = Date.now() - 10 * 60000;
+  return pendientes.concat(enviados.filter((r) => Date.parse(r.enviado_en || "") > hace10));
+};
+
+// Dónde se plantó una generación: [{sector, bancal}], solo lugares que hoy
+// existen. Suma lo que este teléfono cargó y el servicio todavía no devolvió.
+function lugarReal(g) {
+  const out = [], vistos = new Set();
+  const poner = (sector, bancal) => {
+    const b = Number(bancal) || 0;
+    const s = b && sector ? sectores().find((x) => claveArea(x.sector) === claveArea(sector)) : null;
+    if (!s || b > (Number(s.bancales) || 0)) return;
+    const k = `${claveArea(s.sector)}|${b}`;
+    if (!vistos.has(k)) { vistos.add(k); out.push({ sector: s.sector, bancal: b }); }
+  };
+  (g.lugar_real || []).forEach((l) => (l.bancales || []).forEach((b) => poner(l.sector, b)));
+  const k = claveGen(g.cultivo, g.generacion);
+  colaReciente().forEach((r) => {
+    const d = r.datos || {};
+    const esSuyo = (r.tipo === "trasplantes" || (r.tipo === "siembras" && /directa/i.test(d.tipo || "")))
+      && claveGen(d.cultivo, d.generacion) === k;
+    if (esSuyo) poner(d.sector, d.bancal);
+  });
+  return out.sort((a, b) => a.sector.localeCompare(b.sector, "es") || a.bancal - b.bancal);
+}
+
+// Lo registrado en un lugar que hoy no existe (un sector con el nombre de antes).
+const lugarRealPerdido = (g) => (g.lugar_real || [])
+  .filter((l) => !sectores().some((x) => claveArea(x.sector) === claveArea(l.sector)))
+  .map((l) => `${l.sector} ${(l.bancales || []).join(", ")}`).join(" · ");
+
+// "Primavera A 3, 4 · Verano B 1"
+function textoDeLugares(lugares) {
+  const porSector = new Map();
+  lugares.forEach((l) => porSector.set(l.sector, (porSector.get(l.sector) || []).concat(l.bancal)));
+  return [...porSector.entries()].map(([s, bs]) => `${s} ${bs.join(", ")}`).join(" · ");
+}
+
+/* Los bancales que una generación ocupa: lo plantado o, si todavía no fue
+   al campo, lo planificado. Lo plantado es de la generación entera (cultivo
+   y número): si está partida en partes, se le cuenta a la primera y las
+   otras no ocupan nada, para no contarlo dos veces. Se calcula una vez por
+   lista de generaciones. */
+const lugaresMemo = new WeakMap();
+function plantadasDe(todas) {
+  let m = lugaresMemo.get(todas);
+  if (!m) {
+    m = new Map();
+    const duenia = new Map();
+    todas.slice().sort((a, b) => String(a.id).length - String(b.id).length || String(a.id).localeCompare(String(b.id)))
+      .forEach((x) => { const k = claveGen(x.cultivo, x.generacion); if (!duenia.has(k)) duenia.set(k, x.id); });
+    todas.forEach((x) => {
+      const real = lugarReal(x);
+      if (real.length) m.set(x.id, duenia.get(claveGen(x.cultivo, x.generacion)) === x.id ? real : []);
+    });
+    lugaresMemo.set(todas, m);
+  }
+  return m;
+}
+function lugaresDe(g, todas) {
+  const plantadas = plantadasDe(todas);
+  if (plantadas.has(g.id)) return plantadas.get(g.id);
+  return estaUbicada(g) ? bancalesDe(g).map((b) => ({ sector: g.sector, bancal: b })) : [];
+}
+
 function ocupacionDe(g) {
   const t = tramosDe(g);
   if (!t) return null;
@@ -56,8 +133,8 @@ function chocanCon(g, sector, bancales, todas) {
   if (!o) return [];
   const set = new Set(bancales);
   return todas.filter((x) => {
-    if (x.id === g.id || claveArea(x.sector) !== claveArea(sector)) return false;
-    if (!bancalesDe(x).some((b) => set.has(b))) return false;
+    if (x.id === g.id) return false;
+    if (!lugaresDe(x, todas).some((l) => claveArea(l.sector) === claveArea(sector) && set.has(l.bancal))) return false;
     const ox = ocupacionDe(x);
     return ox && ox.desde <= o.hasta && o.desde <= ox.hasta;
   });
@@ -148,8 +225,10 @@ function franjaLibre(g, sector, n, todas, e) {
 
 function mapaDeCultivos() {
   const todas = (leer(LS.generaciones, []) || []);
+  const plantadas = plantadasDe(todas);
+  // Con lugar en el plan (se dibujan), y sin lugar de ningún tipo (a ubicar).
   const asignadas = todas.filter(estaUbicada);
-  const sueltas = todas.filter((g) => !estaUbicada(g));
+  const sueltas = todas.filter((g) => !estaUbicada(g) && !plantadas.has(g.id));
   const sel = todas.find((g) => g.id === genSeleccionada);
   const e = escalaTemporada();
   const bloques = bloquesDelMapa();
@@ -174,9 +253,47 @@ function mapaDeCultivos() {
   }
   const hoyY = e.y(hoy());
 
+  // Lo plantado: un bloque lleno por cada tramo de bancales seguidos.
+  const plantadaEn = (g, sector) => {
+    const o = ocupacionDe(g);
+    if (!o) return "";
+    const top = Math.max(0, e.y(o.desde));
+    const fin = Math.min(e.alto, e.y(o.hasta));
+    if (fin <= top) return "";
+    const bs = (plantadas.get(g.id) || []).filter((l) => claveArea(l.sector) === claveArea(sector))
+      .map((l) => l.bancal).sort((a, b) => a - b);
+    const tramos = [];
+    bs.forEach((b) => {
+      const t = tramos[tramos.length - 1];
+      if (t && t[1] === b - 1) t[1] = b; else tramos.push([b, b]);
+    });
+    return tramos.map(([a, z]) => {
+      const ancho = (z - a + 1) * LZ.bancal;
+      const acostado = ancho >= 2 * LZ.bancal;
+      return `<div class="lz-puesta sembrada real${acostado ? " acostada" : ""}${
+        g.id === genSeleccionada ? " elegida" : ""}" data-real="${esc(g.id)}"
+        style="left:${(a - 1) * LZ.bancal}px;width:${ancho - 1}px;top:${top}px;
+               height:${fin - top}px;background:${colorEtapa(g.cultivo, "cosecha")}"
+        title="${esc(g.cultivo)} ${nombreGen(g)} · plantada en bancal ${a === z ? a : `${a} a ${z}`} · ${
+          fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}">
+        <span>${esc(g.cultivo)} ${nombreGen(g)}${acostado
+          ? `<small>${fechaCorta(o.desde)} – ${fechaCorta(o.hasta)}</small>` : ""}</span>
+      </div>`;
+    }).join("");
+  };
+  // ¿Lo planificado coincide con lo plantado? Entonces no hace falta contorno.
+  const planCumplido = (g) => {
+    const real = lugarReal(g);
+    return bancalesDe(g).every((b) => real.some((l) => claveArea(l.sector) === claveArea(g.sector) && l.bancal === b));
+  };
+
   const puesta = (g) => {
     const o = ocupacionDe(g);
     if (!o) return "";
+    // Ya está en el campo: lo planificado queda en contorno, solo si fue a
+    // parar a otro lado. No se arrastra: es lo que se había decidido.
+    const fantasma = lugarReal(g).length > 0;
+    if (fantasma && planCumplido(g)) return "";
     const bs = bancalesDe(g);
     const desdeB = Math.min(...bs), hastaB = Math.max(...bs);
     const top = Math.max(0, e.y(o.desde));
@@ -186,6 +303,14 @@ function mapaDeCultivos() {
     const ancho = (hastaB - desdeB + 1) * LZ.bancal;
     // Con dos bancales o más entra el nombre acostado; con uno, va parado.
     const acostado = ancho >= 2 * LZ.bancal;
+    if (fantasma) {
+      return `<div class="lz-puesta fantasma${acostado ? " acostada" : ""}"
+        style="left:${(desdeB - 1) * LZ.bancal}px;width:${ancho - 1}px;top:${top}px;height:${fin - top}px"
+        title="${esc(g.cultivo)} ${nombreGen(g)}: se había planificado acá (bancal ${bs.join(", ")}) y se plantó en ${
+          esc(textoDeLugares(lugarReal(g)))}">
+        <span>${esc(g.cultivo)} ${nombreGen(g)}</span>
+      </div>`;
+    }
     return `<div class="lz-puesta${sembrada ? " sembrada" : ""}${acostado ? " acostada" : ""}${
       g.id === genSeleccionada ? " elegida" : ""}" data-puesta="${esc(g.id)}"
       style="left:${(desdeB - 1) * LZ.bancal}px;width:${ancho - 1}px;top:${top}px;
@@ -199,11 +324,14 @@ function mapaDeCultivos() {
 
   const bloque = (b) => {
     const aqui = asignadas.filter((g) => claveArea(g.sector) === claveArea(b.sector));
+    const plantadasAqui = todas.filter((g) => (plantadas.get(g.id) || [])
+      .some((l) => claveArea(l.sector) === claveArea(b.sector)));
+    const cuantas = new Set(aqui.filter((g) => !plantadas.has(g.id)).concat(plantadasAqui).map((g) => g.id)).size;
     return `<div class="lz-bloque" data-bloque="${esc(b.sector)}"
                  style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px">
       <div class="lz-cab" data-agarrar="${esc(b.sector)}" title="Arrastrá para mover el sector">
         <span class="lz-asa">⠿</span><b>${esc(b.sector)}</b>
-        <span class="lz-dato">${b.n} bancales · ${aqui.length} generaciones</span>
+        <span class="lz-dato">${b.n} bancales · ${cuantas} generaciones</span>
       </div>
       <!-- Los números de bancal arriba: sin ellos hay que contar columnas
            para saber cuál es el 17. -->
@@ -218,8 +346,9 @@ function mapaDeCultivos() {
            style="left:${LZ.borde + LZ.meses}px;top:${LZ.cab}px;width:${b.n * LZ.bancal}px;
                   height:${e.alto}px;--bancal:${LZ.bancal}px">
         ${meses.slice(1).map((m) => `<i class="lz-linea-mes" style="top:${m.top}px"></i>`).join("")}
-        ${sel ? franjaLibre(sel, b.sector, b.n, todas, e) : ""}
+        ${sel && !plantadas.has(sel.id) ? franjaLibre(sel, b.sector, b.n, todas, e) : ""}
         ${aqui.map(puesta).join("")}
+        ${plantadasAqui.map((g) => plantadaEn(g, b.sector)).join("")}
         ${hoyY >= 0 && hoyY <= e.alto ? `<i class="lz-hoy" style="top:${hoyY}px"></i>` : ""}
         <div class="lz-previa"></div>
       </div>
@@ -231,11 +360,11 @@ function mapaDeCultivos() {
      y ✕ para sacarla del mapa. Antes una generación ubicada desaparecía de
      la lista y solo se la podía tocar en el mapa, si se la encontraba. */
   const porCultivo = new Map();
-  sueltas.concat(asignadas).forEach((g) => {
+  sueltas.concat(todas.filter((g) => !sueltas.includes(g))).forEach((g) => {
     if (!porCultivo.has(g.cultivo)) porCultivo.set(g.cultivo, []);
     porCultivo.get(g.cultivo).push(g);
   });
-  const faltanDe = (lista) => lista.filter((g) => !estaUbicada(g)).length;
+  const faltanDe = (lista) => lista.filter((g) => sueltas.includes(g)).length;
   // Primero los cultivos a los que les falta ubicar algo.
   const cultivosDeLaLista = [...porCultivo.entries()].sort((a, b) =>
     (faltanDe(b[1]) > 0) - (faltanDe(a[1]) > 0) || a[0].localeCompare(b[0], "es"));
@@ -243,16 +372,20 @@ function mapaDeCultivos() {
   const o = sel ? ocupacionDe(sel) : null;
   return `
   <div class="tarjeta">
-    <h2>Mapa de cultivos <small>${asignadas.length} de ${todas.length} ubicadas</small></h2>
+    <h2>Mapa de cultivos <small>${todas.length - sueltas.length} de ${todas.length} con lugar</small></h2>
     ${barraDePlan("mapa")}
 
     <div class="lz-estado">${sel
       ? `<b>${esc(sel.cultivo)} ${nombreGen(sel)}</b>
          <span>${Math.max(1, Math.round(Number(sel.camas) || 1))} bancal(es)${
            o ? ` · ${fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}` : ""}${
-           estaUbicada(sel) ? ` · ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}`
+           plantadas.has(sel.id) ? ` · plantada en ${esc(textoDeLugares(lugarReal(sel)))}${
+               estaUbicada(sel) ? ` · el plan decía ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}` : ""}`
+             : estaUbicada(sel) ? ` · planificada en ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}`
              : ubicacionPerdida(sel) ? ` · sin ubicar (estaba en ${esc(ubicacionPerdida(sel))}, que ya no existe)` : " · sin ubicar"}</span>
-         <span class="lz-ayuda">En verde, los bancales libres en esas fechas: tocá uno o arrastrala.</span>
+         <span class="lz-ayuda">${plantadas.has(sel.id)
+           ? "Ya está en el campo: su lugar sale de lo registrado. Si está mal, se corrige con ✎ en Trasplantes (o Siembras) → Últimos movimientos."
+           : "En verde, los bancales libres en esas fechas: tocá uno o arrastrala."}</span>
          ${estaUbicada(sel) ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
          <button type="button" class="secundario" id="cancelar-eleccion">Listo</button>`
       : `<span class="lz-ayuda">Arrastrá un sector por su título para acomodarlo como está
@@ -268,6 +401,9 @@ function mapaDeCultivos() {
           <button type="button" class="secundario" data-zoom="+" title="Acercar">+</button>
           <button type="button" class="secundario ajustar" id="ajustar-mapa"
                   title="Que entre todo el campo">Ajustar</button>
+          <span class="lz-leyenda"><i class="ley-plantado"></i>plantado
+            <i class="ley-planificado"></i>planificado
+            <i class="ley-fantasma"></i>se había planificado acá</span>
         </div>
         <div class="lz-vista" id="lz-vista">
           <div class="lz-lienzo" id="lz-lienzo">${bloques.map(bloque).join("")}</div>
@@ -286,25 +422,33 @@ function mapaDeCultivos() {
             faltanDe(lista) ? `${faltanDe(lista)} de ${lista.length}` : `${lista.length} ✓`}</span></summary>
         ${lista.map((g) => {
           const oc = ocupacionDe(g);
-          const ubicada = estaUbicada(g);
-          const perdida = ubicacionPerdida(g);
-          return `<div class="registro elegible lz-arrastrable${ubicada ? " ubicada" : ""}${g.id === genSeleccionada ? " elegida" : ""}"
+          const plantada = plantadas.has(g.id);
+          const real = plantada ? textoDeLugares(lugarReal(g)) : "";
+          const ubicada = !plantada && estaUbicada(g);
+          const perdida = plantada ? "" : ubicacionPerdida(g);
+          const registroViejo = lugarRealPerdido(g);
+          return `<div class="registro elegible${plantada ? " plantada" : " lz-arrastrable"}${ubicada || plantada ? " ubicada" : ""}${g.id === genSeleccionada ? " elegida" : ""}"
                        data-elegir="${esc(g.id)}" role="button" tabindex="0"
-                       title="${ubicada ? "Ya está en el mapa: arrastrala a otro bancal para moverla"
+                       title="${plantada ? "Ya está en el campo: tocala para verla en el mapa"
+                         : ubicada ? "Ya está en el mapa: arrastrala a otro bancal para moverla"
                          : "Arrastrala a un bancal, o tocala y después tocá el bancal"}">
             <div>
               <div class="detalle">${nombreGen(g, todas)} <span class="gen">${
                 Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)</span></div>
-              <div class="cuando">${ubicada ? `<b>${esc(g.sector)} ${bancalesDe(g).join(", ")}</b> · ` : ""}${
-                oc ? `${ubicada ? "" : "ocupa "}del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
+              <div class="cuando">${plantada ? `<b>plantada en ${esc(real)}</b> · `
+                  : ubicada ? `<b>${esc(g.sector)} ${bancalesDe(g).join(", ")}</b> · ` : ""}${
+                oc ? `${ubicada || plantada ? "" : "ocupa "}del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
                 : "sin fechas suficientes"}${
-                perdida ? `<br><span class="lz-perdida">estaba en ${esc(perdida)}, que ya no existe</span>` : ""}</div>
+                plantada && estaUbicada(g) && !planCumplido(g)
+                  ? `<br>el plan decía ${esc(g.sector)} ${bancalesDe(g).join(", ")}` : ""}${
+                perdida ? `<br><span class="lz-perdida">estaba en ${esc(perdida)}, que ya no existe</span>` : ""}${
+                registroViejo ? `<br><span class="lz-perdida">registrada en ${esc(registroViejo)}, que ya no existe</span>` : ""}</div>
             </div>
             ${ubicada ? `<button type="button" class="quitar editar" data-mover-ubicacion="${esc(g.id)}"
                 aria-label="Moverla" title="Elegirla para moverla a otro bancal">✎</button>
               <button type="button" class="quitar" data-quitar-ubicacion="${esc(g.id)}"
                 aria-label="Sacarla del mapa" title="Sacarla del mapa: vuelve a quedar sin ubicar">&times;</button>`
-              : `<span class="lz-asa">⠿</span>`}
+              : plantada ? "" : `<span class="lz-asa">⠿</span>`}
           </div>`;
         }).join("")}
       </details>`).join("")
@@ -517,6 +661,12 @@ function prepararMapa() {
       // Los botones de la fila (mover, sacar) no arrancan un arrastre.
       if (ev.button !== 0 || ev.target.closest("button")) return;
       ev.preventDefault();
+      // Lo ya plantado no se arrastra: se elige, para verlo en el mapa.
+      if (plantadasDe(todas).has(g.id)) {
+        genSeleccionada = genSeleccionada === g.id ? "" : g.id;
+        render("plan", true);
+        return;
+      }
       arrastrarGeneracion(ev, g, 0, null);
     };
     el.onkeydown = (k) => {
@@ -536,6 +686,14 @@ function prepararMapa() {
     if (ev.button !== 0) return;
     const puestaEl = ev.target.closest("[data-puesta]");
     const agarre = ev.target.closest("[data-agarrar]");
+    // Un bloque de lo plantado: se elige con un toque y no se mueve.
+    const realEl = ev.target.closest("[data-real]");
+    if (realEl) {
+      ev.preventDefault();
+      genSeleccionada = genSeleccionada === realEl.dataset.real ? "" : realEl.dataset.real;
+      render("plan", true);
+      return;
+    }
 
     if (puestaEl) {
       ev.preventDefault();
@@ -582,7 +740,7 @@ function prepararMapa() {
       alTocar: (t) => {
         // Un toque sobre un bancal con una generación elegida: va ahí.
         const g = todas.find((x) => x.id === genSeleccionada);
-        const d = g && bancalBajo(t.clientX, t.clientY);
+        const d = g && !plantadasDe(todas).has(g.id) && bancalBajo(t.clientX, t.clientY);
         if (d) ubicar(g, d.b.sector, d.b.n, d.bancal);
       },
     });

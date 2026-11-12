@@ -600,9 +600,10 @@ const plantillas = {
           // Qué bancales del sector tienen algo asignado. Es lo mismo que
           // dibuja el mapa, resumido a una miniatura que entra en un teléfono.
           const tomados = new Set();
-          (leer(LS.generaciones, []) || [])
-            .filter((g) => claveArea(g.sector) === claveArea(s.sector))
-            .forEach((g) => bancalesDe(g).forEach((x) => tomados.add(x)));
+          const todasLasGen = leer(LS.generaciones, []) || [];
+          todasLasGen.forEach((g) => lugaresDe(g, todasLasGen)
+            .filter((l) => claveArea(l.sector) === claveArea(s.sector))
+            .forEach((l) => tomados.add(l.bancal)));
           const sup = n * bancalM2(s.sector);
           return `<div class="croquis">
             <div class="croquis-cab">

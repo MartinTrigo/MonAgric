@@ -393,9 +393,10 @@ function panelGeneracion(g) {
     },
   ].filter(Boolean);
 
-  const lugar = g.sector && bancalesDe(g).length
-    ? `${esc(g.sector)} · bancal${bancalesDe(g).length > 1 ? "es" : ""} ${bancalesDe(g).join(", ")}`
-    : "sin ubicar en el mapa";
+  const plantada = textoDeLugares(lugarReal(g));
+  const delPlan = estaUbicada(g) ? `${esc(g.sector)} ${bancalesDe(g).join(", ")}` : "";
+  const lugar = plantada ? `plantada en ${esc(plantada)}${delPlan && delPlan !== esc(plantada) ? ` (el plan decía ${delPlan})` : ""}`
+    : delPlan ? `planificada en ${delPlan}` : "sin ubicar en el mapa";
 
   return `<aside class="panel-gen" role="dialog" aria-label="${esc(g.cultivo)} ${nombreGen(g)}">
     <div class="panel-cab">

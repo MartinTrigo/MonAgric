@@ -178,8 +178,10 @@ function stockAgrupado(lista, fecha) {
 // las ya sembradas: son las que de verdad están en el campo.
 function cultivosEnBancal(sector, bancal, fecha) {
   if (!sector || !bancal) return [];
-  return (leer(LS.generaciones, []) || [])
-    .filter((g) => g.sector === sector && bancalesDe(g).includes(Number(bancal)))
+  const todas = leer(LS.generaciones, []) || [];
+  // Lo plantado si ya fue al campo; si no, lo planificado (ver lugaresDe).
+  return todas
+    .filter((g) => lugaresDe(g, todas).some((l) => l.sector === sector && l.bancal === Number(bancal)))
     .filter((g) => { const o = ocupacionDe(g); return o && o.desde <= fecha && fecha <= o.hasta; })
     .sort((a, b) => Number(!!b.sembrada) - Number(!!a.sembrada));
 }
@@ -306,7 +308,7 @@ function tarjetaFormStock() {
         </div>
         <div>
           <label>Bancal</label>
-          <select name="bancal">${opcionesBancal(sector, bancal)}</select>
+          <select name="bancal" required>${opcionesBancal(sector, bancal)}</select>
         </div>
       </div></div>
       <div id="stock-en-lugar"${tipo === "En campo" ? " hidden" : ""}>

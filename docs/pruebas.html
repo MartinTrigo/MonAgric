@@ -750,6 +750,33 @@ almacenamiento del teléfono.</p>
       [{ sector: "Otoño", bancales: "1, 2" }, { sector: "Verano", bancales: "3" }, { sector: "", bancales: "" }].map(ubicacionPerdida),
       ["Otoño 1, 2", "", ""]);
 
+    // ---- Lo planificado y lo plantado (13/11) ----
+    {
+      const p = (id, n, sector, bancales, real) => ({ id, cultivo: "Repollo bco", generacion: n, sector, bancales,
+        fecha_almacigo: "2026-08-01", fecha_campo: "2026-09-05", camas: 1, sembrada: true, sembrada_el: "2026-08-01",
+        trasplantada_el: real ? "2026-09-06" : "", lugar_real: real || [] });
+      const lista = [
+        p("g1", 1, "Verano", "3", [{ sector: "Primavera", bancales: [7, 8] }]),     // planificada en un lado, plantada en otro
+        p("g1-b", 1, "Verano", "4", [{ sector: "Primavera", bancales: [7, 8] }]),   // la otra parte de la misma generación
+        p("g2", 2, "Verano", "5", null),                                            // todavía no fue al campo
+        p("g3", 3, "", "", [{ sector: "Otoño", bancales: [2] }, { sector: "Verano", bancales: [40] }]),  // registros en lugares que no existen
+      ];
+      igual("lugar real: lo que dicen los registros, solo en lugares que existen",
+        lista.map((x) => textoDeLugares(lugarReal(x))), ["Primavera 7, 8", "Primavera 7, 8", "", ""]);
+      igual("lugar real: de lo registrado con un nombre que ya no existe se avisa",
+        lugarRealPerdido(lista[3]), "Otoño 2");
+      igual("ocupa: lo plantado se le cuenta a la primera parte; sin plantar, lo planificado",
+        lista.map((x) => textoDeLugares(lugaresDe(x, lista))), ["Primavera 7, 8", "", "Verano 5", ""]);
+      const nueva = p("n", 9, "", "", null);
+      igual("mapa: choca con lo PLANTADO (Primavera 7) y ya no con donde se había planificado (Verano 3)",
+        [chocanCon(nueva, "Primavera", [7], lista).map((x) => x.id), chocanCon(nueva, "Verano", [3], lista).length,
+         chocanCon(nueva, "Verano", [5], lista).map((x) => x.id)], [["g1"], 0, ["g2"]]);
+      igual("formularios: sin sector no hay bancales para elegir, y nada viene elegido",
+        [opcionesBancal("").includes("<option>1</option>"), opcionesBancal("Verano").includes(" selected>Elegí"),
+         opcionesBancal("Verano", 3).includes("<option selected>3</option>"), (opcionesBancal("Verano").match(/<option/g) || []).length],
+        [false, true, true, 26]);
+    }
+
     igual("tablero: sin generaciones en el plan no se dibuja",
       conGeneraciones([], () => tarjetaTablero()), "");
     const html = conGeneraciones(gens, () => tarjetaTablero());

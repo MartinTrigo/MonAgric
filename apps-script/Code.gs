@@ -409,8 +409,11 @@ function atender(p) {
 
   // El panel y exportar son cosa de la administracion: van con la clave de
   // admin, que solo esta en las herramientas de escritorio de Martin.
-  if (p.panel || p.exportar || p.diagfechas) {
+  if (p.panel || p.exportar || p.diagfechas || p.lugares) {
     if (!esAdmin(p.clave)) return respuesta(rechazo("Esto es solo para la administración."));
+    // Corregir los lugares registrados despues de partir o renombrar sectores
+    // (tools/corregir_sectores.py). Sin aplicar=1 solo dice que cambiaria.
+    if (p.lugares) return respuesta(corregirLugares(chacra, JSON.parse(p.lugares), p.aplicar === "1"));
     if (p.diagfechas) return respuesta(diagnosticoFechas());
     if (p.panel) return respuesta(actualizarPanel(chacra));
     return respuesta({ ok: true, hoja: p.exportar, filas: exportarHoja(chacra, p.exportar) });
@@ -520,6 +523,9 @@ function atender(p) {
       // Tiene la hoja Cierres y Cosechas guarda la generacion (12/11). Sin
       // esto la app no ofrece terminar una generacion: quedaria en la cola.
       cfg.cierres = true;
+      // Las generaciones traen donde se plantaron de verdad (13/11): el mapa
+      // dibuja lo plantado sobre lo planificado.
+      cfg.lugar_real = true;
       // Los productos que se venden, para el stock de elaborados, fruta y
       // plantines (10/11). Sin precios. Solo si la chacra tiene su planilla
       // en PRODUCTOS_PLANILLAS; si falla la lectura, la app sigue sin lista.
@@ -1266,6 +1272,26 @@ function generacionesDelPlan(chacra) {
      Asi que: si quien carga la siembra anoto la generacion, se le cree. La
      fecha solo decide cuando nadie anoto ninguna generacion de ese cultivo,
      que es el caso de los registros viejos. */
+  /* DONDE SE PLANTO de verdad cada generacion (13/11): lo que dicen
+     Trasplantes y, en siembra directa, Siembras. "Plan generaciones" guarda
+     donde se PLANIFICO; son dos cosas, como con las fechas. El mapa dibuja lo
+     plantado sobre lo planificado, y calcula con lo plantado que bancal se
+     libera y cuando. Se junta por cultivo y generacion. */
+  var lugares = {};
+  var anotarLugar = function (llave, sector, bancal) {
+    var s = String(sector || "").trim(), b = Number(bancal) || 0;
+    if (!s || !b) return;
+    if (!lugares[llave]) lugares[llave] = {};
+    if (!lugares[llave][s]) lugares[llave][s] = {};
+    lugares[llave][s][b] = true;
+  };
+  var lugarReal = function (llave) {
+    var porSector = lugares[llave] || {};
+    return Object.keys(porSector).sort().map(function (s) {
+      return { sector: s, bancales: Object.keys(porSector[s]).map(Number).sort(function (a, b) { return a - b; }) };
+    });
+  };
+
   var ANTES = 10, DESPUES = 25;
   var siembras = [];
   var hs = libro.getSheetByName(HOJAS.siembras.nombre);
@@ -1276,6 +1302,10 @@ function generacionesDelPlan(chacra) {
         siembras.push({ id: String(f[0]), cultivo: claveCultivo(f[3]),
                         fecha: texto(f[2]), generacion: Number(f[6]) || 0,
                         resiembra: esResiembra_(f[21]) });
+        // Siembra directa: la siembra ES la ida al campo, y dice el bancal.
+        if (/directa/i.test(String(f[5] || ""))) {
+          anotarLugar(claveCultivo(f[3]) + "|" + (Number(f[6]) || 1), f[10], f[11]);
+        }
       });
   }
   /* La siembra de una generacion es la MAS TEMPRANA de las suyas, sin contar
@@ -1329,8 +1359,9 @@ function generacionesDelPlan(chacra) {
   var trasplantadas = { porSiembra: {}, porGeneracion: {} };
   var ht = libro.getSheetByName(HOJAS.trasplantes.nombre);
   if (ht && ht.getLastRow() > 1) {
-    ht.getRange(2, 1, ht.getLastRow() - 1, 11).getValues().forEach(function (f) {
+    ht.getRange(2, 1, ht.getLastRow() - 1, 13).getValues().forEach(function (f) {
       if (!f[0] || !f[2]) return;
+      anotarLugar(claveCultivo(f[8]) + "|" + (Number(f[10]) || 1), f[11], f[12]);
       var cuando = texto(f[2]);
       var poner = function (mapa, llave) {
         if (llave && (!mapa[llave] || cuando < mapa[llave])) mapa[llave] = cuando;
@@ -1371,6 +1402,8 @@ function generacionesDelPlan(chacra) {
         trasplantada_el: texto(f[5]) ? trasplantada : "",
         // Cuantas veces se resembro (11/11).
         resiembras: resiembras[claveCultivo(f[2]) + "|" + gen] || 0,
+        // Donde se planto (vacio si todavia no fue al campo).
+        lugar_real: lugarReal(claveCultivo(f[2]) + "|" + gen),
         variedad: String(f[13] || ""),
       };
     });
@@ -1643,6 +1676,120 @@ function seguimientoDe(chacra) {
   });
 
   return res;
+}
+
+// ---------- Corregir lugares cuando los sectores cambian ----------
+//
+// Los registros guardan el sector y el bancal como se llamaban el dia que se
+// cargaron. En Tica (13/11) los sectores de 27 bancales, 3 de ellos corredores
+// biologicos, pasaron a ser dos de 12 cada uno: "Primavera 14" ya no existe.
+// Esto traduce, en Siembras, Trasplantes, Stock y el plan, cada lugar viejo al
+// nuevo, y deja en Cambios como decia. Solo toca las dos celdas del lugar.
+//
+// tabla: { "Primavera": { quitar: [9, 21, 27],            los que ya no son bancal
+//                         en: ["Primavera A", "Primavera B"], de_a: 12 } }
+// El bancal viejo se corre un lugar por cada uno quitado antes que el, y
+// despues se reparte de a `de_a`. Un registro en un bancal quitado, o que cae
+// fuera de los sectores nuevos, NO se toca y se informa. Sin `aplicar` no
+// escribe nada: devuelve lo que haria.
+function corregirLugares(chacra, tabla, aplicar) {
+  var reglas = {};
+  Object.keys(tabla || {}).forEach(function (s) { reglas[claveNombre(s)] = tabla[s]; });
+  var traducir = function (sector, bancal) {
+    var r = reglas[claveNombre(sector)];
+    var b = Number(bancal) || 0;
+    if (!r) return null;                       // ese sector no cambia
+    if (!b) return { error: "sin bancal" };
+    var quitar = r.quitar || [];
+    if (quitar.indexOf(b) >= 0) return { error: "era un bancal quitado" };
+    var nuevo = b - quitar.filter(function (q) { return q < b; }).length;
+    var destino = (r.en || [])[Math.floor((nuevo - 1) / r.de_a)];
+    if (!destino) return { error: "queda fuera de los sectores nuevos" };
+    return { sector: destino, bancal: ((nuevo - 1) % r.de_a) + 1 };
+  };
+
+  var libro = planillaDe(chacra);
+  var informe = { ok: true, aplicado: !!aplicar, cambios: {}, detalle: [], sin_equivalencia: [] };
+  var paraCambios = [];
+  var anotar = function (hoja, id, de, a) {
+    informe.cambios[hoja] = (informe.cambios[hoja] || 0) + 1;
+    informe.detalle.push({ hoja: hoja, id: id, de: de, a: a });
+    paraCambios.push([new Date(), hoja, id, "lugar corregido", "administración",
+                      JSON.stringify({ antes: de, ahora: a })]);
+  };
+
+  var lock = LockService.getScriptLock();
+  if (aplicar) lock.waitLock(20000);
+  try {
+    // Una fila, un lugar: Siembras, Trasplantes y Stock.
+    [["siembras", 11, 12], ["trasplantes", 12, 13], ["stock", 7, 8]].forEach(function (x) {
+      var def = HOJAS[x[0]];
+      var hoja = libro.getSheetByName(def.nombre);
+      if (!hoja || hoja.getLastRow() < 2) return;
+      var n = hoja.getLastRow() - 1;
+      var ids = hoja.getRange(2, 1, n, 1).getValues();
+      var rango = hoja.getRange(2, x[1], n, 2);       // sector y bancal, juntos
+      var valores = rango.getValues();
+      var toco = false;
+      valores.forEach(function (v, i) {
+        if (!ids[i][0] || !v[0]) return;
+        var t = traducir(v[0], v[1]);
+        if (!t) return;
+        var de = String(v[0]) + " " + v[1];
+        if (t.error) { informe.sin_equivalencia.push({ hoja: def.nombre, id: String(ids[i][0]), lugar: de, motivo: t.error }); return; }
+        anotar(def.nombre, String(ids[i][0]), de, t.sector + " " + t.bancal);
+        v[0] = t.sector; v[1] = t.bancal; toco = true;
+      });
+      if (aplicar && toco) rango.setValues(valores);
+    });
+
+    // El plan: un sector y una lista de bancales. Solo si todos caen en un
+    // mismo sector nuevo; si no, hay que partir la generacion a mano.
+    var dp = HOJAS.generaciones;
+    var hp = libro.getSheetByName(dp.nombre);
+    if (hp && hp.getLastRow() > 1) {
+      var np = hp.getLastRow() - 1;
+      var idsP = hp.getRange(2, 1, np, 1).getValues();
+      var rangoP = hp.getRange(2, 9, np, 2);
+      var vp = rangoP.getValues();
+      var tocoP = false;
+      vp.forEach(function (v, i) {
+        if (!idsP[i][0] || !v[0] || !reglas[claveNombre(v[0])]) return;
+        var lista = String(v[1] instanceof Date ? "" : v[1] || "").split(",")
+          .map(function (b) { return parseInt(b, 10); }).filter(function (b) { return b > 0; });
+        var de = String(v[0]) + " " + lista.join(", ");
+        var t = lista.map(function (b) { return traducir(v[0], b); });
+        var malo = t.filter(function (y) { return !y || y.error; })[0];
+        var sectores = {};
+        t.forEach(function (y) { if (y && !y.error) sectores[y.sector] = true; });
+        if (!lista.length || malo || Object.keys(sectores).length !== 1) {
+          informe.sin_equivalencia.push({ hoja: dp.nombre, id: String(idsP[i][0]), lugar: de,
+            motivo: !lista.length ? "sin bancales" : malo ? malo.error : "queda repartida en dos sectores" });
+          return;
+        }
+        var nuevos = t.map(function (y) { return y.bancal; }).join(", ");
+        anotar(dp.nombre, String(idsP[i][0]), de, t[0].sector + " " + nuevos);
+        v[0] = t[0].sector; v[1] = nuevos; tocoP = true;
+      });
+      if (aplicar && tocoP) {
+        // Como texto: "4, 5" a secas la planilla lo vuelve una fecha.
+        hp.getRange(2, 10, np, 1).setNumberFormat("@");
+        rangoP.setValues(vp);
+      }
+    }
+
+    if (aplicar && paraCambios.length) {
+      var hc = obtenerHoja(libro, CAMBIOS);
+      hc.getRange(hc.getLastRow() + 1, 1, paraCambios.length, 6).setValues(paraCambios);
+    }
+  } finally {
+    if (aplicar) lock.releaseLock();
+  }
+  if (aplicar) {
+    olvidarPlan_(chacra);
+    CacheService.getScriptCache().removeAll(["resumen_" + chacra, "seguimiento_" + String(chacra).toLowerCase()]);
+  }
+  return informe;
 }
 
 function ultimosDeHoja(chacra, cual, cuantos) {

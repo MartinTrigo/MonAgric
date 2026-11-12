@@ -28,19 +28,21 @@
     camas: bancales.length, sector, bancales: bancales.join(", "), estado: "Planificado",
     sembrada: false, siembra_id: "", sembrada_el: "", trasplantada_el: "", variedad: "", ...extra,
   });
-  const sembrada = (id, el, trasplantada = "") => ({ sembrada: true, siembra_id: id, sembrada_el: el,
-                                                     trasplantada_el: trasplantada, estado: "Sembrado" });
+  // real: dónde se plantó de verdad (lo que dicen Trasplantes o la siembra
+  // directa), que puede no ser donde se había planificado.
+  const sembrada = (id, el, trasplantada = "", real = null) => ({ sembrada: true, siembra_id: id, sembrada_el: el,
+    trasplantada_el: trasplantada, estado: "Sembrado", lugar_real: real ? [{ sector: real[0], bancales: real[1] }] : [] });
 
   const generaciones = [
-    gen("Lechuga", 1, "2026-08-10", "2026-09-14", "Huerta A", [1, 2], sembrada("s-lech1", "2026-08-12", "2026-09-18")),
+    gen("Lechuga", 1, "2026-08-10", "2026-09-14", "Huerta A", [1, 2], sembrada("s-lech1", "2026-08-12", "2026-09-18", ["Huerta A", [1, 2]])),
     gen("Lechuga", 2, "2026-09-07", "2026-10-12", "Huerta A", [3, 4], sembrada("s-lech2", "2026-09-09")),
     gen("Lechuga", 3, "2026-10-05", "2026-11-09", "Huerta A", [5, 6]),
     gen("Lechuga", 4, "2026-11-02", "2026-12-07", "Huerta A", [7, 8]),
-    gen("Acelga", 1, "2026-08-11", "2026-09-15", "Huerta B", [1, 2], sembrada("s-ace1", "2026-08-13", "2026-09-30")),
+    gen("Acelga", 1, "2026-08-11", "2026-09-15", "Huerta B", [1, 2], sembrada("s-ace1", "2026-08-13", "2026-09-30", ["Huerta B", [3, 4]])),
     gen("Tomate", 1, "2026-08-17", "2026-10-20", "Invernadero", [1, 2, 3, 4], sembrada("s-tom1", "2026-08-20")),
     gen("Albahaca", 1, "2026-09-15", "2026-10-15", "Invernadero", [5, 6], sembrada("s-alb1", "2026-09-15")),
     gen("Zapallito", 1, "2026-10-08", "2026-11-07", "Huerta B", [5, 6, 7]),
-    gen("Habas", 1, "", "2026-07-20", "Huerta B", [10, 11, 12], sembrada("s-hab1", "2026-07-22")),
+    gen("Habas", 1, "", "2026-07-20", "Huerta B", [10, 11, 12], sembrada("s-hab1", "2026-07-22", "", ["Huerta B", [10, 11, 12]])),
     gen("Rabanito", 1, "", "2026-10-06", "Huerta A", [9]),
     gen("Rabanito", 2, "", "2026-10-27", "Huerta A", [10]),
     gen("Zanahoria", 1, "", "2026-10-12", "Huerta B", [14, 15]),
@@ -58,7 +60,7 @@
     integrantes: ["Ana", "Juan", "Lucía", "Pedro"],
     areas: [{ nombre: "Plantinera", estado: "activo" }],
     plan: [],
-    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true, repeticion: true, cierres: true,
+    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true, repeticion: true, cierres: true, lugar_real: true,
   };
 
   const siembra = (Id, Fecha, Cultivo, Variedad, g, Bandejas, Alveolos, Operador, planificada) => ({

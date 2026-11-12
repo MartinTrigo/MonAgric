@@ -44,17 +44,41 @@ Lo que mostraron los datos de Tica ese día:
 - Renombrar o partir un sector en Configuración no migra nada: trasplantes,
   siembras y stock (8 lugares vigentes) siguen diciendo el nombre viejo.
 
-Orden propuesto (falta el sí de Martín):
-1. **Que el bancal se elija siempre**: sin valor puesto de antemano en sector
-   y bancal. Chico, y corta el error en el origen.
-2. **El lugar real en el mapa**: el servidor arma, de Trasplantes y Siembras
-   enteras, dónde está cada generación; el mapa dibuja lo real (lleno) sobre
-   lo planificado (contorno) y calcula los bancales libres con lo real. Lo ya
-   plantado se ubica solo. Necesita la **tabla de equivalencias** de los
-   bancales viejos a los nuevos (la sabe Martín).
-3. **Planificar lo que falta**: las 37 generaciones sin lugar, con el mapa
-   mostrando qué bancal se libera y cuándo.
-4. **La Recorrida**, que ratifica o rectifica (abajo).
+**Hecho el 13/11 (v92), falta Nueva versión del Apps Script:**
+- Sector y bancal sin valor puesto de antemano en Siembras, Trasplantes y
+  Stock: hay que elegirlos.
+- El servicio manda dónde se plantó cada generación (`lugar_real`) y el mapa
+  lo dibuja lleno; lo planificado en otro lado queda en contorno. Los
+  bancales libres se calculan con lo plantado.
+- `tools/corregir_sectores.py`: traduce los lugares viejos en Siembras,
+  Trasplantes, Stock y el plan. Sin `--aplicar` solo muestra qué cambiaría.
+
+**Para corregir la planilla de Tica falta un dato de Martín: qué tres
+bancales de la numeración vieja (1 a 27) eran los corredores biológicos**, y
+si eran los mismos en los cuatro sectores. En la herramienta está puesto
+9, 21 y 27 (`QUITADOS`), deducido de cómo Martín pasó al mapa el plan viejo
+de Primavera, **sin confirmar**. Los datos solos no lo resuelven: probando
+todas las combinaciones, ninguna hace coincidir más de 11 de 20 generaciones
+de Primavera con lo que Martín ubicó en el mapa.
+
+Simulación del 13/11 con 9, 21 y 27: cambiarían 55 trasplantes, 5 siembras y
+16 filas de stock. Cuatro trasplantes están cargados justo en un bancal que
+sería corredor y no se tocarían: Brócoli G1 (Primavera 9), Morrón G1
+(Verano 9), Pak choi G2 (Verano 21) y Zapallo G1 (Otoño 9).
+
+**Ojo: lo registrado y lo que Martín ubicó de memoria no coinciden.** Aun
+traducido, de 25 generaciones con las dos cosas coinciden 6. Casi todas
+difieren por un bancal; el Zapallo G1 está registrado en Otoño y en el mapa
+en Invierno; en Verano lo registrado (bancales 2 a 5, 9, 10, 12) no se
+parece a lo ubicado. Es lo esperable con bancales difíciles de contar: son
+esos los casos que La Recorrida tiene que ratificar o rectificar. Hasta
+entonces el mapa los muestra como «plantado acá, planificado allá».
+
+Orden, una vez corregida la planilla:
+1. Mirar el mapa con lo plantado y lo planificado, y decidir caso por caso
+   cuál vale (corrigiendo el trasplante con ✎, o sacando el plan con ✕).
+2. Planificar en el mapa las generaciones que faltan sembrar.
+3. La Recorrida (abajo).
 
 ## Lo que sigue: La Recorrida (12/11) — PROPUESTA, sin empezar
 

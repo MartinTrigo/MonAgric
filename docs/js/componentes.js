@@ -16,12 +16,13 @@ function renglonBancal(i) {
     <div>
       ${i === 0 ? "<label>Sector</label>" : ""}
       <select name="sector_${i}" data-sector>
+        <option value="" disabled selected>Elegí…</option>
         ${secs.map((s) => `<option value="${esc(s.sector)}">${esc(s.sector)} (${s.bancales})</option>`).join("")}
       </select>
     </div>
     <div>
       ${i === 0 ? "<label>Bancal</label>" : ""}
-      <select name="bancal_${i}" data-bancal>${opcionesBancal(secs[0].sector)}</select>
+      <select name="bancal_${i}" data-bancal>${opcionesBancal("")}</select>
     </div>
     ${i === 0 ? "" : `<button type="button" class="quitar" data-quitar-bancal
         aria-label="Quitar este bancal">&times;</button>`}
@@ -309,12 +310,18 @@ function opcionesIntegrante(seleccionado = "") {
 // Cada sector tiene su propia cantidad de bancales, asi que la lista se rearma
 // al elegir sector. Antes salia siempre la del primero: en Chacra Tica eso
 // dejaba elegir solo del 1 al 6 (los del Frutillar) en sectores de 25 bancales.
+//
+// Ni el sector ni el bancal vienen elegidos (13/11): el primero de la lista
+// quedaba puesto, y hay siembras de Tica registradas en «Primavera 1» y
+// «Frutillar 1» que casi seguro son ese valor sin tocar. Ahora hay que
+// elegirlos; sin sector no hay bancales para elegir.
 function opcionesBancal(sector, seleccionado = "") {
-  const s = sectores().find((x) => x.sector === sector) || sectores()[0];
+  const s = sectores().find((x) => x.sector === sector);
   const n = s ? s.bancales : 0;
-  return Array.from({ length: n }, (_, i) => i + 1)
-    .map((b) => `<option${String(b) === String(seleccionado) ? " selected" : ""}>${b}</option>`)
-    .join("");
+  const elegido = Number(seleccionado) >= 1 && Number(seleccionado) <= n ? String(seleccionado) : "";
+  return `<option value="" disabled${elegido ? "" : " selected"}>${s ? "Elegí…" : "—"}</option>`
+    + Array.from({ length: n }, (_, i) => i + 1)
+      .map((b) => `<option${String(b) === elegido ? " selected" : ""}>${b}</option>`).join("");
 }
 
 function camposSectorBancal(idPrefijo = "") {
@@ -324,13 +331,14 @@ function camposSectorBancal(idPrefijo = "") {
     <div>
       <label>Sector</label>
       <select name="sector" id="${idPrefijo}sector">
+        <option value="" disabled selected>Elegí…</option>
         ${secs.map((s) => `<option value="${esc(s.sector)}">${esc(s.sector)} (${s.bancales} bancales)</option>`).join("")}
       </select>
     </div>
     <div>
       <label>Bancal</label>
       <select name="bancal" id="${idPrefijo}bancal">
-        ${opcionesBancal(secs[0].sector)}
+        ${opcionesBancal("")}
       </select>
     </div>
   </div>`;
@@ -342,11 +350,7 @@ function enlazarSectorBancal(form) {
   const ban = form.querySelector("select[name=bancal]");
   if (!sel || !ban) return;
   sel.addEventListener("change", () => {
-    const s = sectores().find((x) => x.sector === sel.value);
-    const n = s ? s.bancales : 15;
-    const previo = ban.value;
-    ban.innerHTML = Array.from({ length: n }, (_, i) => `<option>${i + 1}</option>`).join("");
-    if (Number(previo) <= n) ban.value = previo;
+    ban.innerHTML = opcionesBancal(sel.value, ban.value);
   });
 }
 

@@ -176,6 +176,13 @@ def main() -> None:
     else:
         print("  [ANTERIOR] terminar generaciones y rinde logrado (Cosechas no ofrece «Terminar una generación»)")
         viejas.append("terminar generaciones")
+    # 13/11: el plan trae donde se planto de verdad cada generacion.
+    con_lugar = sum(1 for g in pedir("generaciones=1&chacra=tica").get("generaciones", []) if g.get("lugar_real"))
+    if cf.get("lugar_real"):
+        print(f"  [al dia]   el lugar donde se planto cada generacion ({con_lugar} con lugar registrado en Tica)")
+    else:
+        print("  [ANTERIOR] el lugar donde se planto cada generacion (el mapa solo muestra lo planificado)")
+        viejas.append("el lugar real")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")

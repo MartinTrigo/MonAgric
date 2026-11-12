@@ -277,6 +277,36 @@ flor parecía un éxito en «Cosecha a hoy» y había rendido menos.
   más de lo que tardaron en Tica. Se sigue registrando y se ajusta con los
   datos de primavera.
 
+## El lugar: planificado y plantado (13/11)
+
+**El mapa es el plan**: dónde y cuándo va cada generación, y qué sigue en cada
+bancal cuando se libera. Después se ejecuta, y lo que cambie se rectifica
+(pedido de Martín, 12/11). Por eso el lugar tiene dos versiones, igual que
+las fechas:
+
+- **Planificado**: sector y bancales de «Plan generaciones». Se arrastra en
+  el mapa mientras la generación no fue al campo.
+- **Plantado**: lo que dicen los registros —Trasplantes y, en siembra
+  directa, Siembras—. Lo arma el servicio sobre las hojas enteras y viaja en
+  cada generación como `lugar_real` (`cfg.lugar_real`). Es un hecho: en el
+  mapa va lleno, no se arrastra, y se corrige corrigiendo el registro (✎).
+- Si se plantó en otro lado que el planificado, lo planificado queda en el
+  mapa **en contorno punteado**, para comparar. No se borra.
+- **Qué bancal está ocupado** se calcula con lo plantado si la generación ya
+  fue al campo y con lo planificado si no (`lugaresDe`, en `plan-mapa.js`).
+  Lo usan los choques del mapa, los bancales libres, el croquis de Plan y
+  «qué hay en este bancal» de Stock. `bancalesPlanificados` (lo que completa
+  el formulario de trasplante) sigue siendo el plan.
+- Lo plantado es de la generación entera (cultivo y número); si está partida
+  en partes se le cuenta a la primera.
+- **Sector y bancal no vienen elegidos en ningún formulario**
+  (`opcionesBancal`): venía puesto el primero de la lista y hay siembras de
+  Tica en «Primavera 1» y «Frutillar 1» que casi seguro son ese valor sin
+  tocar.
+- **Cuando los sectores cambian**, los registros viejos se traducen con
+  `tools/corregir_sectores.py` (`corregirLugares` en el servicio): toca solo
+  sector y bancal, deja copia en Cambios, y sin `--aplicar` solo simula.
+
 ## El mapa y los sectores que cambian (13/11)
 
 - **Una generación está ubicada solo si su lugar existe** (`estaUbicada`, en

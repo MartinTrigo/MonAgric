@@ -347,8 +347,7 @@ function prepararComunes() {
     const bancal = sel.closest("form")?.querySelector('select[name="bancal"]');
     if (!bancal) return;
     sel.addEventListener("change", () => {
-      const antes = bancal.value;
-      bancal.innerHTML = opcionesBancal(sel.value, antes);
+      bancal.innerHTML = opcionesBancal(sel.value, bancal.value);
     });
   });
 

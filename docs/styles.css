@@ -1916,3 +1916,16 @@ h3.subtitulo { font-size: .86rem; color: var(--sage-dark); margin: 14px 0 4px; }
 .registro.ubicada.elegida .detalle { color: var(--texto); }
 .lz-perdida { color: var(--amber-tx); }
 .gen-cultivo summary span.completo { color: var(--sage); }
+
+/* Mapa: lo plantado (lleno) y lo que se había planificado en otro lado (13/11). */
+.lz-puesta.real { cursor: pointer; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.28); }
+.lz-puesta.fantasma {
+  background: transparent; border: 1.5px dashed var(--tenue); pointer-events: none; z-index: 1;
+}
+.lz-puesta.fantasma span { color: var(--tenue); text-shadow: none; }
+.registro.plantada { cursor: pointer; }
+.lz-leyenda { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; color: var(--tenue); margin-left: 8px; flex-wrap: wrap; }
+.lz-leyenda i { display: inline-block; width: 13px; height: 11px; border-radius: 2px; margin-left: 7px; }
+.ley-plantado { background: var(--sage); box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.28); }
+.ley-planificado { background: var(--sage-light); }
+.ley-fantasma { border: 1.5px dashed var(--tenue); }

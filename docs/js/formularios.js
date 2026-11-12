@@ -214,6 +214,7 @@ function prepararSiembras() {
     } else if (f.sector) {
       datos.sector = f.sector.value;
       datos.bancal = parseInt(f.bancal.value, 10) || 0;
+      if (!datos.sector || !datos.bancal) return aviso("Elegí el sector y el bancal donde se sembró.", true);
     }
 
     if (!leer(LS.nombre, "")) escribir(LS.nombre, datos.operador);
@@ -433,6 +434,7 @@ function prepararTrasplantes() {
     const planificada = genPlan ? (tramosDe(genPlan)?.plan.campo || "") : "";
     const lugares = destinos();
     if (!lugares.length) return aviso("Elegí al menos un bancal.", true);
+    if (lugares.some((l) => !l.sector || !l.bancal)) return aviso("Falta elegir el sector o el bancal en algún renglón.", true);
     escribir(LS.nombre, f.operador.value);
 
     // Una fila por bancal: comparten siembra de origen, fecha y marco, pero
