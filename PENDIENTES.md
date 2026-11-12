@@ -21,6 +21,18 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## LEER PRIMERO: `PROMPT-CONTINUAR.md` (13/11)
+
+Tiene el orden de trabajo y las decisiones ya tomadas, y manda sobre lo que
+diga este archivo más abajo. Resumen: (1) guardar el lugar plantado en la
+generación, con fecha de verificación, en vez de deducirlo de registros con
+bancales mal contados; (2) frenar el error de bancal al cargarlo; (3) una
+semana de uso real sin funciones nuevas; (4) lista de bancales que se
+liberan; (5) La Recorrida, con sus cinco decisiones ya propuestas.
+
+Dato del 13/11: con los corredores en 1, 14 y 27, de 24 generaciones con
+registro y lugar en el mapa coinciden 4. No se corrige con una fórmula.
+
 ## El lugar: planificado y real (12/11) — ANÁLISIS, va ANTES de La Recorrida
 
 Martín (12/11): el mapa es para **planificar** dónde y cuándo va cada
