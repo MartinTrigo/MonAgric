@@ -180,12 +180,34 @@ var HOJAS = {
   // totales por cultivo; el rendimiento sale despues contra el plan.
   cosechas: {
     nombre: "Cosechas",
+    // "Generación" (12/11), al final y optativa: de que generacion salio. La
+    // app la pone sola cuando ese cultivo tiene una sola generacion en el
+    // campo; si no, queda vacia ("sin asignar") y se reparte al terminar la
+    // generacion (hoja Cierres).
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Kg", "Cosechó",
-                  "Cargado por", "Recibido"],
+                  "Cargado por", "Recibido", "Generación"],
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.kg,
-              d.operador || "", r.dispositivo || "", new Date()];
+              d.operador || "", r.dispositivo || "", new Date(), numeroOVacio(d.generacion)];
+    },
+  },
+  /* Cuando una generacion se termina (12/11): se cosecho entera, o se perdio
+     o se levanto antes (se fue en flor, plaga, malezas, no germino...). Una
+     fila por generacion, con el motivo y los KILOS QUE DIO EN TOTAL. De ahi
+     sale el rinde logrado: kilos contra lo que se esperaba de esos bancales,
+     que no depende de ninguna fecha. Reabrir una generacion es borrar su
+     fila (queda copia en Cambios). Si quedaran dos filas de la misma, vale
+     la ultima. */
+  cierres: {
+    nombre: "Cierres",
+    encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Generación", "Motivo", "Kg",
+                  "Observaciones", "Cerró", "Cargado por", "Recibido"],
+    fila: function (r) {
+      var d = r.datos;
+      return [r.id, r.temporada || "", d.fecha, d.cultivo, d.generacion || 1, d.motivo || "",
+              numeroOVacio(d.kg), d.observaciones || "", d.operador || "",
+              r.dispositivo || "", new Date()];
     },
   },
   // Stock (23/10): una FOTO de lo que hay, no una cuenta de entradas y
@@ -495,6 +517,9 @@ function atender(p) {
       // generacion. Contra una version anterior la app no ofrece el campo: la
       // fila se guardaria como una siembra comun.
       cfg.repeticion = true;
+      // Tiene la hoja Cierres y Cosechas guarda la generacion (12/11). Sin
+      // esto la app no ofrece terminar una generacion: quedaria en la cola.
+      cfg.cierres = true;
       // Los productos que se venden, para el stock de elaborados, fruta y
       // plantines (10/11). Sin precios. Solo si la chacra tiene su planilla
       // en PRODUCTOS_PLANILLAS; si falla la lectura, la app sigue sin lista.
@@ -1403,7 +1428,7 @@ function fichaDeCultivo(chacra, cultivo) {
 
   var cosechas = leer(HOJAS.cosechas, 3, function (f) {
     return { id: String(f[0]), fecha: texto(f[2]), kg: Number(f[4]) || 0,
-             operador: String(f[5] || "") };
+             operador: String(f[5] || ""), generacion: Number(f[8]) || "" };
   });
 
   var kg = 0;
@@ -1497,6 +1522,10 @@ function temporadaDe_(libro, chacra) {
      Con esto la app propone la generacion que sigue y no deja cargar dos
      veces la misma por error, tambien en cultivos que no estan en el plan.
    - resiembras: cada resiembra, con su motivo.
+   - kg_generacion: los kilos cosechados que dicen de que generacion son
+     ("hakusai|1": 20); kg_sin_asignar: por cultivo, los que no lo dicen.
+   - cierres: las generaciones terminadas, con su motivo y los kilos que
+     dieron (hoja Cierres).
    - futuras: registros con fecha posterior a hoy (un mes mal tipeado).
    - ultimo: el ultimo dia con algo cargado en cada hoja.
    Solo cuenta lo fechado dentro de la temporada. */
@@ -1530,7 +1559,7 @@ function seguimientoDe(chacra) {
 
   var res = { ok: true, desde: t.desde, hasta: t.hasta, hoy: t.hoy, cosechas: [],
               kg_cosechados: 0, no_propias: [], repetidas: [], futuras: [], ultimo: {},
-              sembradas: {}, resiembras: [] };
+              sembradas: {}, resiembras: [], kg_generacion: {}, kg_sin_asignar: {}, cierres: [] };
   var anotar = function (hoja, cultivo, fecha) {
     if (fecha > t.hoy) {
       if (res.futuras.length < 20) res.futuras.push({ hoja: hoja, cultivo: cultivo, fecha: fecha });
@@ -1542,11 +1571,15 @@ function seguimientoDe(chacra) {
 
   // Cosechas: Id, Temporada, Fecha, Cultivo, Kg.
   var porSemana = {}, nombres = {};
-  filasDe(HOJAS.cosechas, 5).forEach(function (f) {
+  var sumar = function (mapa, llave, kg) { mapa[llave] = Math.round(((mapa[llave] || 0) + kg) * 100) / 100; };
+  filasDe(HOJAS.cosechas, 9).forEach(function (f) {
     var fecha = texto(f[2]), cultivo = String(f[3] || "").trim(), kg = Number(f[4]) || 0;
     if (!cultivo || !enTemporada(fecha) || !anotar("cosechas", cultivo, fecha) || !kg) return;
     var k = claveCultivo(cultivo);
     if (!nombres[k]) nombres[k] = cultivo;
+    var gen = Number(f[8]) || 0;
+    if (gen) sumar(res.kg_generacion, k + "|" + gen, kg);
+    else sumar(res.kg_sin_asignar, k, kg);
     var llave = lunesDe(fecha) + "|" + k;
     porSemana[llave] = (porSemana[llave] || 0) + kg;
     res.kg_cosechados += kg;
@@ -1592,6 +1625,15 @@ function seguimientoDe(chacra) {
     var g = porGeneracion[k];
     var dias = (new Date(g.hasta + "T12:00:00Z") - new Date(g.desde + "T12:00:00Z")) / 86400000;
     if (g.veces > 1 && dias > 7) res.repetidas.push(g);
+  });
+
+  // Cierres: Fecha 2, Cultivo 3, Generacion 4, Motivo 5, Kg 6, Observaciones 7.
+  filasDe(HOJAS.cierres, 8).forEach(function (f) {
+    var fecha = texto(f[2]), cultivo = String(f[3] || "").trim();
+    if (!cultivo || !enTemporada(fecha)) return;
+    res.cierres.push({ id: String(f[0]), fecha: fecha, cultivo: cultivo,
+                       generacion: Number(f[4]) || 1, motivo: String(f[5] || ""),
+                       kg: Number(f[6]) || 0, observaciones: String(f[7] || "") });
   });
 
   // Trasplantes: Fecha 2, Cultivo 8.
@@ -1689,7 +1731,7 @@ function stockDe(chacra, fecha, desde) {
 // Nada se pierde: cada cambio deja la fila COMO ESTABA en la hoja "Cambios"
 // de la chacra, con quien lo hizo y cuando. Si alguien borra algo por error,
 // se recupera copiando esa fila de vuelta.
-var CORREGIBLES = { siembras: 1, trasplantes: 1, cosechas: 1, horas: 1, stock: 1 };
+var CORREGIBLES = { siembras: 1, trasplantes: 1, cosechas: 1, horas: 1, stock: 1, cierres: 1 };
 var CAMBIOS = { nombre: "Cambios",
                 encabezados: ["Cuándo", "Hoja", "Id", "Qué", "Quién", "Cómo estaba"] };
 

@@ -88,9 +88,9 @@ verde con las cuentas nuevas; `version_servicio.py` reconoce el endpoint.
   origen Propio) y rinde real contra el de referencia, con el botón «usar este
   número la temporada que viene» (escribe en la planilla del catálogo de esa
   chacra, no en el compartido).
-- **Cosecha con generación y sector opcionales**, sugeridos por la app (la que
-  está en ventana): es el único dato nuevo que se pide, y destraba el rinde
-  por generación y por bancal.
+- ~~Cosecha con generación~~ **hecho el 12/11 (v90)**, junto con terminar una
+  generación y el reloj de rinde logrado: ver `CLAUDE.md`. Falta el sector
+  (rinde por bancal y no solo por generación).
 - Aviso al cargar una siembra si esa generación ya tiene una.
 
 ## Etapa 3 — Relojes de sustentabilidad y la araña

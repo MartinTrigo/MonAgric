@@ -169,6 +169,13 @@ def main() -> None:
     else:
         print("  [ANTERIOR] resiembras y generacion sugerida (el formulario no ofrece «Esta siembra es»)")
         viejas.append("las resiembras")
+    # 12/11: terminar una generacion (hoja Cierres) y la generacion en Cosechas.
+    if cf.get("cierres") and "cierres" in sg:
+        print(f"  [al dia]   terminar generaciones y rinde logrado "
+              f"({len(sg.get('cierres') or [])} generaciones terminadas en Tica)")
+    else:
+        print("  [ANTERIOR] terminar generaciones y rinde logrado (Cosechas no ofrece «Terminar una generación»)")
+        viejas.append("terminar generaciones")
     if cf.get("horas_por_servicio"):
         print(f"  [al dia]   las horas de Tica entran por el servicio "
               f"({len(cf.get('nombres_horas') or [])} nombres en la planilla de horas)")

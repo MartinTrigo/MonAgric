@@ -56,6 +56,8 @@ function almacigosPendientes() {
     .filter((s) => /almácigo|almacigo/i.test(s.tipo || ""))
     .filter((s) => !yaHechos.has(s.id))
     .filter((s) => (vistos.has(s.id) ? false : vistos.add(s.id)))
+    // Una generación terminada (el almácigo que falló) ya no espera nada.
+    .filter((s) => !cierreDe(s))
     // Cuándo va al bancal: la siembra real más los días en bandeja del plan
     // (ver trasplantePrevisto), no lo que se estimó el día que se cargó.
     .map((s) => Object.assign(s, { objetivo: trasplantePrevisto(s) }))

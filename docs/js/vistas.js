@@ -514,6 +514,7 @@ const plantillas = {
         <button class="principal">Guardar cosecha</button>
       </form>
     </div>
+    ${parte("cierres", tarjetaCierres())}
     ${parte("historial", historialDe("cosechas"))}`;
   },
 

@@ -243,6 +243,40 @@ etapa 1 de `PROMPT-TABLERO.md`.
 - Una generación es una **fecha de siembra**, no una variedad: tres variedades
   sembradas el mismo día son una generación con tres tandas.
 
+## Terminar una generación y rinde logrado (12/11)
+
+Dos preguntas distintas, dos medidas: **¿venimos a tiempo?** (Cosecha a hoy,
+Ritmo, Puntualidad) y **¿los bancales rinden lo esperado?** (Rinde logrado).
+La segunda no mira fechas: el Hakusai que se cosechó antes porque se fue en
+flor parecía un éxito en «Cosecha a hoy» y había rendido menos.
+
+- **Una generación se termina** en Cosechas → «Terminar una generación»
+  (`js/cierres.js`): cómo terminó (cosecha completa, se fue en flor, plaga o
+  enfermedad, malezas, no germinó, clima, otro) y **los kilos que dio en
+  total**. Va a la hoja **Cierres**, una fila por generación (cultivo +
+  número: las partes de una generación partida se cierran juntas). Reabrir
+  es borrar esa fila.
+- **Rinde logrado** = kilos de los cierres ÷ kilos esperados de esos bancales
+  (`rindeLogrado`, sobre `ventanasDeCosecha`).
+- **La cosecha puede decir de qué generación es** (columna «Generación» de
+  Cosechas, optativa). La app la pone sola únicamente cuando ese cultivo
+  tiene una sola generación abierta en el campo (`generacionEnCosecha`); si
+  no, queda sin asignar y se reparte al cerrar: el formulario de cierre
+  propone lo asignado más lo que queda sin asignar (`kgSinAsignar`).
+- **Lo que cambia al terminar**: sale de «Para trasplantar», su etapa sin
+  hacer deja de contar en el Ritmo, `tramosDe` la corta en la fecha de cierre
+  (libera el bancal en el mapa y en Stock por semana; lo previsto queda en
+  `sinCierre`) y **se espera todo de ella desde ese día** (`esperadoAl`): así
+  la pérdida se ve en «Cosecha a hoy» en vez de borrarse.
+- Los cierres llegan con `?seguimiento=1`. La app suma encima los de su cola
+  y los enviados hace menos de diez minutos (`cierresVigentes`); después
+  manda la planilla.
+- Todo aparece solo si el servicio lo guarda (`cfg.cierres`).
+- **El catálogo no se toca hasta el verano** (decidido el 12/11): los días de
+  trasplante a cosecha del Hakusai (105) y del Mix de hojas (52) son mucho
+  más de lo que tardaron en Tica. Se sigue registrando y se ajusta con los
+  datos de primavera.
+
 ## Stock: una foto, no una cuenta (23/10)
 
 - Cada registro dice "esto había acá, este día". **Lo vigente de un lugar es

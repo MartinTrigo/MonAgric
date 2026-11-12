@@ -63,7 +63,7 @@ function etapasDelPlan(gens, noPropias = new Set()) {
       const ya = etapas.get(k);
       if (!ya) {
         etapas.set(k, { tipo, cultivo: g.cultivo, generacion: Number(g.generacion) || 1,
-                        plan, real: real || "", mide });
+                        plan, real: real || "", mide, cerrada: !!t.cerrada });
         return;
       }
       if (plan < ya.plan) ya.plan = plan;
@@ -77,9 +77,11 @@ function etapasDelPlan(gens, noPropias = new Set()) {
 }
 
 /* Ritmo del plan: de las etapas que tocaban hasta hoy, cuántas se hicieron.
-   Se mueve desde el primer día de la temporada, antes de cosechar nada. */
+   Se mueve desde el primer día de la temporada, antes de cosechar nada. Lo
+   que quedó sin hacer en una generación terminada (el trasplante de un
+   almácigo que falló) ya no toca. */
 function ritmoDelPlan(etapas, hoyISO) {
-  const tocaban = etapas.filter((e) => e.plan <= hoyISO);
+  const tocaban = etapas.filter((e) => e.plan <= hoyISO && (e.real || !e.cerrada));
   const hechas = tocaban.filter((e) => e.real);
   return {
     tocaban: tocaban.length, hechas: hechas.length,
@@ -117,20 +119,27 @@ function ventanasDeCosecha(gens, plan = []) {
     const rinde = Number(fila.rinde_kg_m2) || Number((perfil(g.cultivo) || {}).rinde_ref_kg_m2) || 0;
     const kg = camas * bancalM2(g.sector) * rinde;
     if (!kg) return;
-    const aCosecha = diasEntre(t.campo, t.inicioCosecha) || 0;
-    const dura = diasEntre(t.inicioCosecha, t.fin) || DIAS_EN_COSECHA_SUPUESTOS;
+    // Los días son los previstos, aunque la generación se haya terminado antes.
+    const s = t.sinCierre || t;
+    const aCosecha = diasEntre(s.campo, s.inicioCosecha) || 0;
+    const dura = diasEntre(s.inicioCosecha, s.fin) || DIAS_EN_COSECHA_SUPUESTOS;
     const desde = masDias(t.plan.campo, aCosecha);
-    out.push({ cultivo: g.cultivo, kg, desde, hasta: masDias(desde, dura), dias: dura });
+    out.push({ cultivo: g.cultivo, generacion: Number(g.generacion) || 1, camas, kg, desde,
+               hasta: masDias(desde, dura), dias: dura, cerrada: t.cerrada || "" });
   });
   return out;
 }
 
-// Los kilos que el plan esperaba tener cosechados hasta esa fecha (inclusive).
+/* Los kilos que el plan esperaba tener cosechados hasta esa fecha
+   (inclusive). De una generación TERMINADA se espera todo desde el día en
+   que se cerró: ya no va a dar más. Sin esto, lo que se levanta antes de
+   tiempo (el Hakusai que se fue en flor) figuraba como kilos de más. */
 function esperadoAl(ventanas, fecha, cultivo = "") {
   const k = cultivo ? claveArea(cultivo) : "";
   let kg = 0;
   ventanas.forEach((v) => {
     if (k && claveArea(v.cultivo) !== k) return;
+    if (v.cerrada && fecha >= v.cerrada) { kg += v.kg; return; }
     const pasados = diasEntre(v.desde, fecha) + 1;
     kg += v.kg * Math.max(0, Math.min(1, pasados / v.dias));
   });
@@ -172,11 +181,12 @@ function cosechaPorCultivo(ventanas, cosechas, hoyISO, finISO) {
   const filas = new Map();
   const fila = (cultivo) => {
     const k = claveArea(cultivo);
-    if (!filas.has(k)) filas.set(k, { cultivo, esperado: 0, real: 0, total: 0 });
+    if (!filas.has(k)) filas.set(k, { cultivo, esperado: 0, real: 0, total: 0, desde: "" });
     return filas.get(k);
   };
   ventanas.forEach((v) => {
     const x = fila(v.cultivo);
+    if (!x.desde || v.desde < x.desde) x.desde = v.desde;
     x.esperado += esperadoAl([v], hoyISO);
     x.total += esperadoAl([v], finISO);
   });
@@ -280,6 +290,8 @@ function datosDelTablero() {
     porCultivo: cosechaPorCultivo(ventanas, cosechas, hoyISO, masDias(hasta, -1)),
     primeraCosecha: ventanas.map((v) => v.desde).sort()[0] || "",
     revisar: datosParaRevisar({ etapas, vencidos, seg, ventanas, hoyISO }),
+    rinde: rindeLogrado(ventanas, cierresVigentes()),
+    hayCierres: !!CFG?.cierres,
   };
 }
 
@@ -313,11 +325,11 @@ const pctTexto = (p) => `${num(p)}<small>%</small>`;
 const plural = (n, uno, muchos) => `${num(n)} ${n === 1 ? uno : muchos}`;
 
 function relojesDelTablero(d) {
-  const { ritmo, puntualidad: p, serie, revisar } = d;
+  const { ritmo, puntualidad: p, serie, revisar, rinde } = d;
   const h = serie.hoy;
   const tocaCosecha = h && h.plan >= 1;
   const pctCosecha = tocaCosecha ? (h.real / h.plan) * 100 : null;
-  return `<div class="relojes">
+  return `<div class="relojes${d.hayCierres ? " cinco" : ""}">
     ${reloj("ritmo", {
       pct: ritmo.pct, titulo: "Ritmo del plan",
       valor: ritmo.pct === null ? "—" : pctTexto(ritmo.pct),
@@ -342,6 +354,12 @@ function relojesDelTablero(d) {
       valor: revisar.pct === null ? "—" : pctTexto(revisar.pct),
       detalle: revisar.senales.length ? `${plural(revisar.senales.length, "cosa", "cosas")} para revisar` : "nada para revisar",
     })}
+    ${d.hayCierres ? reloj("rinde", {
+      pct: rinde.pct, titulo: "Rinde logrado",
+      valor: rinde.pct === null ? "—" : pctTexto(rinde.pct),
+      detalle: rinde.pct === null ? "todavía no se terminó ninguna generación"
+        : `${num(rinde.kg)} de ${num(rinde.esperado)} kg en ${plural(rinde.filas.filter((f) => f.esperado > 0).length, "generación terminada", "generaciones terminadas")}`,
+    }) : ""}
   </div>`;
 }
 
@@ -448,7 +466,8 @@ function detalleCosecha(d) {
       Lo esperado reparte los kilos de cada generación en los días que dura su cosecha.</p>
     ${filas.slice(0, TOPE).map((x) => `<div class="bala">
       <div class="bala-cab"><b>${esc(x.cultivo)}</b>
-        <span>${num(x.real)} de ${num(x.esperado)} kg</span></div>
+        <span>${x.esperado >= 0.5 ? `${num(x.real)} de ${num(x.esperado)} kg`
+          : `${num(x.real)} kg · el plan la esperaba ${x.desde ? "desde el " + diaMes(x.desde) : "más adelante"}`}</span></div>
       <div class="bala-pista">
         <i style="width:${((x.real / maximo) * 100).toFixed(1)}%"></i>
         ${x.esperado >= 0.5 ? `<u style="left:${((x.esperado / maximo) * 100).toFixed(1)}%"></u>` : ""}
@@ -503,6 +522,42 @@ function detallePuntualidad(d) {
   </div>`;
 }
 
+/* Rinde logrado: una barra por generación terminada. La barra es lo que dio
+   y la marca, lo que se esperaba de sus bancales. No depende de fechas: dice
+   si el bancal rindió, no si llegó a tiempo. */
+function detalleRinde(d) {
+  const { filas, motivos } = d.rinde;
+  if (!filas.length) {
+    return `<div class="reloj-panel">
+      <p class="nota">Todavía no se terminó ninguna generación. Cuando un bancal se termina de cosechar,
+        se pierde o se levanta antes, se cierra en Cosechas diciendo cómo terminó y cuántos kilos dio.</p>
+      <button type="button" class="secundario chico" data-ir-seccion="cosechas" style="margin-bottom:8px">Terminar una generación</button>
+    </div>`;
+  }
+  const TOPE = 10;
+  const maximo = Math.max(...filas.map((f) => Math.max(f.esperado, f.kg)), 1);
+  return `<div class="reloj-panel">
+    <p class="nota">De cada generación terminada: la barra es lo que dio y la marca, lo que se esperaba de sus bancales.
+      No mira fechas: dice si el bancal rindió.</p>
+    ${filas.slice(0, TOPE).map((f) => `<div class="bala">
+      <div class="bala-cab"><b>${esc(f.cultivo)} <span class="gen">G${f.generacion}</span></b>
+        <span>${num(f.kg)}${f.esperado ? ` de ${num(f.esperado)} kg · ${num(f.pct)}%` : " kg"}</span></div>
+      <div class="bala-pista${f.motivo === COSECHA_COMPLETA ? "" : " perdida"}">
+        <i style="width:${((f.kg / maximo) * 100).toFixed(1)}%"></i>
+        ${f.esperado ? `<u style="left:${((f.esperado / maximo) * 100).toFixed(1)}%"></u>` : ""}
+      </div>
+      <div class="cuando">${esc(f.motivo.toLowerCase())}${
+        f.bancales ? ` · ${num(f.kg / f.bancales)} kg por bancal${f.esperado ? ` (esperaba ${num(f.esperado / f.bancales)})` : ""}` : ""}${
+        f.faltaban ? ` · ${f.faltaban} días antes de lo previsto` : ""}</div>
+    </div>`).join("")}${tantosMas(filas, TOPE)}
+    ${motivos.length ? `<h3 class="subtitulo">Lo que no fue cosecha completa</h3>
+      ${motivos.map((m) => `<div class="registro"><div class="detalle senal">${esc(m.motivo)}</div>
+        <span class="etiqueta espera">${plural(m.generaciones, "generación", "generaciones")}${
+          m.faltaron >= 1 ? ` · faltaron ${num(m.faltaron)} kg` : ""}</span></div>`).join("")}` : ""}
+    <button type="button" class="secundario chico" data-ir-seccion="cosechas" style="margin:8px 0">Terminar otra generación</button>
+  </div>`;
+}
+
 const SECCION_DE = { siembras: "Siembras", trasplantes: "Trasplantes", cosechas: "Cosechas" };
 
 function detalleRevisar(d) {
@@ -525,8 +580,8 @@ function detalleRevisar(d) {
 function tarjetaTablero() {
   const d = datosDelTablero();
   if (!d) return "";
-  const detalle = { ritmo: detalleRitmo, cosecha: detalleCosecha,
-                    puntualidad: detallePuntualidad, revisar: detalleRevisar }[relojAbierto];
+  const detalle = { ritmo: detalleRitmo, cosecha: detalleCosecha, puntualidad: detallePuntualidad,
+                    revisar: detalleRevisar, rinde: detalleRinde }[relojAbierto];
   return `<div class="tarjeta tablero">
     <h2>Cómo viene la temporada <small>plan contra real</small></h2>
     ${relojesDelTablero(d)}
@@ -555,6 +610,7 @@ function prepararTablero() {
       // Siembras y Trasplantes se abren con su lista "Para…" desplegada.
       if (b.dataset.irSeccion === "siembras") abiertoParaSembrar = true;
       if (b.dataset.irSeccion === "trasplantes") abiertoParaTrasplantar = true;
+      if (b.dataset.irSeccion === "cosechas") desplegablesAbiertos.add("cierres");
       render(b.dataset.irSeccion);
     };
   });
@@ -573,6 +629,10 @@ async function traerSeguimiento(forzar = false) {
     const nuevo = { chacra: chacraCodigo(), datos: d };
     const cambio = JSON.stringify(leer(LS.seguimiento, null)) !== JSON.stringify(nuevo);
     escribir(LS.seguimiento, nuevo);
-    if (cambio && vistaActual === "inicio") redibujarConDatos("inicio");
+    // Además de Inicio: los cierres cambian lo que espera trasplante, lo
+    // que está en marcha en Cosechas y lo que ocupa cada bancal en el plan.
+    if (cambio && ["inicio", "cosechas", "trasplantes", "siembras", "plan", "stock"].includes(vistaActual)) {
+      redibujarConDatos(vistaActual);
+    }
   } catch { /* sin señal: se usa lo último que se bajó */ }
 }

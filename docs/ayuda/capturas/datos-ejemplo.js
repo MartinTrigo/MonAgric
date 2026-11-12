@@ -58,7 +58,7 @@
     integrantes: ["Ana", "Juan", "Lucía", "Pedro"],
     areas: [{ nombre: "Plantinera", estado: "activo" }],
     plan: [],
-    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true, repeticion: true,
+    corregir: true, parcial: true, largo_por_sector: true, seguimiento: true, tablero: true, repeticion: true, cierres: true,
   };
 
   const siembra = (Id, Fecha, Cultivo, Variedad, g, Bandejas, Alveolos, Operador, planificada) => ({
@@ -138,6 +138,9 @@
     ok: true, desde: "2026-07-01", hasta: "2027-07-01", hoy: hoy(),
     cosechas: cosechasPorSemana, kg_cosechados: kgEjemplo, no_propias: [],
     repetidas: [{ cultivo: "Lechuga", generacion: 2, veces: 2, desde: "2026-09-09", hasta: "2026-09-21" }],
+    // Las habas ya se terminaron: dieron 139 de los 180 kg esperados.
+    kg_generacion: {}, kg_sin_asignar: { haba: 139, lechuga: 20, acelga: 4 },
+    cierres: [{ id: "ci1", fecha: "2026-10-24", cultivo: "Habas", generacion: 1, motivo: "Cosecha completa", kg: 139, observaciones: "" }],
     sembradas: { lechuga: [1, 2], acelga: [1], tomate: [1], albahaca: [1], haba: [1] }, resiembras: [],
     futuras: [], ultimo: { cosechas: "2026-11-06", siembras: "2026-09-15", trasplantes: "2026-09-30" },
   } });

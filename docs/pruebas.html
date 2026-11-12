@@ -34,6 +34,7 @@ almacenamiento del teléfono.</p>
 <script src="js/pendientes.js"></script>
 <script src="js/plan-grafico.js"></script>
 <script src="js/tablero.js"></script>
+<script src="js/cierres.js"></script>
 <script src="js/plan-mapa.js"></script>
 <script src="js/plan-cultivos.js"></script>
 <script src="js/ficha.js"></script>
@@ -698,6 +699,46 @@ almacenamiento del teléfono.</p>
     pendientes = [];
     igual("resiembra: se reconoce por la palabra, con su motivo; otra tanda no lo es",
       ["Resiembra: Germinó poco", "resiembra", "Otra tanda", ""].map(esResiembra), [true, true, false, false]);
+
+    // ---- Terminar una generación y rinde logrado (12/11) ----
+    {
+      const cierre = { id: "c1", fecha: "2026-10-15", cultivo: "Repollo bco", generacion: 1, motivo: "Se fue en flor", kg: 180 };
+      const cierres = new Map([[claveGen("Repollo bco", 1), cierre]]);
+      const rl = rindeLogrado(v, cierres);
+      igual("rinde logrado: los kilos que dio contra lo esperado de sus bancales (las dos partes: 360 kg)",
+        [rl.filas.length, rl.esperado, rl.kg, rl.pct, rl.filas[0].bancales], [1, 360, 180, 50, 3]);
+      igual("rinde logrado: lo que no fue cosecha completa, por causa y con lo que faltó",
+        rl.motivos, [{ motivo: "Se fue en flor", generaciones: 1, faltaron: 180 }]);
+      igual("rinde logrado: si no fue cosecha completa, cuántos días antes de lo previsto se terminó",
+        rl.filas[0].faltaban, diasEntre("2026-10-15", v[0].hasta));
+      igual("rinde logrado: sin generaciones terminadas no hay porcentaje",
+        rindeLogrado(v, new Map()).pct, null);
+
+      const seg = { kg_sin_asignar: { "repollo bco": 200 }, kg_generacion: { "repollo bco|1": 30 } };
+      igual("kilos sin asignar: un cierre de 180 kg con 30 a su nombre se lleva 150 de los 200",
+        [kgSinAsignar("Repollo bco", seg, new Map()), kgSinAsignar("Repollo bco", seg, cierres),
+         kgAsignados("Repollo bco", 1, seg)], [200, 50, 30]);
+
+      const dos = [g("a", 1, "2026-08-01", "2026-09-05", 1, hecha),
+                   g("b", 2, "2026-09-01", "2026-10-06", 1, { sembrada: true, sembrada_el: "2026-09-01", trasplantada_el: "2026-10-10" })];
+      igual("en marcha: las sembradas sin terminar, con desde cuándo están en el campo",
+        generacionesAbiertas(dos, new Map()).map((x) => [x.generacion, x.enCampo]), [[1, "2026-09-20"], [2, "2026-10-10"]]);
+      igual("en marcha: una terminada sale de la lista",
+        generacionesAbiertas(dos, cierres).map((x) => x.generacion), [2]);
+      igual("cosecha: con una sola generación en el campo queda a su nombre; con dos, sin asignar",
+        [generacionEnCosecha("Repollo bco", "2026-10-01", dos, new Map()),
+         generacionEnCosecha("Repollo bco", "2026-10-20", dos, new Map()),
+         generacionEnCosecha("Repollo bco", "2026-10-20", dos, cierres),
+         generacionEnCosecha("Repollo bco", "2026-09-10", dos, new Map())], [1, "", 2, ""]);
+
+      const cerrada = [{ cultivo: "Repollo bco", kg: 100, desde: "2026-11-01", hasta: "2026-11-21", dias: 20, cerrada: "2026-10-15" }];
+      igual("esperado: de una generación terminada se espera todo desde el día en que se cerró",
+        ["2026-10-14", "2026-10-15", "2026-11-05"].map((f) => esperadoAl(cerrada, f)), [0, 100, 100]);
+      igual("ritmo: el trasplante que no se hizo de una generación terminada ya no toca",
+        (() => { const e = [{ tipo: "siembra", plan: "2026-08-01", real: "2026-08-02", cerrada: true },
+                            { tipo: "trasplante", plan: "2026-09-01", real: "", cerrada: true }];
+                 const x = ritmoDelPlan(e, HOY); return [x.tocaban, x.hechas, x.pct]; })(), [1, 1, 100]);
+    }
 
     igual("tablero: sin generaciones en el plan no se dibuja",
       conGeneraciones([], () => tarjetaTablero()), "");

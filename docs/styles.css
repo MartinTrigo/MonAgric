@@ -1892,3 +1892,19 @@ button.secundario.chico { width: auto; margin: 0; padding: 5px 11px; font-size: 
 
 /* Un aviso dentro de un texto (una generación que ya está sembrada). */
 .texto-alerta { color: var(--peligro); }
+
+/* Con el quinto reloj (rinde logrado, 12/11): en el teléfono, dos por fila y
+   el último a lo ancho; con más lugar, tres arriba y dos abajo. */
+.relojes.cinco .reloj:nth-child(5) { grid-column: span 2; }
+@media (min-width: 560px) {
+  .relojes.cinco { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .relojes.cinco .reloj { grid-column: span 2; }
+  .relojes.cinco .reloj:nth-child(n+4) { grid-column: span 3; }
+}
+.bala .cuando { font-size: .74rem; color: var(--tenue); margin-top: 5px; }
+.bala-cab .gen { font-weight: 400; color: var(--tenue); }
+/* Lo que no fue cosecha completa, en el color de aviso. */
+.bala-pista.perdida i { background: var(--amber); }
+h3.subtitulo { font-size: .86rem; color: var(--sage-dark); margin: 14px 0 4px; }
+.abre-cierre { cursor: pointer; border-radius: 8px; }
+.abre-cierre:hover { background: var(--sage-suave); }

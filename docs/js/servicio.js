@@ -143,7 +143,7 @@ async function sincronizarUnaVez(silencioso) {
     // y una siembra nueva puede sumar uno: las dos cosas cambian esa lista.
     if (tipos.has("trasplantes") || tipos.has("siembras")) traerAlmacigos(true);
     // El tablero de Inicio cuenta siembras, trasplantes y cosechas.
-    if (["siembras", "trasplantes", "cosechas"].some((t) => tipos.has(t) || corregidas.has(t))) {
+    if (["siembras", "trasplantes", "cosechas", "cierres"].some((t) => tipos.has(t) || corregidas.has(t))) {
       traerSeguimiento(true);
     }
     const ids = new Set(enviadosAhora.map((r) => r.id));

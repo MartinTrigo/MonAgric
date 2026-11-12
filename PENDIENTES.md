@@ -21,6 +21,44 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## Terminar generaciones y rinde logrado (12/11) — PUBLICADO, FALTA NUEVA VERSIÓN
+
+Publicado en la app (v90). Una sola Nueva versión del Apps Script sirve para
+esto y para las resiembras de abajo:
+1. Pegar `Code.gs` en MonAgric Datos 2026-27.
+2. Implementar → Administrar implementaciones → ✏ → **Nueva versión**.
+3. Desde `produccion`: `python tools/version_servicio.py` tiene que decir
+   «terminar generaciones y rinde logrado» y «resiembras y generación sugerida».
+
+Lo que hace: en Cosechas, «Terminar una generación» (cómo terminó y cuántos
+kilos dio); en Inicio, el reloj **Rinde logrado** con una barra por
+generación terminada y las causas de lo que no fue cosecha completa; la
+cosecha queda a nombre de su generación cuando no hay duda; «Cosecha a hoy»
+espera todo de lo que ya se terminó. Probado con la chacra de ejemplo y el
+servidor contra una planilla simulada, **no con datos reales**.
+
+Para cargar después de la Nueva versión (lo que contó Martín el 11/11):
+- **Hakusai G1 y G2**: se fueron en flor. Hay 135 kg sin asignar: decir
+  cuánto fue de cada una.
+- **Rúcula G1**: tapada de yuyos, 0 kg (motivo Malezas).
+- **Albahaca G1**: falló la siembra, 0 kg.
+- **Brócoli**: los que se pierdan por plaga, cuando se levanten.
+- **Brócoli G4** tiene dos siembras (05/10 y 26/10): ¿resiembra o error?
+
+Para mirar con el uso:
+- Si hace falta cerrar solo algunos bancales de una generación (hoy se
+  cierra entera).
+- Si conviene poder elegir la generación al cargar la cosecha cuando hay dos
+  en el campo (hoy queda sin asignar y se reparte al cerrar; se puede poner
+  a mano con ✎).
+- Sumar todo esto a la guía de uso.
+
+**Ajuste de primavera del catálogo — para cuando empiece el verano** (pedido
+de Martín, 12/11: no tocar las planillas todavía). Con lo registrado, revisar
+«días de trasplante a cosecha»: Hakusai dice 105 y se cosechó a los 41-47
+(pero se fue en flor); Mix de hojas dice 52 y se cosechó a los 24-32. El
+catálogo es compartido por las seis chacras.
+
 ## Resiembras y generación sugerida (11/11) — PUBLICADO, FALTA NUEVA VERSIÓN
 
 Publicado en la app (v89): al elegir el cultivo la app propone la generación
@@ -41,14 +79,6 @@ Después, en la app, con ✎ en Siembras → Últimos movimientos:
 - **Tomate**: ver la respuesta del 11/11 sobre variedades (una generación es
   una fecha de siembra; las tres variedades serían una generación con tres
   tandas).
-
-**Pedido el 11/11, sin diseñar todavía: cerrar una generación.** Poder decir
-que una siembra falló (albahaca) o que un bancal se levantó sin cosechar o
-antes de tiempo (rúcula G1 tapada de yuyos, hakusai que se fue en flor,
-brócolis con plaga), con el motivo: cosecha normal, plaga o enfermedad,
-malezas, floración, clima, germinación, otro. Que la app pregunte el motivo
-al cerrar y avise si es prematuro. En el tablero, lo cerrado deja de
-reclamar como pendiente y las pérdidas se cuentan aparte.
 
 ## El Tablero: plan contra real — ETAPA 1 PUBLICADA E IMPLEMENTADA (11/11)
 

@@ -540,6 +540,11 @@ function prepararCosechas() {
 
   // Los dos modos se leen igual de afuera: una lista de cultivo + kilos. En
   // pizarra se descartan los que quedaron vacíos, que son la mayoría.
+  // De qué generación es (ver generacionEnCosecha): solo si el servicio lo
+  // guarda y no hay duda; si no, queda sin asignar.
+  const generacionDeLaCosecha = (cultivo) => (CFG?.cierres && cultivo
+    ? generacionEnCosecha(cultivo, f.fecha.value || hoy(), leer(LS.generaciones, []) || [], cierresVigentes()) : "");
+
   const leerRenglones = () => {
     if (pizarra) {
       return [...pizarra.querySelectorAll("input[data-cultivo]")]
@@ -565,8 +570,12 @@ function prepararCosechas() {
     const total = cargados.reduce((a, r) => a + r.kg, 0);
     const detalle = cargados.map((r) => {
       const plan = enPlan(r.cultivo);
-      if (!plan?.cosecha_esperada_kg) return `${esc(r.cultivo)} ${num(r.kg, 1)} kg`;
-      return `${esc(r.cultivo)} ${num(r.kg, 1)} kg (${num((r.kg / plan.cosecha_esperada_kg) * 100, 1)}% de lo esperado)`;
+      // Si ese cultivo tiene una sola generación en el campo, la cosecha
+      // queda a su nombre: se muestra para que se vea a dónde va.
+      const gen = generacionDeLaCosecha(r.cultivo);
+      const aQuien = gen ? ` → G${gen}` : "";
+      if (!plan?.cosecha_esperada_kg) return `${esc(r.cultivo)} ${num(r.kg, 1)} kg${aQuien}`;
+      return `${esc(r.cultivo)} ${num(r.kg, 1)} kg${aQuien} (${num((r.kg / plan.cosecha_esperada_kg) * 100, 1)}% de lo esperado)`;
     }).join(" · ");
     calculo.innerHTML = `<b>${num(total, 1)} kg</b> en ${cargados.length} cultivo(s)
       <div class="nota" style="margin-top:4px">${detalle}</div>`;
@@ -659,6 +668,7 @@ function prepararCosechas() {
         cultivo,
         kg: Math.round(kg * 100) / 100,
         operador: f.operador.value,
+        generacion: generacionDeLaCosecha(cultivo),
       }, `Cosecha guardada: ${Object.keys(porCultivo).length} cultivo(s) ✓`);
     });
     render("inicio");

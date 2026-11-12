@@ -57,7 +57,8 @@ function filaEquipo(tipo, f) {
              f.Plantines ? `${num(f.Plantines)} plantines` : "",
              f.Operador ? "por " + esc(f.Operador) : ""].filter(Boolean).join(" · ");
   } else if (tipo === "cosechas") {
-    detalle = `${esc(f.Cultivo)} — ${num(f.Kg, 1)} kg`;
+    detalle = `${esc(f.Cultivo)} — ${num(f.Kg, 1)} kg${
+      f["Generación"] ? ` <span class="gen">G${esc(f["Generación"])}</span>` : ""}`;
     extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
   } else if (tipo === "stock") {
     const d = deFilaStock(f);
@@ -98,7 +99,7 @@ function filaRegistro(r) {
     detalle = `${esc(d.integrante)}: ${d.horas} h${d.actividad ? " · " + esc(d.actividad) : ""}`;
   } else if (r.tipo === "cosechas") {
     titulo = "Cosecha";
-    detalle = `${esc(d.cultivo)}: ${num(d.kg, 1)} kg`;
+    detalle = `${esc(d.cultivo)}: ${num(d.kg, 1)} kg${d.generacion ? ` · G${d.generacion}` : ""}`;
   } else if (r.tipo === "stock") {
     titulo = "Stock";
     detalle = `${esc(d.cultivo)}: ${esc(cantidadStock(d))} · ${esc(dondeStock(d))}`;
@@ -165,7 +166,8 @@ const CORRECCION = {
     ["disposicion", "Disposición", "disposicion"], ["plantines", "Plantines", "numero"],
     ["operador", "Operador", "persona"], ["observaciones", "Observaciones", "texto"]],
   cosechas: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
-    ["kg", "Kg", "numero"], ["operador", "Cosechó", "persona"]],
+    ["kg", "Kg", "numero"], ["operador", "Cosechó", "persona"],
+    ["generacion", "Generación (vacío: sin asignar)", "generacionCosecha"]],
   horas: [["fecha", "Fecha", "fecha"], ["integrante", "Quién", "persona"],
     ["horas", "Horas", "numero"], ["area", "Área", "area"],
     ["actividad", "Actividad", "texto"], ["observaciones", "Qué se hizo", "texto"]],
@@ -196,7 +198,7 @@ const DE_LA_HOJA = {
     distancia_cm: "Distancia cm", disposicion: "Disposición", marco: "Marco",
     plantines: "Plantines", operador: "Operador", observaciones: "Observaciones",
     fecha_planificada: "Fecha planificada", diferencia_plan: "Diferencia plan" },
-  cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó" },
+  cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó", generacion: "Generación" },
   horas: { fecha: "Fecha", integrante: "Integrante", horas: "Horas", actividad: "Actividad",
     area: "Área", observaciones: "Observaciones" },
   stock: { fecha: "Fecha", tipo: "Tipo", cultivo: "Cultivo", variedad: "Variedad",
@@ -220,6 +222,7 @@ function campoCorreccion([k, rotulo, clase], v) {
   else if (clase === "tipoSiembra") campo = `<select name="${k}">${opciones(tiposSiembra())}</select>`;
   else if (clase === "alveolos") campo = `<select name="${k}">${opciones([...tiposBandeja().map(String), CAJON])}</select>`;
   else if (clase === "origen") campo = `<select name="${k}">${opciones(ORIGENES)}</select>`;
+  else if (clase === "generacionCosecha") campo = `<input type="text" name="${k}" inputmode="numeric" value="${esc(val)}" placeholder="—">`;
   else if (clase === "repeticion") campo = `<select name="${k}">${opcionesRepeticion(val)}</select>`;
   else if (clase === "disposicion") campo = `<select name="${k}">${opciones(DISPOSICIONES)}</select>`;
   else if (clase === "persona") campo = `<select name="${k}">${opciones(integrantes())}</select>`;
@@ -235,7 +238,8 @@ function campoCorreccion([k, rotulo, clase], v) {
 function formularioCorreccion(tipo, f) {
   const d = datosDeFila(tipo, f);
   // «Repetición» solo si el servicio la guarda: si no, se perdería al corregir.
-  const campos = CORRECCION[tipo].filter((c) => c[2] !== "repeticion" || CFG?.repeticion)
+  const campos = CORRECCION[tipo].filter((c) => (c[2] !== "repeticion" || CFG?.repeticion)
+      && (c[2] !== "generacionCosecha" || CFG?.cierres))
     .map((c) => campoCorreccion(c, d[c[0]]));
   // De a dos por renglón, como el resto de los formularios.
   const filas = [];
@@ -264,6 +268,7 @@ function datosCorregidos(tipo, f, form) {
     d.fecha_planificada = base;
     d.diferencia_plan = base && d.fecha ? diasEntre(base, d.fecha) : "";
   };
+  if (tipo === "cosechas") d.generacion = parseInt(d.generacion, 10) || "";
   if (tipo === "siembras") {
     d.generacion = parseInt(d.generacion, 10) || 1;
     const conBandeja = EN_BANDEJA.has(d.tipo);
@@ -315,13 +320,14 @@ function columnasQueFaltan(esquema) {
   const NUEVAS = new Set(["Origen", "Fecha planificada", "Diferencia plan"]);
   // «Repetición» (11/11): un servicio que todavía no la tiene no es un error;
   // la app no ofrece el campo (cfg.repeticion).
-  const OPCIONALES = new Set(["Repetición"]);
+  // Lo mismo con «Generación» en Cosechas (12/11, cfg.cierres).
+  const OPCIONALES = { siembras: ["Repetición"], cosechas: ["Generación"] };
   const faltan = [];
   Object.entries(DE_LA_HOJA).forEach(([hoja, campos]) => {
     if (!Array.isArray(esquema[hoja])) return;
     const hay = new Set(esquema[hoja]);
     ["Id", ...Object.values(campos)].forEach((c) => {
-      if (!hay.has(c) && !(anterior && NUEVAS.has(c)) && !OPCIONALES.has(c)) faltan.push(`${hoja} «${c}»`);
+      if (!hay.has(c) && !(anterior && NUEVAS.has(c)) && !(OPCIONALES[hoja] || []).includes(c)) faltan.push(`${hoja} «${c}»`);
     });
   });
   return faltan;

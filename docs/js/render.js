@@ -137,6 +137,7 @@ function engancharPartes(vista) {
   engancharFilas();
   if (vista === "tareas") prepararTareas();
   if (vista === "inicio") prepararInicio();
+  if (vista === "cosechas") prepararCierres();
   if (vista === "stock") { engancharAgotados(); engancharModoStock(); prepararResumenStock(); }
   if (vista === "plan") { prepararEdicionCultivos(); if (recalcularSerie) recalcularSerie(); }
 }
@@ -200,6 +201,7 @@ function render_(vista, conservarScroll, htmlListo) {
 
   prepararComunes();
   prepararCorrecciones();
+  if (vista === "cosechas") prepararCierres();
 
   // Las secciones de registro muestran lo último de toda la chacra.
   if (["siembras", "cosechas", "horas", "trasplantes", "stock"].includes(vista)) traerUltimos(vista);
@@ -214,7 +216,8 @@ function render_(vista, conservarScroll, htmlListo) {
   // redibujo solo si cambió: no hace lazo.
   if (vista === "inicio" || vista === "plan") traerAlmacigos();
   // El tablero de Inicio: los hechos de la temporada, con el mismo freno.
-  if (vista === "inicio") traerSeguimiento();
+  // También donde importan los cierres y las generaciones ya sembradas.
+  if (["inicio", "cosechas", "trasplantes", "siembras", "plan", "stock"].includes(vista)) traerSeguimiento();
 
   engancharFilas();
   const volver = $("#volver-plan");

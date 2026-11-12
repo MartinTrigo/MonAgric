@@ -70,13 +70,28 @@ function tramosDe(g) {
   if (!dura) faltan.push("días en cosecha");
   const finCosecha = inicioCosecha && dura ? sumarDias(inicioCosecha, dura) : inicioCosecha;
 
-  return { inicio: inicioTodo, campo, inicioCosecha, fin: finCosecha || campo, directa,
+  const res = { inicio: inicioTodo, campo, inicioCosecha, fin: finCosecha || campo, directa,
            faltan,
            // Lo registrado de verdad: con esto se sabe qué tramo es un hecho
            // y cuál una previsión.
            real: { siembra: sembradaEl, campo: directa ? sembradaEl : trasplantada },
            // La línea de base, para medir cuánto se apartó cada momento.
            plan: { inicio: planInicio, campo: planCampo } };
+  /* Una generación terminada (12/11, ver cierres.js) ocupa su lugar hasta el
+     día en que se cerró, no hasta el fin de cosecha previsto: el bancal
+     queda libre en el mapa y el plan deja de anunciar su cosecha. Lo
+     previsto se guarda en sinCierre: el tablero lo necesita para saber
+     cuánto se esperaba y cuánto antes se levantó. */
+  const cierre = typeof cierreDe === "function" ? cierreDe(g) : null;
+  if (cierre && cierre.fecha) {
+    res.sinCierre = { campo: res.campo, inicioCosecha: res.inicioCosecha, fin: res.fin };
+    res.cerrada = cierre.fecha;
+    const tope = cierre.fecha < res.inicio ? res.inicio : cierre.fecha;
+    if (res.campo > tope) res.campo = tope;
+    if (res.inicioCosecha > tope) res.inicioCosecha = tope;
+    res.fin = tope;
+  }
+  return res;
 }
 
 function generacionesParaElPlan() {
