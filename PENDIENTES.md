@@ -21,6 +21,25 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 - El 27/10 a las 19:43 Drive mandó a la Papelera todo `AMA\produccion`,
   `economia` y `_archivo\horas-bioma`. Se restauró el 29/10 y quedó igual a GitHub.
 
+## Sectores partidos en Tica (13/11) — reubicar en el mapa
+
+Tica partió Primavera, Otoño e Invierno en sectores A y B de 12 bancales
+(los de 27 eran difíciles de contar y de ahí salieron errores al cargar
+trasplantes) y sacó los corredores biológicos. Quedaron **23 generaciones
+apuntando a «Primavera» u «Otoño»**, que ya no existen. Arreglado en la app
+(v91): vuelven a la lista del mapa como sin ubicar, con el lugar donde
+estaban, y la lista ahora muestra también las ya ubicadas con ✎ y ✕. No hace
+falta Nueva versión.
+
+- **Falta que Martín las reubique** en Plan → Mapa (notebook). Casi todas
+  están sembradas y en el campo.
+- **Verano sigue con 27 bancales**: ¿también se parte?
+- Lo ya registrado no cambia solo: los trasplantes cargados y el **stock
+  vigente** (8 lugares) siguen diciendo «Primavera». El stock se corrige
+  relevando de nuevo con el sector nuevo y marcando agotado el viejo.
+- «Corredor Biológico G2» sigue en el plan (estaba en Primavera 9): sacarlo
+  si ya no va.
+
 ## Terminar generaciones y rinde logrado (12/11) — PUBLICADO, FALTA NUEVA VERSIÓN
 
 Publicado en la app (v90). Una sola Nueva versión del Apps Script sirve para

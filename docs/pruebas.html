@@ -740,6 +740,16 @@ almacenamiento del teléfono.</p>
                  const x = ritmoDelPlan(e, HOY); return [x.tocaban, x.hechas, x.pct]; })(), [1, 1, 100]);
     }
 
+    // ---- El mapa: ¿está en un lugar que existe? (13/11) ----
+    igual("mapa: ubicada solo si su sector existe y tiene esos bancales (CFG: Primavera y Verano, 25 cada uno)",
+      [{ sector: "Verano", bancales: "3, 4" }, { sector: "verano", bancales: "25" },
+       { sector: "Verano", bancales: "26" }, { sector: "Otoño", bancales: "1" },
+       { sector: "Verano", bancales: "" }, { sector: "", bancales: "2" }].map(estaUbicada),
+      [true, true, false, false, false, false]);
+    igual("mapa: de la que quedó sin lugar se recuerda dónde estaba",
+      [{ sector: "Otoño", bancales: "1, 2" }, { sector: "Verano", bancales: "3" }, { sector: "", bancales: "" }].map(ubicacionPerdida),
+      ["Otoño 1, 2", "", ""]);
+
     igual("tablero: sin generaciones en el plan no se dibuja",
       conGeneraciones([], () => tarjetaTablero()), "");
     const html = conGeneraciones(gens, () => tarjetaTablero());

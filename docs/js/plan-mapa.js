@@ -18,6 +18,23 @@ let genSeleccionada = "";
 const bancalesDe = (g) => String(g.bancales || "")
   .split(",").map((x) => parseInt(x, 10)).filter((n) => n > 0);
 
+/* ¿Está en un lugar que existe? (13/11) Tener sector y bancales no alcanza:
+   Tica partió «Primavera» (27 bancales) en «Primavera A» y «Primavera B» (12
+   cada uno) y 23 generaciones quedaron apuntando a un sector que ya no
+   estaba. El mapa no las dibujaba y la lista tampoco las ofrecía, porque
+   para la lista "tenían lugar": no había cómo volver a ubicarlas. Ahora una
+   generación cuyo sector no existe, o con un bancal que el sector ya no
+   tiene, cuenta como sin ubicar, y la lista dice dónde estaba. */
+function estaUbicada(g) {
+  const bs = bancalesDe(g);
+  if (!g.sector || !bs.length) return false;
+  const s = sectores().find((x) => claveArea(x.sector) === claveArea(g.sector));
+  return !!s && bs.every((b) => b <= (Number(s.bancales) || 0));
+}
+// Dónde decía estar una generación que quedó sin lugar, para reubicarla.
+const ubicacionPerdida = (g) => (g.sector && bancalesDe(g).length && !estaUbicada(g)
+  ? `${g.sector} ${bancalesDe(g).join(", ")}` : "");
+
 function ocupacionDe(g) {
   const t = tramosDe(g);
   if (!t) return null;
@@ -131,8 +148,8 @@ function franjaLibre(g, sector, n, todas, e) {
 
 function mapaDeCultivos() {
   const todas = (leer(LS.generaciones, []) || []);
-  const asignadas = todas.filter((g) => g.sector && bancalesDe(g).length);
-  const sueltas = todas.filter((g) => !(g.sector && bancalesDe(g).length));
+  const asignadas = todas.filter(estaUbicada);
+  const sueltas = todas.filter((g) => !estaUbicada(g));
   const sel = todas.find((g) => g.id === genSeleccionada);
   const e = escalaTemporada();
   const bloques = bloquesDelMapa();
@@ -209,11 +226,19 @@ function mapaDeCultivos() {
     </div>`;
   };
 
+  /* La lista tiene TODAS las generaciones, por cultivo (13/11): las que
+     faltan ubicar primero y, más claras, las ya ubicadas, con ✎ para moverla
+     y ✕ para sacarla del mapa. Antes una generación ubicada desaparecía de
+     la lista y solo se la podía tocar en el mapa, si se la encontraba. */
   const porCultivo = new Map();
-  sueltas.forEach((g) => {
+  sueltas.concat(asignadas).forEach((g) => {
     if (!porCultivo.has(g.cultivo)) porCultivo.set(g.cultivo, []);
     porCultivo.get(g.cultivo).push(g);
   });
+  const faltanDe = (lista) => lista.filter((g) => !estaUbicada(g)).length;
+  // Primero los cultivos a los que les falta ubicar algo.
+  const cultivosDeLaLista = [...porCultivo.entries()].sort((a, b) =>
+    (faltanDe(b[1]) > 0) - (faltanDe(a[1]) > 0) || a[0].localeCompare(b[0], "es"));
 
   const o = sel ? ocupacionDe(sel) : null;
   return `
@@ -225,9 +250,10 @@ function mapaDeCultivos() {
       ? `<b>${esc(sel.cultivo)} ${nombreGen(sel)}</b>
          <span>${Math.max(1, Math.round(Number(sel.camas) || 1))} bancal(es)${
            o ? ` · ${fechaCorta(o.desde)} a ${fechaCorta(o.hasta)}` : ""}${
-           sel.sector ? ` · ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}` : " · sin ubicar"}</span>
+           estaUbicada(sel) ? ` · ${esc(sel.sector)} ${bancalesDe(sel).join(", ")}`
+             : ubicacionPerdida(sel) ? ` · sin ubicar (estaba en ${esc(ubicacionPerdida(sel))}, que ya no existe)` : " · sin ubicar"}</span>
          <span class="lz-ayuda">En verde, los bancales libres en esas fechas: tocá uno o arrastrala.</span>
-         ${sel.sector ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
+         ${estaUbicada(sel) ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
          <button type="button" class="secundario" id="cancelar-eleccion">Listo</button>`
       : `<span class="lz-ayuda">Arrastrá un sector por su título para acomodarlo como está
          en el campo. Arrastrá una generación de la lista a un bancal, o una ya puesta a
@@ -249,29 +275,40 @@ function mapaDeCultivos() {
       </div>
 
       <div class="lista-panel">
-        <h3 class="sub">Sin ubicar <small>${sueltas.length}</small></h3>
+        <h3 class="sub">Generaciones <small>${sueltas.length
+          ? `${sueltas.length} sin ubicar` : "todas ubicadas"}</small></h3>
         <div class="lista-scroll">
-    ${porCultivo.size ? [...porCultivo.entries()].map(([cultivo, lista]) => `
+    ${porCultivo.size ? cultivosDeLaLista.map(([cultivo, lista]) => `
       <details class="gen-cultivo" data-recordar="${esc("mapa:" + cultivo)}"${
         (sel && sel.cultivo === cultivo) || estaDesplegado("mapa:" + cultivo) ? " open" : ""}>
         <summary><i class="lz-color" style="background:${colorEtapa(cultivo, "campo")}"></i>${
-          esc(cultivo)} <span>${lista.length}</span></summary>
+          esc(cultivo)} <span${faltanDe(lista) ? "" : ' class="completo"'}>${
+            faltanDe(lista) ? `${faltanDe(lista)} de ${lista.length}` : `${lista.length} ✓`}</span></summary>
         ${lista.map((g) => {
           const oc = ocupacionDe(g);
-          return `<div class="registro elegible lz-arrastrable${g.id === genSeleccionada ? " elegida" : ""}"
+          const ubicada = estaUbicada(g);
+          const perdida = ubicacionPerdida(g);
+          return `<div class="registro elegible lz-arrastrable${ubicada ? " ubicada" : ""}${g.id === genSeleccionada ? " elegida" : ""}"
                        data-elegir="${esc(g.id)}" role="button" tabindex="0"
-                       title="Arrastrala a un bancal, o tocala y después tocá el bancal">
+                       title="${ubicada ? "Ya está en el mapa: arrastrala a otro bancal para moverla"
+                         : "Arrastrala a un bancal, o tocala y después tocá el bancal"}">
             <div>
               <div class="detalle">${nombreGen(g, todas)} <span class="gen">${
                 Math.max(1, Math.round(Number(g.camas) || 1))} bancal(es)</span></div>
-              <div class="cuando">${oc ? `ocupa del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
-                : "sin fechas suficientes"}</div>
+              <div class="cuando">${ubicada ? `<b>${esc(g.sector)} ${bancalesDe(g).join(", ")}</b> · ` : ""}${
+                oc ? `${ubicada ? "" : "ocupa "}del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
+                : "sin fechas suficientes"}${
+                perdida ? `<br><span class="lz-perdida">estaba en ${esc(perdida)}, que ya no existe</span>` : ""}</div>
             </div>
-            <span class="lz-asa">⠿</span>
+            ${ubicada ? `<button type="button" class="quitar editar" data-mover-ubicacion="${esc(g.id)}"
+                aria-label="Moverla" title="Elegirla para moverla a otro bancal">✎</button>
+              <button type="button" class="quitar" data-quitar-ubicacion="${esc(g.id)}"
+                aria-label="Sacarla del mapa" title="Sacarla del mapa: vuelve a quedar sin ubicar">&times;</button>`
+              : `<span class="lz-asa">⠿</span>`}
           </div>`;
         }).join("")}
       </details>`).join("")
-      : `<p class="nota">Están todas ubicadas.</p>`}
+      : `<p class="nota">Todavía no hay generaciones en el plan.</p>`}
         </div>
       </div>
     </div>
@@ -378,7 +415,9 @@ function prepararMapa() {
       metodo: g.metodo, fecha_almacigo: g.fecha_almacigo,
       fecha_campo: g.fecha_campo, camas: g.camas,
       sector, bancales: bancales.join(", "),
-      estado: g.estado, origen: "AMA",
+      // La variedad viaja siempre: el servicio rearma la fila entera, y sin
+      // esto mover una generación en el mapa se la borraba.
+      estado: g.estado, origen: "AMA", variedad: g.variedad || "",
     }, sector
       ? `${g.cultivo} ${nombreGen(g)} → ${sector} ${bancales.join(", ")} ✓`
       : `${g.cultivo} ${nombreGen(g)} sacada del mapa ✓`);
@@ -475,7 +514,8 @@ function prepararMapa() {
     const g = todas.find((x) => x.id === el.dataset.elegir);
     if (!g) return;
     el.onpointerdown = (ev) => {
-      if (ev.button !== 0) return;
+      // Los botones de la fila (mover, sacar) no arrancan un arrastre.
+      if (ev.button !== 0 || ev.target.closest("button")) return;
       ev.preventDefault();
       arrastrarGeneracion(ev, g, 0, null);
     };
@@ -575,14 +615,26 @@ function prepararMapa() {
     guardarPartesDeConfig({ sectores: lista }, movidos, `${nombre} movido ✓`, "plan");
   };
 
-  const cancelar = $("#cancelar-eleccion");
-  if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; render("plan", true); };
-  const sacar = $("#sacar-del-mapa");
-  if (sacar) sacar.onclick = () => {
-    const g = todas.find((x) => x.id === genSeleccionada);
+  // En la lista, sobre una generación ya ubicada: ✎ la elige para moverla
+  // (se ven en verde los bancales libres) y ✕ la saca del mapa.
+  const sacarDelMapa = (g) => {
     if (g && confirm(`¿Sacar ${g.cultivo} ${nombreGen(g)} del mapa?\n` +
                      "Queda en el plan, solo sin lugar asignado.")) {
       guardarUbicacion(g, "", []);
     }
   };
+  document.querySelectorAll("[data-mover-ubicacion]").forEach((b) => {
+    b.onclick = () => {
+      genSeleccionada = genSeleccionada === b.dataset.moverUbicacion ? "" : b.dataset.moverUbicacion;
+      render("plan", true);
+    };
+  });
+  document.querySelectorAll("[data-quitar-ubicacion]").forEach((b) => {
+    b.onclick = () => sacarDelMapa(todas.find((x) => x.id === b.dataset.quitarUbicacion));
+  });
+
+  const cancelar = $("#cancelar-eleccion");
+  if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; render("plan", true); };
+  const sacar = $("#sacar-del-mapa");
+  if (sacar) sacar.onclick = () => sacarDelMapa(todas.find((x) => x.id === genSeleccionada));
 }

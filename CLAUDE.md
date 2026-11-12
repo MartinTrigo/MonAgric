@@ -277,6 +277,21 @@ flor parecía un éxito en «Cosecha a hoy» y había rendido menos.
   más de lo que tardaron en Tica. Se sigue registrando y se ajusta con los
   datos de primavera.
 
+## El mapa y los sectores que cambian (13/11)
+
+- **Una generación está ubicada solo si su lugar existe** (`estaUbicada`, en
+  `plan-mapa.js`): el sector está en la configuración y tiene esos bancales.
+  Tica partió «Primavera» (27) en «Primavera A» y «B» (12 cada uno) y 23
+  generaciones quedaron apuntando a un sector que ya no estaba: el mapa no
+  las dibujaba y la lista no las ofrecía. Ahora cuentan como sin ubicar, y
+  la lista dice dónde estaban (`ubicacionPerdida`). El dato viejo no se
+  borra de la planilla: se pisa al ubicarla de nuevo.
+- **La lista del mapa muestra todas las generaciones**: primero las que
+  faltan y, más claras, las ya ubicadas, con ✎ (elegirla para moverla) y ✕
+  (sacarla del mapa).
+- Renombrar o partir un sector no corrige lo ya registrado: los trasplantes
+  y el stock cargados antes siguen diciendo el sector viejo.
+
 ## Stock: una foto, no una cuenta (23/10)
 
 - Cada registro dice "esto había acá, este día". **Lo vigente de un lugar es

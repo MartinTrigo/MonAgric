@@ -1908,3 +1908,11 @@ button.secundario.chico { width: auto; margin: 0; padding: 5px 11px; font-size: 
 h3.subtitulo { font-size: .86rem; color: var(--sage-dark); margin: 14px 0 4px; }
 .abre-cierre { cursor: pointer; border-radius: 8px; }
 .abre-cierre:hover { background: var(--sage-suave); }
+
+/* Mapa: en la lista, las generaciones ya ubicadas van más claras (13/11). */
+.registro.ubicada .detalle { font-weight: 500; color: var(--tenue); }
+.registro.ubicada .cuando { color: var(--tenue); }
+.registro.ubicada .cuando b { color: var(--sage-dark); font-weight: 600; }
+.registro.ubicada.elegida .detalle { color: var(--texto); }
+.lz-perdida { color: var(--amber-tx); }
+.gen-cultivo summary span.completo { color: var(--sage); }

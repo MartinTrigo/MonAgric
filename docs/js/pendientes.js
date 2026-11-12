@@ -412,7 +412,9 @@ function bancalesPlanificados(cultivo, generacion) {
   const k = claveArea(cultivo);
   const out = [];
   (leer(LS.generaciones, []) || [])
-    .filter((g) => claveArea(g.cultivo) === k && Number(g.generacion) === Number(generacion) && g.sector)
+    // Solo si el lugar existe: un sector que se partió o se sacó ya no sirve
+    // para completar el trasplante (ver estaUbicada, en plan-mapa.js).
+    .filter((g) => claveArea(g.cultivo) === k && Number(g.generacion) === Number(generacion) && estaUbicada(g))
     .forEach((g) => bancalesDe(g).forEach((b) => out.push({ sector: g.sector, bancal: b })));
   return out;
 }
