@@ -292,6 +292,25 @@ las fechas:
   mapa va lleno, no se arrastra, y se corrige corrigiendo el registro (✎).
 - Si se plantó en otro lado que el planificado, lo planificado queda en el
   mapa **en contorno punteado**, para comparar. No se borra.
+- **Lo verificado en el campo le gana a los registros** (13/11, v93). En
+  Tica, después de partir los sectores, de 24 generaciones con registro y
+  lugar en el mapa coincidían 4: los bancales se habían contado mal al
+  cargar, cada vez de una forma distinta, y ninguna fórmula lo arreglaba.
+  Por eso el lugar plantado se guarda **en la generación**, con la fecha en
+  que alguien lo vio: tres columnas después de las que escribe
+  `guardarGeneracion` («Sector plantado», «Bancales plantados», «Lugar
+  verificado»; `LUGAR_VERIFICADO` y `verificarLugar` en `Code.gs`, tipo de
+  registro `lugar_verificado`, que toca solo esas tres celdas). Si están,
+  `lugar_real` sale de ahí y viaja `lugar_verificado` con la fecha; si no,
+  sale de los registros y el mapa lo dibuja **rayado**, «sin verificar».
+  Los registros de Trasplantes no se reescriben: son lo que se anotó ese día.
+- Verificar no toca el plan (Sector y Bancales): queda «planificado acá,
+  plantado allá». En el mapa: «Está donde dice el plan», «Está en otro lado»
+  (se toca el bancal), «Quitar la verificación», y un aviso para confirmar de
+  una vez todo lo sembrado que tiene lugar en el mapa. **Es lo mismo que va a
+  escribir La Recorrida al confirmar un bancal** (`cfg.lugar_verificado`).
+- Una generación partida en partes: lo verificado es de cada parte, con sus
+  bancales; lo que sale de los registros es de la generación entera.
 - **Qué bancal está ocupado** se calcula con lo plantado si la generación ya
   fue al campo y con lo planificado si no (`lugaresDe`, en `plan-mapa.js`).
   Lo usan los choques del mapa, los bancales libres, el croquis de Plan y

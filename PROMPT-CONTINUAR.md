@@ -61,8 +61,7 @@ con datos reales.**
 4. Correr `tools\corregir_sectores.py` sin `--aplicar`, mostrarle la lista
    y aplicarla con su sí (traduce el stock y los registros de lo que no está
    en el mapa).
-5. Documentar en `CLAUDE.md` (sección «El lugar: planificado y plantado»)
-   el lugar verificado: quedó sin escribir por falta de uso.
+5. (Hecho el 13/11) Documentado en `CLAUDE.md`, sección «El lugar: planificado y plantado».
 
 Lo que sigue en esta sección es el análisis y el diseño, ya ejecutados.
 

@@ -23,6 +23,11 @@ chacra, la credencial y lo pendiente de enviar de AMA.
 
 ## LEER PRIMERO: `PROMPT-CONTINUAR.md` (13/11)
 
+**Estado al 13/11: publicada la v93 con el lugar verificado. Falta la Nueva
+versión del Apps Script** (`version_servicio.py` dice ANTERIOR en «el lugar
+verificado en el campo»). Después, Martín confirma en Plan → Mapa lo que vio
+el 12/11, y se corre `tools\corregir_sectores.py` para traducir el stock.
+
 Tiene el orden de trabajo y las decisiones ya tomadas, y manda sobre lo que
 diga este archivo más abajo. Resumen: (1) guardar el lugar plantado en la
 generación, con fecha de verificación, en vez de deducirlo de registros con
