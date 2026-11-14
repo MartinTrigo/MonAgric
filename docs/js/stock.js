@@ -722,7 +722,30 @@ function descargarStock(cual) {
     g.fecha.replace(/-/g, "")}.csv`, COLUMNAS_STOCK, regs.map(filaCSVStock));
 }
 
-// El texto para mandar por WhatsApp a quien arma la venta de la semana.
+/* La cantidad para el mensaje, con la presentación (14/11): «98 atados de
+   0,5 kg (49 kg)». Quien arma la oferta necesita saber de cuánto es cada
+   atado, no solo cuántos hay. Si un cultivo tiene atados de distinto peso, va
+   cada presentación aparte: «58 atados de 0,5 kg + 40 atados de 0,6 kg». */
+function cantidadParaMensaje(regs) {
+  const pesoCorto = (p) => p.toLocaleString("es-AR", { maximumFractionDigits: 2 });
+  const kgTotal = regs.reduce((a, d) => a + (Number(d.kg) || 0), 0);
+  const sueltos = regs.filter((d) => (d.formato || "kg") === "kg")
+    .reduce((a, d) => a + (Number(d.kg) || 0), 0);
+  const presentaciones = new Map();
+  regs.filter((d) => (d.formato || "kg") !== "kg").forEach((d) => {
+    const n = Number(d.cantidad) || 0;
+    // Sin peso anotado, el que sale de los kilos que se calcularon.
+    const peso = Number(d.peso_unidad) || (n && Number(d.kg) ? Math.round(Number(d.kg) / n * 100) / 100 : 0);
+    const k = `${d.formato}|${peso}`;
+    presentaciones.set(k, { formato: d.formato, peso, n: (presentaciones.get(k)?.n || 0) + n });
+  });
+  if (!presentaciones.size) return `${num(kgTotal, 1)} kg`;
+  const partes = [...presentaciones.values()].sort((a, b) => a.formato.localeCompare(b.formato) || a.peso - b.peso)
+    .map((p) => `${enFormato(p.n, p.formato)}${p.peso ? ` de ${pesoCorto(p.peso)} kg` : ""}`);
+  if (sueltos) partes.push(`${num(sueltos, 1)} kg sueltos`);
+  return `${partes.join(" + ")}${kgTotal ? ` (${num(kgTotal, 1)} kg)` : ""}`;
+}
+
 // El texto para mandar por WhatsApp a quien arma la venta de la semana. Va
 // por la semana en que entra cada cosa, y solo lo relevado: lo del plan es una
 // estimación y no se ofrece.
@@ -742,11 +765,11 @@ function textoStock() {
     });
     return [``, `*${s.nombre.toUpperCase()}*${s.rango ? ` (${s.rango})` : ""}`,
       ...[...porCultivo.values()].sort((a, b) => a.cultivo.localeCompare(b.cultivo))
-        .map((c) => `• ${c.cultivo}: ${totalStock(c.regs)}`)].join("\n");
+        .map((c) => `• ${c.cultivo}: ${cantidadParaMensaje(c.regs)}`)].join("\n");
   }).filter(Boolean);
   const despues = lista.filter((d) => semanaDe(d.disponible || d.fecha, lunes0) >= SEMANAS_STOCK);
   if (despues.length) {
-    bloques.push(["", "*MÁS ADELANTE*", ...despues.map((d) => `• ${d.cultivo}: ${totalStock([d])}`)].join("\n"));
+    bloques.push(["", "*MÁS ADELANTE*", ...despues.map((d) => `• ${d.cultivo}: ${cantidadParaMensaje([d])}`)].join("\n"));
   }
   return [`Stock de ${nombre} ${fecha === hoy() ? "hoy" : "al"} ${fechaCorta(fecha)}`, ...bloques].join("\n");
 }
