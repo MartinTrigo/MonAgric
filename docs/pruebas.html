@@ -779,8 +779,12 @@ almacenamiento del teléfono.</p>
         lista.map((x) => textoDeLugares(lugarReal(x))), ["Primavera 7, 8", "Primavera 7, 8", "", ""]);
       igual("lugar real: de lo registrado con un nombre que ya no existe se avisa",
         lugarRealPerdido(lista[3]), "Otoño 2");
-      igual("ocupa: lo plantado se le cuenta a la primera parte; sin plantar, lo planificado",
-        lista.map((x) => textoDeLugares(lugaresDe(x, lista))), ["Primavera 7, 8", "", "Verano 5", ""]);
+      igual("ocupa: lo plantado se le cuenta a la primera parte; las otras partes y lo sin plantar, lo planificado",
+        lista.map((x) => textoDeLugares(lugaresDe(x, lista))), ["Primavera 7, 8", "Verano 4", "Verano 5", ""]);
+      // 14/11: el Tomate G1 partido en tres quedó con dos partes "plantadas"
+      // sin bancal: no se podían arrastrar, sacar ni verificar.
+      igual("mapa: una parte sin lugar propio no cuenta como plantada (se puede mover y verificar)",
+        [plantadasDe(lista).has("g1"), plantadasDe(lista).has("g1-b")], [true, false]);
       const nueva = p("n", 9, "", "", null);
       igual("mapa: choca con lo PLANTADO (Primavera 7) y ya no con donde se había planificado (Verano 3)",
         [chocanCon(nueva, "Primavera", [7], lista).map((x) => x.id), chocanCon(nueva, "Verano", [3], lista).length,

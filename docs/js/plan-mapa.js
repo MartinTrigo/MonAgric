@@ -114,7 +114,11 @@ function plantadasDe(todas) {
       if (!real.length) return;
       // Verificado en el campo: cada parte tiene su propio lugar. Si sale de
       // los registros, es de la generación entera y se le cuenta a la primera.
-      m.set(x.id, x.lugar_verificado || duenia.get(claveGen(x.cultivo, x.generacion)) === x.id ? real : []);
+      // Las otras partes NO cuentan como plantadas (14/11): antes quedaban
+      // "plantadas" sin ningún bancal, y no se podían arrastrar, sacar ni
+      // verificar (el Tomate G1 partido en tres quedó trabado así). Siguen
+      // con su plan hasta que alguien diga dónde están.
+      if (x.lugar_verificado || duenia.get(claveGen(x.cultivo, x.generacion)) === x.id) m.set(x.id, real);
     });
     lugaresMemo.set(todas, m);
   }
@@ -298,7 +302,7 @@ function mapaDeCultivos() {
   };
   // ¿Lo planificado coincide con lo plantado? Entonces no hace falta contorno.
   const planCumplido = (g) => {
-    const real = lugarReal(g);
+    const real = plantadas.get(g.id) || [];
     return bancalesDe(g).every((b) => real.some((l) => claveArea(l.sector) === claveArea(g.sector) && l.bancal === b));
   };
 
@@ -307,7 +311,9 @@ function mapaDeCultivos() {
     if (!o) return "";
     // Ya está en el campo: lo planificado queda en contorno, solo si fue a
     // parar a otro lado. No se arrastra: es lo que se había decidido.
-    const fantasma = lugarReal(g).length > 0;
+    // Solo si ESTA parte tiene lugar plantado: una parte sin lugar propio se
+    // dibuja con su plan y se puede mover.
+    const fantasma = plantadas.has(g.id);
     if (fantasma && planCumplido(g)) return "";
     const bs = bancalesDe(g);
     const desdeB = Math.min(...bs), hastaB = Math.max(...bs);
