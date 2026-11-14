@@ -282,6 +282,24 @@ comercialización), con el **SKU de la tienda como llave**, precio por kg ×
 kg de la presentación, y de ahí salen Precios (por fórmula), la tienda (hoja
 con su formato de importación) y las dos apps.
 
+## Stock en campo: la foto es por cultivo (14/11, v94) — FALTA IMPLEMENTAR EL SERVICIO
+
+El mensaje del 14/11 ofrecía la acelga, el kale, el mix y el nabo dos veces:
+lo relevado el 6/11 en «Primavera N» seguía vigente al lado de lo del 14/11
+en «Primavera A N» (el sector se partió y la clave del lugar cambió). Ahora,
+en el campo, **el último día que se relevó un cultivo es su foto**: lo de
+días anteriores de ese cultivo no cuenta (`fotoDelCultivo` en stock.js,
+lo mismo en `stockDe`). Cámara, elaborados y demás siguen por lugar.
+- La app ya lo hace sola (publicada). **Falta pegar `Code.gs` e implementar
+  Nueva versión**: hasta entonces la pestaña Semana de AMA Economía
+  (`?stockcomercial=1`) sigue viendo lo duplicado.
+- Consecuencia a saber: si un día se releva un solo bancal de un cultivo,
+  los otros bancales de ese cultivo dejan de contar. Relevar el cultivo entero.
+- Rabanito (6/11, 290 atados) y Lechuga (30/10) siguen vigentes porque no se
+  relevaron el 14/11: marcarlos agotados o relevarlos.
+- Propuesto, sin decidir: en el mensaje, que lo que ya está listo también
+  figure para la semana del bolsón (hoy aparece solo en «Esta semana»).
+
 ## Stock, versión 1 (23/10) — servicio implementado
 
 Publicada (v82) y con el servicio implementado (verificado el 24/10): la

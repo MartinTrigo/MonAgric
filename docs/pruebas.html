@@ -544,6 +544,20 @@ almacenamiento del teléfono.</p>
     igual("stock: el mismo cultivo con otra forma de escribirlo es el mismo lugar",
       stockVigente([r("a", "2026-10-20", "Acelgas", 40), r("b", "2026-10-20", "acelga", 5)], "2026-10-20")
         .map((x) => x.id), ["b"]);
+    {
+      // 14/11: el sector cambió de nombre entre un relevamiento y otro.
+      const viejos = [r("v1", "2026-11-06", "Acelga", 10, { sector: "Primavera", bancal: 1 }),
+                      r("v2", "2026-11-06", "Rabanito", 100, { sector: "Primavera", bancal: 5 }),
+                      r("c1", "2026-11-06", "Acelga", 8, { tipo: "Cosechado", sector: "", bancal: "", lugar: "Cámara" })];
+      const nuevos = [r("n1", "2026-11-14", "Acelga", 29, { sector: "Primavera A", bancal: 1 }),
+                      r("n2", "2026-11-14", "Acelga", 20, { sector: "Primavera A", bancal: 2 })];
+      const vig = stockVigente(viejos.concat(nuevos), "2026-11-14");
+      igual("stock en campo: el último día relevado de un cultivo es su foto",
+        fotoDelCultivo(vig, vig).map((x) => x.id).sort(), ["c1", "n1", "n2", "v2"]);
+      const agot = r("n3", "2026-11-14", "Rabanito", 0, { sector: "Primavera A", bancal: 5 });
+      igual("stock en campo: marcarlo agotado ese día también es la foto",
+        fotoDelCultivo(vig, vig.concat(agot)).map((x) => x.id).sort(), ["c1", "n1", "n2"]);
+    }
     igual("stock: 25 unidades de 1,2 kg, listas en 7 días",
       calcularStock({ fecha: "2026-10-23", formato: "unidad", cantidad: 25, peso_unidad: 1.2, dias: 7 }),
       { kg: 30, dias: 7, disponible: "2026-10-30" });

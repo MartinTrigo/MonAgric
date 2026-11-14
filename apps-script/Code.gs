@@ -1915,7 +1915,19 @@ function stockDe(chacra, fecha, desde) {
   var limpia = function (o) { var c = Object.assign({}, o); delete c._orden; return c; };
   var hayAlgo = function (o) { return Number(o.Kg) > 0 || Number(o.Cantidad) > 0; };
   var ultimas = Object.keys(ultima).map(function (k) { return ultima[k]; });
-  var vigente = ultimas.filter(hayAlgo).map(limpia);
+  // En el campo, el ultimo dia que se relevo un cultivo es su foto (14/11):
+  // lo de dias anteriores en otros bancales ya no cuenta. Cuando Tica partio
+  // "Primavera" en A y B, la acelga del 6/11 en "Primavera 1" seguia al lado
+  // de la del 14/11 en "Primavera A 1". Igual que fotoDelCultivo en stock.js.
+  var deCampo = function (o) { return (o.Tipo || "En campo") === "En campo"; };
+  var ultimoDia = {};
+  ultimas.filter(deCampo).forEach(function (o) {
+    var k = claveCultivo(o.Cultivo);
+    if (!ultimoDia[k] || o.Fecha > ultimoDia[k]) ultimoDia[k] = o.Fecha;
+  });
+  var vigente = ultimas.filter(hayAlgo)
+    .filter(function (o) { return !deCampo(o) || o.Fecha >= ultimoDia[claveCultivo(o.Cultivo)]; })
+    .map(limpia);
   // Lo ultimo de un lugar que quedo en cero (24/10): la vista por semanas lo
   // necesita para no volver a mostrar ese bancal como "lo que dice el plan".
   var agotados = ultimas.filter(function (o) { return !hayAlgo(o); }).map(limpia);

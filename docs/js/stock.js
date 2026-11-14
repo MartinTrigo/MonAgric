@@ -114,8 +114,26 @@ function stockAl(fecha) {
     .filter(({ r }) => r.tipo === "stock" && !conocidos.has(String(r.id)))
     .sort((a, b) => String(a.r.creado_en).localeCompare(String(b.r.creado_en)))
     .map(({ r, porEnviar }) => ({ ...r.datos, id: String(r.id), porEnviar }));
-  return { lista: stockVigente(base.concat(locales), fecha),
-           ultimos: stockVigente(agotados.concat(base, locales), fecha, true), delServicio };
+  const ultimos = stockVigente(agotados.concat(base, locales), fecha, true);
+  return { lista: fotoDelCultivo(stockVigente(base.concat(locales), fecha), ultimos),
+           ultimos, delServicio };
+}
+
+/* En el campo, el último día que se relevó un cultivo es su foto (14/11):
+   lo relevado ese día es TODO lo que hay de ese cultivo, y lo de días
+   anteriores en otros bancales ya no cuenta. Por lugar solo no alcanzaba:
+   cuando Tica partió «Primavera» en A y B, la acelga relevada el 6/11 en
+   «Primavera 1» seguía vigente al lado de la del 14/11 en «Primavera A 1», y
+   el mensaje la ofrecía dos veces. El mismo día, cada bancal sigue siendo un
+   lugar. Lo marcado agotado ese día también es parte de la foto. La cámara,
+   lo elaborado y lo demás siguen yendo por lugar. Igual que stockDe en Code.gs. */
+function fotoDelCultivo(lista, ultimos) {
+  const ultimoDia = new Map();
+  ultimos.concat(lista).filter(esDeCampo).forEach((d) => {
+    const k = claveArea(d.cultivo);
+    if (!ultimoDia.has(k) || d.fecha > ultimoDia.get(k)) ultimoDia.set(k, d.fecha);
+  });
+  return lista.filter((d) => !esDeCampo(d) || d.fecha >= (ultimoDia.get(claveArea(d.cultivo)) || ""));
 }
 
 // En qué grupo cae, mirado desde la fecha que se está viendo.
