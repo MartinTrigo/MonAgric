@@ -6,6 +6,29 @@ que falta hacer.
 
 ---
 
+## El mapa de Tica después de la recorrida del 14/11
+
+- **Arreglado (v96):** una generación partida en partes (Tomate G1 en tres)
+  dejaba las partes sin lugar propio «plantadas» sin bancal: no se podían
+  arrastrar, sacar ni verificar. Ahora siguen con su plan.
+- **Cargado:** 34 generaciones verificadas el 14/11 con la lista de Martín
+  (Primavera A y B, Verano A 2, 4, 5, 12, Verano B entero salvo el 3,
+  Invierno A y B con zapallo). Los contornos punteados que quedan son el
+  plan original: se ven a propósito, para comparar.
+- **Falta que Martín diga** (no se adivinó):
+  - Verano A 3: el campo dice perejil, el registro dice Apio G1 (10/11).
+  - Verano A 6 y 7, mix: Mix de hojas G3 está registrado en el 7; ¿el 6 es
+    otra generación de mix? El 6 tiene registrado Repollo G5.
+  - Verano A 8, «coles»: candidatos Repollo G5 (registrado en el 6, 8/11),
+    Brócoli G4 (registrado en «Primavera 20», 10/11) o Pak choi G1 (sin lugar).
+  - Verano B 3, berenjena: solo hay una generación de berenjena (Verano A 12).
+    El Morrón G1 está registrado en Verano B 9 y no aparece en el campo.
+  - Tomate G1 tiene una tercera parte (`gen-tomate-1-b-b`, 1 bancal) que no
+    está en el campo: ¿borrarla?
+- **Frutilla:** 5 bancales en Frutillar. Hace falta una forma de cargar
+  perennes (ocupa el bancal varias temporadas, cosecha todos los años). No
+  entra en el modelo de generación con siembra → campo → fin.
+
 ## BioSalud comparte el sitio con AMA (29/10) — HAY QUE SEPARARLO
 
 Producción, Economía y BioSalud se publican en `martintrigo.github.io`: para el
