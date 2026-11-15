@@ -34,6 +34,19 @@ que falta hacer.
   Zapallito G1 (29/09) ya no aparecía. Se corrigió desde la computadora.
   Hace falta poder buscar un registro más viejo (por cultivo o generación)
   y pedírselo al servicio para corregirlo.
+- **Los mix de hojas no cierran (15/11).** Martín dice que lo único que se
+  cosecha es «Mix G1» en Primavera A 12. Pero los registros dicen: Mix G2
+  (7/10) y Mix G4 (9/10, «trasplantamos mix g1, mix g2 y lechuga g1»)
+  fueron al mismo bancal, el viejo Primavera 12; la única cosecha de mix
+  (4/11, 123 kg, ¿no serán 12,3?) es anterior a la siembra directa de la
+  G1 (21/10, cargada en «Frutillar 1», casi seguro el valor sin tocar). Lo
+  de Primavera A 12 parece ser G2 + G4. Preguntarle antes de tocar nada.
+- **Kilos al terminar una generación** (pedido de Martín, 15/11): no quiere
+  cargar los kilos a mano; tienen que salir de las cosechas registradas.
+  Hoy el formulario de cierre ya propone lo asignado + lo sin asignar
+  (`kgSinAsignar`), pero las cosechas no dicen bancal ni casi nunca
+  generación, así que con dos generaciones del mismo cultivo abiertas no
+  se sabe de cuál es cada kilo. Pensarlo junto con «rinde por bancal».
 - **Frutilla:** 5 bancales en Frutillar. Hace falta una forma de cargar
   perennes (ocupa el bancal varias temporadas, cosecha todos los años). No
   entra en el modelo de generación con siembra → campo → fin.

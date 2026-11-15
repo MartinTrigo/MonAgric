@@ -206,8 +206,13 @@ contra la planilla el 14/11):
 - Zapallito G1: la fila «30/10» se había cargado el 2/10: era la siembra
   original con el mes mal puesto. **Corregida el 15/11 a 29/09** (con el sí
   de Martín). Zucchini G1 del 29/09: alvéolos corregidos de 128 a 25 (150
-  plantines), como decía su observación. **Falta cargar las dos resiembras
-  del 30/10** como siembras nuevas, con «Esta siembra es: Resiembra».
+  plantines), como decía su observación. Las dos resiembras del 30/10
+  **cargadas el 15/11** (3 bandejas de 25 cada una, aproximado).
+- **Hecho el 15/11:** Brócoli G4 del 26/10 marcada como resiembra (Martín
+  no sabe qué pasó; la del 27/10 sigue como G5). Tomates propios (10 y
+  12/09) pasados a **Tomate G2**, que se creó en el plan (`gen-tomate-2`,
+  1 bancal, sin ubicar: es el cuarto bancal que falta trasplantar). Se borró
+  la cuarta parte de la G1 (`gen-tomate-1-b-b`).
 - Tomate: G1 son los encargados (3 bancales plantados en Verano B 1, 2 y
   12, y una cuarta parte de 1 bancal sin ubicar, que Martín quiere dejar
   fuera del mapa hasta decidir dónde va). Las tres variedades propias (10 a
