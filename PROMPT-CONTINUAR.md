@@ -60,8 +60,9 @@ con datos reales.**
    generación partida sin lugar propio contaban como «plantadas» sin bancal
    y no se podían mover, sacar ni verificar (Tomate G1). Falta que Martín
    mire el mapa con datos reales y diga si se ve como el campo.
-4. **Pendiente, esperando el sí de Martín:** `corregir_sectores.py` simulado
-   el 14/11 (55 lugares, 11 sin equivalencia). Ahora casi todo está
+4. **Aplicado el 15/11 con el sí de Martín:** `corregir_sectores.py`
+   (55 lugares traducidos; 11 sin equivalencia, en los viejos corredores 1
+   y 14, quedan como estaban: Lechuga G2 y Perejil G1 siguen sin lugar). Ahora casi todo está
    verificado y lo verificado le gana a los registros, así que traducir los
    Trasplantes solo cambia el dibujo de lo NO verificado: Brócoli G4
    (Primavera 20 → B 6, encima del Brócoli G3) y Mix de hojas G4

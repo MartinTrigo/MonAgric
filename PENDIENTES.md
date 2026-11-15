@@ -24,6 +24,11 @@ que falta hacer.
     sin verificar hasta que alguien lo mire.
   - Tomate G1 tiene una tercera parte (`gen-tomate-1-b-b`, 1 bancal) que no
     está en el campo: ¿borrarla?
+- **Sectores viejos traducidos (15/11)** con `corregir_sectores.py --aplicar`.
+  Quedan rayadas, sin verificar: Brócoli G4 (Primavera B 6, encima del
+  Brócoli G3; ¿es la col de Verano A 8?) y Mix de hojas G4 (Primavera A 11,
+  encima del Kale; seguramente ya cosechada: terminarla). Lechuga G2 y
+  Perejil G1 quedaron registradas en corredores viejos, sin lugar.
 - **Frutilla:** 5 bancales en Frutillar. Hace falta una forma de cargar
   perennes (ocupa el bancal varias temporadas, cosecha todos los años). No
   entra en el modelo de generación con siembra → campo → fin.
