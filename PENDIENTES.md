@@ -34,13 +34,18 @@ que falta hacer.
   Zapallito G1 (29/09) ya no aparecía. Se corrigió desde la computadora.
   Hace falta poder buscar un registro más viejo (por cultivo o generación)
   y pedírselo al servicio para corregirlo.
-- **Los mix de hojas no cierran (15/11).** Martín dice que lo único que se
-  cosecha es «Mix G1» en Primavera A 12. Pero los registros dicen: Mix G2
-  (7/10) y Mix G4 (9/10, «trasplantamos mix g1, mix g2 y lechuga g1»)
-  fueron al mismo bancal, el viejo Primavera 12; la única cosecha de mix
-  (4/11, 123 kg, ¿no serán 12,3?) es anterior a la siembra directa de la
-  G1 (21/10, cargada en «Frutillar 1», casi seguro el valor sin tocar). Lo
-  de Primavera A 12 parece ser G2 + G4. Preguntarle antes de tocar nada.
+- **Mix de hojas (15/11, aclarado por Martín):** la germinación salió al
+  50 % y Primavera A 12 se llenó con **Mix G1, Mix G2 y Lechuga G1**
+  (verificadas ahí). Se borró la siembra directa de Mix G1 del 21/10 en
+  «Frutillar 1», que estaba mal (copia en Cambios). Quedan:
+  - Mix G1 sin siembra cargada (se trasplantó el 9/10: falta su almácigo).
+  - Mix G4 sin saber dónde está; Martín cree que puede ser Primavera B 10.
+  - Primavera B 2 (lechuga) y B 10 (mix) quedaron sin generación
+    verificada: ¿Lechuga G2 (trasplantada el 21/10, registrada en el viejo
+    corredor 14) y Mix G4?
+  - La cosecha de mix del 4/11 dice 123 kg: Martín la revisa en la app.
+- En Frutillar hay 5 trasplantes de Frutilla G1 del 10/10 (bancales 1 a 5):
+  son reales y se dejaron.
 - **Kilos al terminar una generación** (pedido de Martín, 15/11): no quiere
   cargar los kilos a mano; tienen que salir de las cosechas registradas.
   Hoy el formulario de cierre ya propone lo asignado + lo sin asignar
