@@ -989,9 +989,24 @@ function prepararResumenStock() {
 
 // "Agotado" en una línea de lo disponible: se terminó. Es un relevamiento más, con
 // cantidad cero, del mismo cultivo en el mismo lugar.
+/* «Por semana» / «Por lugar». Se redibuja la tarjeta a mano (15/11): con
+   redibujarConDatos no cambiaba nada, porque el botón recién tocado queda con
+   el foco DENTRO de la parte, y una parte con el foco adentro (o donde se
+   escribió algo) no se reemplaza. Mismo arreglo que los cierres. */
 function engancharModoStock() {
   document.querySelectorAll("[data-modo-stock]").forEach((b) => {
-    b.onclick = () => { modoStock = b.dataset.modoStock; redibujarConDatos("stock"); };
+    b.onclick = () => {
+      modoStock = b.dataset.modoStock;
+      const viva = document.querySelector('#vista [data-parte="stock-disponible"]');
+      if (!viva) { render("stock", true); return; }
+      const t = document.createElement("template");
+      t.innerHTML = parte("stock-disponible", tarjetaDisponible());
+      const nueva = t.content.firstElementChild;
+      viva.replaceWith(nueva);
+      htmlDePartes.set("stock-disponible", nueva.outerHTML);
+      partesTocadas.delete("stock-disponible");
+      engancharPartes("stock");
+    };
   });
 }
 

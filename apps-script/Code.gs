@@ -184,12 +184,17 @@ var HOJAS = {
     // app la pone sola cuando ese cultivo tiene una sola generacion en el
     // campo; si no, queda vacia ("sin asignar") y se reparte al terminar la
     // generacion (hoja Cierres).
+    // "Sector" y "Bancales" (15/11), al final y optativas: de donde salio la
+    // cosecha, para saber cuanto rindio cada bancal. Bancales es una lista
+    // ("4, 5"): va como texto, si no la planilla la vuelve una fecha.
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Kg", "Cosechó",
-                  "Cargado por", "Recibido", "Generación"],
+                  "Cargado por", "Recibido", "Generación", "Sector", "Bancales"],
+    columnasTexto: [11],
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.kg,
-              d.operador || "", r.dispositivo || "", new Date(), numeroOVacio(d.generacion)];
+              d.operador || "", r.dispositivo || "", new Date(), numeroOVacio(d.generacion),
+              d.sector || "", d.bancales || ""];
     },
   },
   /* Cuando una generacion se termina (12/11): se cosecho entera, o se perdio
@@ -523,6 +528,9 @@ function atender(p) {
       // Tiene la hoja Cierres y Cosechas guarda la generacion (12/11). Sin
       // esto la app no ofrece terminar una generacion: quedaria en la cola.
       cfg.cierres = true;
+      // Cosechas guarda de que sector y bancales salio (15/11). Sin esto la
+      // app no ofrece el campo: se perderia al guardar.
+      cfg.cosecha_lugar = true;
       // Las generaciones traen donde se plantaron de verdad (13/11): el mapa
       // dibuja lo plantado sobre lo planificado.
       cfg.lugar_real = true;
@@ -655,6 +663,7 @@ function doPost(e) {
         }
         var def = HOJAS[tipo];
         var hoja = obtenerHoja(libro, def);
+        columnasComoTexto(hoja, def);
         var existentes = idsExistentes(hoja);
         var filas = [];
         porTipo[tipo].forEach(function (r) {
@@ -1965,6 +1974,10 @@ function corregirRegistro(chacra, libro, r, borrar) {
   var def = HOJAS[cual];
   var hoja = libro.getSheetByName(def.nombre);
   if (!hoja || hoja.getLastRow() < 2) throw new Error("No encontré la hoja " + def.nombre + ".");
+  // Corregir puede escribir columnas que la hoja todavia no tenia (Sector y
+  // Bancales en Cosechas): se les pone el titulo antes.
+  hoja = obtenerHoja(libro, def);
+  columnasComoTexto(hoja, def);
   var n = def.encabezados.length;
 
   /* TODAS las filas con ese id, no solo la primera. Hasta el 01/10 se
@@ -2906,6 +2919,14 @@ function exportarHoja(chacra, cual) {
 }
 
 // ---------- Auxiliares ----------
+
+// Las columnas que guardan listas de bancales ("4, 5") van como texto: si no,
+// la planilla las interpreta como una fecha (ver guardarGeneracion).
+function columnasComoTexto(hoja, def) {
+  (def.columnasTexto || []).forEach(function (c) {
+    hoja.getRange(1, c, hoja.getMaxRows(), 1).setNumberFormat("@");
+  });
+}
 
 function obtenerHoja(libro, def) {
   var hoja = libro.getSheetByName(def.nombre);

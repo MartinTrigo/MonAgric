@@ -547,21 +547,64 @@ function prepararCosechas() {
   const generacionDeLaCosecha = (cultivo) => (CFG?.cierres && cultivo
     ? generacionEnCosecha(cultivo, f.fecha.value || hoy(), leer(LS.generaciones, []) || [], cierresVigentes()) : "");
 
+  // De qué bancal (15/11, ver lugaresDeCosecha). Cada desplegable recuerda
+  // para qué cultivo y qué fecha se llenó: se rehace solo si cambian.
+  const lugaresParaCosecha = (cultivo) => (CFG?.cosecha_lugar && cultivo
+    ? lugaresDeCosecha(cultivo, f.fecha.value || hoy(), leer(LS.generaciones, []) || [], cierresVigentes()) : []);
+  const llenarLugar = (sel, cultivo) => {
+    if (!sel) return;
+    const firma = `${cultivo}|${f.fecha.value}`;
+    if (sel.dataset.firma === firma) return;
+    sel.dataset.firma = firma;
+    const lugares = lugaresParaCosecha(cultivo);
+    sel.innerHTML = opcionesLugarCosecha(lugares, sel.value);
+    sel.hidden = !lugares.length;
+  };
+  const lugarElegido = (sel, cultivo) => (sel && sel.value
+    ? lugaresParaCosecha(cultivo).find((l) => l.clave === sel.value) || null : null);
+
   const leerRenglones = () => {
     if (pizarra) {
       return [...pizarra.querySelectorAll("input[data-cultivo]")]
-        .map((inp) => ({ cultivo: inp.dataset.cultivo, kg: aNumero(inp.value) || 0 }))
+        .map((inp) => {
+          const sel = inp.parentElement.querySelector(".lugar-cosecha");
+          return { cultivo: inp.dataset.cultivo, kg: aNumero(inp.value) || 0, lugar: lugarElegido(sel, inp.dataset.cultivo) };
+        })
         .filter((r) => r.kg > 0);
     }
     return [...renglones.querySelectorAll(".renglon-cosecha")]
       .map((div) => {
         const i = div.dataset.renglon;
-        return { cultivo: f["cultivo_" + i]?.value || "", kg: aNumero(f["kg_" + i]?.value) || 0 };
+        const cultivo = f["cultivo_" + i]?.value || "";
+        return { cultivo, kg: aNumero(f["kg_" + i]?.value) || 0, lugar: lugarElegido(f["lugar_" + i], cultivo) };
       })
       .filter((r) => r.cultivo || r.kg);
   };
+  // Llena los desplegables de los cultivos ya elegidos (en pizarra, los que
+  // tienen kilos: así no se ven veinte desplegables vacíos).
+  const llenarLugares = () => {
+    if (!CFG?.cosecha_lugar) return;
+    if (pizarra) {
+      pizarra.querySelectorAll("input[data-cultivo]").forEach((inp) => {
+        const sel = inp.parentElement.querySelector(".lugar-cosecha");
+        if (aNumero(inp.value) > 0) llenarLugar(sel, inp.dataset.cultivo);
+        else if (sel) sel.hidden = true;
+      });
+      return;
+    }
+    renglones.querySelectorAll(".renglon-cosecha").forEach((div) => {
+      const i = div.dataset.renglon;
+      llenarLugar(f["lugar_" + i], f["cultivo_" + i]?.value || "");
+    });
+  };
+  // La generación: la del lugar si ahí hay una sola; si se eligió un lugar
+  // con dos, sin asignar; sin lugar, la regla de siempre.
+  const generacionDe = (r) => (r.lugar
+    ? (CFG?.cierres && r.lugar.generaciones.length === 1 ? r.lugar.generaciones[0] : "")
+    : generacionDeLaCosecha(r.cultivo));
 
   const actualizar = () => {
+    llenarLugares();
     const cargados = leerRenglones().filter((r) => r.cultivo && r.kg > 0);
     if (!cargados.length) {
       calculo.innerHTML = pizarra
@@ -574,8 +617,8 @@ function prepararCosechas() {
       const plan = enPlan(r.cultivo);
       // Si ese cultivo tiene una sola generación en el campo, la cosecha
       // queda a su nombre: se muestra para que se vea a dónde va.
-      const gen = generacionDeLaCosecha(r.cultivo);
-      const aQuien = gen ? ` → G${gen}` : "";
+      const gen = generacionDe(r);
+      const aQuien = (r.lugar ? ` · ${r.lugar.sector} ${tramosDeBancales(r.lugar.bancales)}` : "") + (gen ? ` → G${gen}` : "");
       if (!plan?.cosecha_esperada_kg) return `${esc(r.cultivo)} ${num(r.kg, 1)} kg${aQuien}`;
       return `${esc(r.cultivo)} ${num(r.kg, 1)} kg${aQuien} (${num((r.kg / plan.cosecha_esperada_kg) * 100, 1)}% de lo esperado)`;
     }).join(" · ");
@@ -658,20 +701,27 @@ function prepararCosechas() {
         ? `Faltan los kilos de ${incompleto.cultivo}.`
         : "Hay un renglón sin cultivo elegido.", true);
     }
-    // Un mismo cultivo dos veces sería confuso al analizar: se suma.
-    const porCultivo = {};
-    cargados.forEach((r) => { porCultivo[r.cultivo] = (porCultivo[r.cultivo] || 0) + r.kg; });
+    // Un mismo cultivo dos veces del mismo lugar sería confuso al analizar:
+    // se suma. De dos bancales distintos son dos filas (15/11).
+    const juntos = new Map();
+    cargados.forEach((r) => {
+      const k = `${r.cultivo}|${r.lugar ? r.lugar.clave : ""}`;
+      const x = juntos.get(k) || { ...r, kg: 0 };
+      x.kg += r.kg;
+      juntos.set(k, x);
+    });
 
     if (f.operador.value && !leer(LS.nombre, "")) escribir(LS.nombre, f.operador.value);
-    // Una fila por cultivo, todas con la misma fecha y la misma persona.
-    Object.entries(porCultivo).forEach(([cultivo, kg]) => {
+    // Una fila por cultivo y lugar, todas con la misma fecha y la misma persona.
+    juntos.forEach((r) => {
       guardarRegistro("cosechas", {
         fecha: f.fecha.value,
-        cultivo,
-        kg: Math.round(kg * 100) / 100,
+        cultivo: r.cultivo,
+        kg: Math.round(r.kg * 100) / 100,
         operador: f.operador.value,
-        generacion: generacionDeLaCosecha(cultivo),
-      }, `Cosecha guardada: ${Object.keys(porCultivo).length} cultivo(s) ✓`);
+        generacion: generacionDe(r),
+        ...(CFG?.cosecha_lugar ? { sector: r.lugar ? r.lugar.sector : "", bancales: r.lugar ? r.lugar.bancales.join(", ") : "" } : {}),
+      }, `Cosecha guardada: ${juntos.size} renglón(es) ✓`);
     });
     render("inicio");
   };

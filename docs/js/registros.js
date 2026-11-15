@@ -167,7 +167,8 @@ const CORRECCION = {
     ["operador", "Operador", "persona"], ["observaciones", "Observaciones", "texto"]],
   cosechas: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
     ["kg", "Kg", "numero"], ["operador", "Cosechó", "persona"],
-    ["generacion", "Generación (vacío: sin asignar)", "generacionCosecha"]],
+    ["generacion", "Generación (vacío: sin asignar)", "generacionCosecha"],
+    ["sector", "Sector (de dónde salió)", "sectorCosecha"], ["bancales", "Bancales (ej: 4, 5)", "bancalesCosecha"]],
   horas: [["fecha", "Fecha", "fecha"], ["integrante", "Quién", "persona"],
     ["horas", "Horas", "numero"], ["area", "Área", "area"],
     ["actividad", "Actividad", "texto"], ["observaciones", "Qué se hizo", "texto"]],
@@ -198,7 +199,8 @@ const DE_LA_HOJA = {
     distancia_cm: "Distancia cm", disposicion: "Disposición", marco: "Marco",
     plantines: "Plantines", operador: "Operador", observaciones: "Observaciones",
     fecha_planificada: "Fecha planificada", diferencia_plan: "Diferencia plan" },
-  cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó", generacion: "Generación" },
+  cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó", generacion: "Generación",
+    sector: "Sector", bancales: "Bancales" },
   horas: { fecha: "Fecha", integrante: "Integrante", horas: "Horas", actividad: "Actividad",
     area: "Área", observaciones: "Observaciones" },
   stock: { fecha: "Fecha", tipo: "Tipo", cultivo: "Cultivo", variedad: "Variedad",
@@ -226,7 +228,7 @@ function campoCorreccion([k, rotulo, clase], v) {
   else if (clase === "repeticion") campo = `<select name="${k}">${opcionesRepeticion(val)}</select>`;
   else if (clase === "disposicion") campo = `<select name="${k}">${opciones(DISPOSICIONES)}</select>`;
   else if (clase === "persona") campo = `<select name="${k}">${opciones(integrantes())}</select>`;
-  else if (clase === "sector") campo = `<select name="${k}"><option value="">—</option>${
+  else if (clase === "sector" || clase === "sectorCosecha") campo = `<select name="${k}"><option value="">—</option>${
     sectores().map((s) => `<option${s.sector === val ? " selected" : ""}>${esc(s.sector)}</option>`).join("")}</select>`;
   else if (clase === "area") campo = `<select name="${k}">${opcionesArea(val)}</select>`;
   else if (clase === "tipoStock") campo = `<select name="${k}">${opciones(TIPOS_STOCK)}</select>`;
@@ -239,7 +241,8 @@ function formularioCorreccion(tipo, f) {
   const d = datosDeFila(tipo, f);
   // «Repetición» solo si el servicio la guarda: si no, se perdería al corregir.
   const campos = CORRECCION[tipo].filter((c) => (c[2] !== "repeticion" || CFG?.repeticion)
-      && (c[2] !== "generacionCosecha" || CFG?.cierres))
+      && (c[2] !== "generacionCosecha" || CFG?.cierres)
+      && (!["sectorCosecha", "bancalesCosecha"].includes(c[2]) || CFG?.cosecha_lugar))
     .map((c) => campoCorreccion(c, d[c[0]]));
   // De a dos por renglón, como el resto de los formularios.
   const filas = [];
@@ -321,7 +324,8 @@ function columnasQueFaltan(esquema) {
   // «Repetición» (11/11): un servicio que todavía no la tiene no es un error;
   // la app no ofrece el campo (cfg.repeticion).
   // Lo mismo con «Generación» en Cosechas (12/11, cfg.cierres).
-  const OPCIONALES = { siembras: ["Repetición"], cosechas: ["Generación"] };
+    // Y «Sector» y «Bancales» en Cosechas (15/11, cfg.cosecha_lugar).
+  const OPCIONALES = { siembras: ["Repetición"], cosechas: ["Generación", "Sector", "Bancales"] };
   const faltan = [];
   Object.entries(DE_LA_HOJA).forEach(([hoja, campos]) => {
     if (!Array.isArray(esquema[hoja])) return;

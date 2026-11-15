@@ -801,6 +801,20 @@ almacenamiento del teléfono.</p>
         [opcionesBancal("").includes("<option>1</option>"), opcionesBancal("Verano").includes(" selected>Elegí"),
          opcionesBancal("Verano", 3).includes("<option selected>3</option>"), (opcionesBancal("Verano").match(/<option/g) || []).length],
         [false, true, true, 26]);
+      // 15/11: de qué bancal sale una cosecha.
+      igual("cosecha: los lugares donde el cultivo está en el campo (lo plantado y las partes con su plan)",
+        lugaresDeCosecha("Repollo bco", "2026-10-01", lista, new Map()).map((l) => l.texto),
+        ["Primavera 7, 8 (G1)", "Verano 4 (G1)"]);
+      igual("cosecha: una generación terminada ya no ofrece su bancal",
+        lugaresDeCosecha("Repollo bco", "2026-10-01", lista, new Map([[claveGen("Repollo bco", 1), {}]])).length, 0);
+      const dosEnUno = [p("m1", 1, "", "", [{ sector: "Verano", bancales: [12] }]), p("m2", 2, "", "", [{ sector: "Verano", bancales: [12] }])]
+        .map((x) => ({ ...x, lugar_verificado: "2026-11-14" }));
+      igual("cosecha: dos generaciones en el mismo bancal son un lugar con las dos (no se asigna generación)",
+        lugaresDeCosecha("Repollo bco", "2026-11-15", dosEnUno, new Map()).map((l) => [l.texto, l.generaciones]),
+        [["Verano 12 (G1, G2)", [1, 2]]]);
+      igual("cosecha: bancales seguidos se escriben como tramo",
+        [tramosDeBancales([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), tramosDeBancales([1, 2, 5]), tramosDeBancales([4])],
+        ["1 a 12", "1, 2, 5", "4"]);
     }
 
     igual("tablero: sin generaciones en el plan no se dibuja",

@@ -62,7 +62,18 @@ function renglonPizarra(cultivo, i) {
     <label for="pz_${i}">${esc(cultivo)}</label>
     <input type="text" id="pz_${i}" name="pz_${i}" data-cultivo="${esc(cultivo)}"
            inputmode="decimal" autocomplete="off" placeholder="kg">
+    ${CFG?.cosecha_lugar ? `<select class="lugar-cosecha" name="pzlugar_${i}" hidden aria-label="De qué bancal"></select>` : ""}
   </div>`;
+}
+
+/* El desplegable «¿De qué bancal?» de una cosecha (15/11): los lugares donde
+   ese cultivo está en el campo (lugaresDeCosecha). Si hay uno solo viene
+   elegido; si no hay ninguno, no se muestra. Así se sabe cuánto rindió
+   cada bancal, y de qué generación es lo cosechado. */
+function opcionesLugarCosecha(lugares, elegido = "") {
+  const sel = elegido || (lugares.length === 1 ? lugares[0].clave : "");
+  return `<option value=""${sel ? "" : " selected"}>¿De qué bancal? (no sé)</option>`
+    + lugares.map((l) => `<option value="${esc(l.clave)}"${l.clave === sel ? " selected" : ""}>${esc(l.texto)}</option>`).join("");
 }
 
 // Un cultivo con sus kilos, en un solo renglón. Una cosecha de pizarra son
@@ -76,6 +87,7 @@ function renglonCosecha(i, valor = "", kg = "") {
            value="${esc(kg)}" placeholder="kg" aria-label="Kilos cosechados">
     <button type="button" class="quitar" data-quitar-renglon="${i}"
             aria-label="Quitar este cultivo">&times;</button>
+    ${CFG?.cosecha_lugar ? `<select class="lugar-cosecha" name="lugar_${i}" hidden aria-label="De qué bancal"></select>` : ""}
   </div>`;
 }
 

@@ -184,6 +184,12 @@ def main() -> None:
     else:
         print("  [ANTERIOR] el lugar verificado en el campo (el mapa no ofrece confirmar)")
         viejas.append("el lugar verificado")
+    # 15/11: Cosechas guarda de que sector y bancales salio.
+    if cf.get("cosecha_lugar"):
+        print("  [al dia]   el bancal de cada cosecha")
+    else:
+        print("  [ANTERIOR] el bancal de cada cosecha (el formulario no pregunta de donde salio)")
+        viejas.append("el bancal de la cosecha")
     if cf.get("lugar_real"):
         print(f"  [al dia]   el lugar donde se planto cada generacion ({con_lugar} con lugar registrado en Tica)")
     else:

@@ -409,6 +409,9 @@ a.tab { text-decoration: none; }
   cursor: pointer;
 }
 .renglon-cosecha .quitar:active { color: var(--alerta); }
+/* De qué bancal (15/11): debajo del cultivo y los kilos, a todo el ancho. */
+.renglon-cosecha .lugar-cosecha { grid-column: 1 / 3; margin-bottom: 4px; }
+.renglon-pizarra .lugar-cosecha { grid-column: 1 / -1; margin: 2px 0 4px; padding: 5px 8px; font-size: .88rem; }
 /* Un solo renglón no se puede quitar: sin él no queda nada que cargar. */
 .renglon-cosecha:only-child .quitar { visibility: hidden; }
 

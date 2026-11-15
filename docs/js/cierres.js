@@ -145,6 +145,47 @@ function generacionEnCosecha(cultivo, fecha, gens, cierres) {
   return enCampo.length === 1 ? enCampo[0].generacion : "";
 }
 
+// [1,2,3,5] -> "1 a 3, 5": doce bancales seguidos no entran en un desplegable.
+function tramosDeBancales(bs) {
+  const t = [];
+  bs.forEach((b) => { const u = t[t.length - 1]; if (u && u[1] === b - 1) u[1] = b; else t.push([b, b]); });
+  return t.map(([a, z]) => (a === z ? `${a}` : z === a + 1 ? `${a}, ${z}` : `${a} a ${z}`)).join(", ");
+}
+
+/* De qué bancales puede salir la cosecha de un cultivo (15/11): los lugares
+   donde hay una generación suya abierta en el campo. Un lugar por parte de
+   generación; dos generaciones en el mismo lugar (Mix G1 y G2 en Primavera
+   A 12) son un solo lugar con las dos. Si el lugar tiene una sola
+   generación, la cosecha queda a su nombre sin preguntar.
+   Devuelve [{ clave, sector, bancales: [..], generaciones: [..], texto }]. */
+function lugaresDeCosecha(cultivo, fecha, gens, cierres) {
+  const k = claveArea(cultivo);
+  const plantadas = plantadasDe(gens);
+  const porLugar = new Map();
+  gens.forEach((g) => {
+    if (claveArea(g.cultivo) !== k || cierres.has(claveGen(g.cultivo, g.generacion))) return;
+    // En el campo: tiene lugar plantado (verificado o registrado), o el plan
+    // dice que ya fue a tierra antes de esta fecha.
+    const t = tramosDe(g);
+    const enCampo = plantadas.has(g.id) || (esSembrada(g) && t && t.real.campo && t.real.campo <= fecha);
+    if (!enCampo) return;
+    const porSector = new Map();
+    lugaresDe(g, gens).forEach((l) => porSector.set(l.sector, (porSector.get(l.sector) || []).concat(l.bancal)));
+    porSector.forEach((bs, sector) => {
+      bs.sort((a, b) => a - b);
+      const clave = `${sector}|${bs.join(",")}`;
+      const x = porLugar.get(clave) || { clave, sector, bancales: bs, generaciones: [] };
+      const n = Number(g.generacion) || 1;
+      if (!x.generaciones.includes(n)) x.generaciones.push(n);
+      porLugar.set(clave, x);
+    });
+  });
+  return [...porLugar.values()]
+    .map((x) => ({ ...x, generaciones: x.generaciones.sort((a, b) => a - b),
+                   texto: `${x.sector} ${tramosDeBancales(x.bancales)} (G${x.generaciones.slice().sort((a, b) => a - b).join(", G")})` }))
+    .sort((a, b) => a.sector.localeCompare(b.sector, "es") || a.bancales[0] - b.bancales[0]);
+}
+
 // ==========================================================
 // LA PANTALLA: en Cosechas, «Terminar una generación»
 // ==========================================================
