@@ -48,10 +48,13 @@ que falta hacer.
   son reales y se dejaron.
 - **Kilos al terminar una generación** (pedido de Martín, 15/11): no quiere
   cargar los kilos a mano; tienen que salir de las cosechas registradas.
-  Hoy el formulario de cierre ya propone lo asignado + lo sin asignar
-  (`kgSinAsignar`), pero las cosechas no dicen bancal ni casi nunca
-  generación, así que con dos generaciones del mismo cultivo abiertas no
-  se sabe de cuál es cada kilo. Pensarlo junto con «rinde por bancal».
+  **Hecho el primer paso (v97):** la cosecha guarda de qué bancal salió y,
+  si ahí hay una sola generación, de cuál es. **Falta:** (1) que Martín haga
+  la Nueva versión del Apps Script (sin eso el campo no aparece);
+  (2) mostrar el rinde por bancal (kg cosechados ÷ m² del bancal, contra lo
+  esperado); (3) que el cierre proponga los kilos ya sumados por bancal.
+  Las cosechas anteriores al 15/11 no tienen bancal.
+- **Stock «Por lugar» (arreglado en v97):** el botón no cambiaba la vista.
 - **Frutilla:** 5 bancales en Frutillar. Hace falta una forma de cargar
   perennes (ocupa el bancal varias temporadas, cosecha todos los años). No
   entra en el modelo de generación con siembra → campo → fin.

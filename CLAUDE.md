@@ -326,6 +326,21 @@ las fechas:
   `tools/corregir_sectores.py` (`corregirLugares` en el servicio): toca solo
   sector y bancal, deja copia en Cambios, y sin `--aplicar` solo simula.
 
+## De qué bancal sale una cosecha (15/11, v97)
+
+- Cada renglón de Cosechas (lista y pizarra) pregunta **de qué bancal**
+  salió, entre los lugares donde ese cultivo está hoy en el campo
+  (`lugaresDeCosecha`, en `cierres.js`: lo plantado con `lugaresDe`, y las
+  generaciones terminadas no cuentan). Uno solo viene elegido; «no sé» se
+  puede siempre. Columnas **Sector** y **Bancales** al final de Cosechas
+  (texto: «4, 5» sin formato se vuelve fecha; `columnasTexto` en `HOJAS`).
+- Si en el lugar hay una sola generación, la cosecha queda a su nombre. Si
+  hay dos (Mix G1 y G2 en Primavera A 12), queda sin asignar. Sin lugar,
+  la regla de antes (`generacionEnCosecha`).
+- Todavía **no se calcula el rinde por bancal**: el dato se empezó a guardar
+  el 15/11. Es el paso siguiente (ver `PENDIENTES.md`).
+- Aparece solo si el servicio lo guarda (`cfg.cosecha_lugar`).
+
 ## El mapa y los sectores que cambian (13/11)
 
 - **Una generación está ubicada solo si su lugar existe** (`estaUbicada`, en
