@@ -203,9 +203,11 @@ que mirar con datos reales (nada de esto se verificó en un teléfono):
 
 Pendientes de datos que Martín tiene que cargar (recordáselos; revisado
 contra la planilla el 14/11):
-- Zapallito G1: marcar la siembra del 30/10 como resiembra y cargar la del
-  29/09. **Sigue sin hacer** (figura sembrada el 30/10, sin resiembras).
-  Zucchini G1: cargar la resiembra del 30/10. **Sigue sin hacer.**
+- Zapallito G1: la fila «30/10» se había cargado el 2/10: era la siembra
+  original con el mes mal puesto. **Corregida el 15/11 a 29/09** (con el sí
+  de Martín). Zucchini G1 del 29/09: alvéolos corregidos de 128 a 25 (150
+  plantines), como decía su observación. **Falta cargar las dos resiembras
+  del 30/10** como siembras nuevas, con «Esta siembra es: Resiembra».
 - Tomate: G1 son los encargados (3 bancales plantados en Verano B 1, 2 y
   12, y una cuarta parte de 1 bancal sin ubicar, que Martín quiere dejar
   fuera del mapa hasta decidir dónde va). Las tres variedades propias (10 a

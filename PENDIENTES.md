@@ -29,6 +29,11 @@ que falta hacer.
   Brócoli G3; ¿es la col de Verano A 8?) y Mix de hojas G4 (Primavera A 11,
   encima del Kale; seguramente ya cosechada: terminarla). Lechuga G2 y
   Perejil G1 quedaron registradas en corredores viejos, sin lugar.
+- **Corregir un registro viejo no se puede desde el teléfono** (15/11):
+  «Últimos movimientos» muestra solo las últimas 15 filas, y la siembra de
+  Zapallito G1 (29/09) ya no aparecía. Se corrigió desde la computadora.
+  Hace falta poder buscar un registro más viejo (por cultivo o generación)
+  y pedírselo al servicio para corregirlo.
 - **Frutilla:** 5 bancales en Frutillar. Hace falta una forma de cargar
   perennes (ocupa el bancal varias temporadas, cosecha todos los años). No
   entra en el modelo de generación con siembra → campo → fin.
