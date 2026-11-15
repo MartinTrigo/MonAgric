@@ -51,16 +51,22 @@ aviso de arriba para confirmar todo junto con una fecha). Probado con la
 chacra inventada y el servidor simulado; 127 pruebas en verde. **No probado
 con datos reales.**
 
-**Lo que falta de esta tarea:**
-1. Que Martín haga la **Nueva versión** del Apps Script (se tocó `Code.gs`).
-   `python tools/version_servicio.py` tiene que decir «el lugar verificado».
-2. Que Martín abra Plan → Mapa en la notebook, ponga la fecha 12/11/2026 en
-   el aviso amarillo y toque «Confirmar que están donde dice el mapa».
-3. Mirar el mapa con datos reales: lo que ubicó tiene que quedar plantado y
-   verificado, sin contornos punteados; lo demás, rayado («sin verificar»).
-4. Correr `tools\corregir_sectores.py` sin `--aplicar`, mostrarle la lista
-   y aplicarla con su sí (traduce el stock y los registros de lo que no está
-   en el mapa).
+**Estado al 14/11 (Opus 5.5):**
+1. Hecho: el servicio corre la última versión (`version_servicio.py` al día).
+2. Hecho de otra forma: Martín recorrió el campo el 14/11 y se cargaron
+   **38 generaciones verificadas** con fecha 14/11, desde `tools` con la
+   clave de admin (tipo `lugar_verificado`). Detalle en `PENDIENTES.md`.
+3. Arreglado un error que trababa el mapa (v96): las partes de una
+   generación partida sin lugar propio contaban como «plantadas» sin bancal
+   y no se podían mover, sacar ni verificar (Tomate G1). Falta que Martín
+   mire el mapa con datos reales y diga si se ve como el campo.
+4. **Pendiente, esperando el sí de Martín:** `corregir_sectores.py` simulado
+   el 14/11 (55 lugares, 11 sin equivalencia). Ahora casi todo está
+   verificado y lo verificado le gana a los registros, así que traducir los
+   Trasplantes solo cambia el dibujo de lo NO verificado: Brócoli G4
+   (Primavera 20 → B 6, encima del Brócoli G3) y Mix de hojas G4
+   (Primavera 12 → A 11, encima del Kale). Lo que sí sirve es el Stock (14
+   filas) y la fila del plan de Mix de hojas G11 (Primavera 23 → B 9).
 5. (Hecho el 13/11) Documentado en `CLAUDE.md`, sección «El lugar: planificado y plantado».
 
 Lo que sigue en esta sección es el análisis y el diseño, ya ejecutados.
@@ -194,14 +200,26 @@ que mirar con datos reales (nada de esto se verificó en un teléfono):
   almácigo vencido, 30 una siembra sin cargar): ajustarlos con lo que diga
   Martín.
 
-Pendientes de datos que Martín tiene que cargar (recordáselos):
+Pendientes de datos que Martín tiene que cargar (recordáselos; revisado
+contra la planilla el 14/11):
 - Zapallito G1: marcar la siembra del 30/10 como resiembra y cargar la del
-  29/09. Zucchini G1: cargar la resiembra del 30/10.
-- Tomate: G1 son los encargados; las tres variedades propias (10 a 12/09)
-  son **una** generación, la G2, con tres tandas. Falta la G2 en el plan.
-- Brócoli G4 tiene dos siembras (05/10 y 26/10): ¿resiembra o error?
-- En el plan quedan con sector viejo «Corredor Biológico G2» (sacarla si ya
-  no va) y «Mix de hojas G11».
+  29/09. **Sigue sin hacer** (figura sembrada el 30/10, sin resiembras).
+  Zucchini G1: cargar la resiembra del 30/10. **Sigue sin hacer.**
+- Tomate: G1 son los encargados (3 bancales plantados en Verano B 1, 2 y
+  12, y una cuarta parte de 1 bancal sin ubicar, que Martín quiere dejar
+  fuera del mapa hasta decidir dónde va). Las tres variedades propias (10 a
+  12/09) son **una** generación, la G2, con tres tandas. **Falta la G2 en
+  el plan.**
+- Brócoli G4 tiene dos siembras (05/10 y 26/10): ¿resiembra o error? Se
+  trasplantó el 10/11 y quedó registrado en «Primavera 20». Es el mejor
+  candidato para las «coles» de Verano A 8, que nadie supo identificar.
+- Mix de hojas G4 (trasplantado el 09/10) no está en el campo: seguramente
+  ya se cosechó. Terminarla en Cosechas → «Terminar una generación».
+- Hecho: «Corredor Biológico G2» ya no está en el plan. Queda «Mix de hojas
+  G11» con el sector viejo «Primavera 23» (se arregla con
+  `corregir_sectores.py` o ubicándola en el mapa).
+- Frutilla: 5 bancales en Frutillar sin forma de cargarla (perenne). Ver
+  `PENDIENTES.md`.
 
 ## Tarea 4 — Planificar en el mapa lo que falta sembrar
 
