@@ -297,6 +297,18 @@ function datosCorregidos(tipo, f, form) {
     else contraPlan();
   } else if (tipo === "trasplantes") {
     d.generacion = parseInt(d.generacion, 10) || 1;
+    // Otra generación (20/11): el trasplante pasa a salir de SU siembra. Si
+    // no, el servicio, que cruza por la siembra de origen, lo seguía viendo
+    // como de la generación de antes (el Pak choi G1, que no germinó, figuraba
+    // trasplantada con lo que era la G2). La fecha planificada congelada era
+    // de la otra generación: se deja vacía.
+    if (d.generacion !== (parseInt(f["Generación"], 10) || 1)) {
+      const g = (leer(LS.generaciones, []) || [])
+        .find((x) => claveGen(x.cultivo, x.generacion) === claveGen(d.cultivo, d.generacion));
+      d.siembra_id = g?.siembra_id || "";
+      d.fecha_siembra = g?.sembrada_el || "";
+      d.fecha_planificada = "";
+    }
     const real = d.fecha_siembra && d.dias_almacigo_teorico !== ""
       ? diasEntre(String(d.fecha_siembra).slice(0, 10), d.fecha) : null;
     d.dias_almacigo_real = real === null ? "" : real;
