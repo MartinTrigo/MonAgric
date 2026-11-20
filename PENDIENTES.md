@@ -8,8 +8,8 @@ que falta hacer.
 
 ## Cosecha en atados y foto de la pizarra (20/11, v101)
 
-- **Falta: implementar Code.gs (Nueva versión).** Hasta entonces la app
-  guarda los kilos totales pero no Formato, Cantidad ni Peso unidad.
+- Code.gs implementado el 20/11: Cosechas ya guarda Formato, Cantidad y
+  Peso unidad kg (`version_servicio.py` lo revisa).
 - **Probar la foto con una pizarra real escrita a mano.** Con letra impresa
   lee bien; con fibrón a mano no se sabe. Si no alcanza: Google Cloud Vision
   o Claude por el servidor (ver CLAUDE.md).
