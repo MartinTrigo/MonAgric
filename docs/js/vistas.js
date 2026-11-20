@@ -470,6 +470,7 @@ const plantillas = {
     const pizarra = modoCosecha === "pizarra" && delPlan.length > 0;
 
     return `
+    ${tarjetaFotoPizarra()}
     <div class="tarjeta">
       <h2>&#127807; Registrar cosecha</h2>
 
@@ -481,9 +482,10 @@ const plantillas = {
       </div>
 
       <p class="nota">${pizarra
-        ? `Todos los cultivos del plan, como en la pizarra: escribí los kilos
-           solo en los que cosechaste y dejá el resto vacío.`
-        : `Los kilos totales de cada cultivo, de todos los bancales juntos.
+        ? `Todos los cultivos del plan, como en la pizarra: escribí los kilos,
+           o los atados o unidades con su peso, solo en los que cosechaste y dejá el resto vacío.`
+        : `Lo cosechado de cada cultivo, de todos los bancales juntos: en kilos, o
+           en atados o unidades con su peso (la app saca los kilos).
            Un renglón por cultivo: con el + sumás otro, y con el × sacás el que sobre.`}</p>
 
       ${modoCosecha === "pizarra" && !delPlan.length ? `<p class="nota alerta">
@@ -500,7 +502,7 @@ const plantillas = {
           ${delPlan.map((c, i) => renglonPizarra(c, i)).join("")}
         </div>` : `
         <!-- Los encabezados van una sola vez, no uno por renglón. -->
-        <div class="cosecha-cab"><span>Cultivo</span><span>Kilos</span></div>
+        <div class="cosecha-cab"><span>Cultivo</span><span>Cantidad</span></div>
         <div id="renglones-cosecha">${renglonCosecha(0)}</div>
 
         <button type="button" class="secundario mas" id="btn-mas-cultivo"

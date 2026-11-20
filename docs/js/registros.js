@@ -57,7 +57,9 @@ function filaEquipo(tipo, f) {
              f.Plantines ? `${num(f.Plantines)} plantines` : "",
              f.Operador ? "por " + esc(f.Operador) : ""].filter(Boolean).join(" · ");
   } else if (tipo === "cosechas") {
-    detalle = `${esc(f.Cultivo)} — ${num(f.Kg, 1)} kg${
+    const como = f.Formato && f.Formato !== "kg" && Number(f.Cantidad)
+      ? `${esc(cantidadCosechaTexto(f.Cantidad, f.Formato, Math.round((Number(f["Peso unidad kg"]) || 0) * 1000)))} = ` : "";
+    detalle = `${esc(f.Cultivo)} — ${como}${num(f.Kg, 1)} kg${
       f["Generación"] ? ` <span class="gen">G${esc(f["Generación"])}</span>` : ""}`;
     extra = f["Cosechó"] ? "por " + esc(f["Cosechó"]) : "";
   } else if (tipo === "stock") {
@@ -99,7 +101,9 @@ function filaRegistro(r) {
     detalle = `${esc(d.integrante)}: ${d.horas} h${d.actividad ? " · " + esc(d.actividad) : ""}`;
   } else if (r.tipo === "cosechas") {
     titulo = "Cosecha";
-    detalle = `${esc(d.cultivo)}: ${num(d.kg, 1)} kg${d.generacion ? ` · G${d.generacion}` : ""}`;
+    const como = d.formato && d.formato !== "kg"
+      ? `${esc(cantidadCosechaTexto(d.cantidad, d.formato, Math.round((Number(d.peso_unidad) || 0) * 1000)))} = ` : "";
+    detalle = `${esc(d.cultivo)}: ${como}${num(d.kg, 1)} kg${d.generacion ? ` · G${d.generacion}` : ""}`;
   } else if (r.tipo === "stock") {
     titulo = "Stock";
     detalle = `${esc(d.cultivo)}: ${esc(cantidadStock(d))} · ${esc(dondeStock(d))}`;
@@ -166,7 +170,9 @@ const CORRECCION = {
     ["disposicion", "Disposición", "disposicion"], ["plantines", "Plantines", "numero"],
     ["operador", "Operador", "persona"], ["observaciones", "Observaciones", "texto"]],
   cosechas: [["fecha", "Fecha", "fecha"], ["cultivo", "Cultivo", "cultivo"],
-    ["kg", "Kg", "numero"], ["operador", "Cosechó", "persona"],
+    ["formato", "Se cosechó en", "formatoCosecha"], ["cantidad", "Atados o unidades", "numero"],
+    ["peso_unidad", "Peso de cada uno (kg)", "numero"],
+    ["kg", "Kg (en atados o unidades se calcula)", "numero"], ["operador", "Cosechó", "persona"],
     ["generacion", "Generación (vacío: sin asignar)", "generacionCosecha"],
     ["sector", "Sector (de dónde salió)", "sectorCosecha"], ["bancales", "Bancales (ej: 4, 5)", "bancalesCosecha"]],
   horas: [["fecha", "Fecha", "fecha"], ["integrante", "Quién", "persona"],
@@ -200,7 +206,8 @@ const DE_LA_HOJA = {
     plantines: "Plantines", operador: "Operador", observaciones: "Observaciones",
     fecha_planificada: "Fecha planificada", diferencia_plan: "Diferencia plan" },
   cosechas: { fecha: "Fecha", cultivo: "Cultivo", kg: "Kg", operador: "Cosechó", generacion: "Generación",
-    sector: "Sector", bancales: "Bancales" },
+    sector: "Sector", bancales: "Bancales",
+    formato: "Formato", cantidad: "Cantidad", peso_unidad: "Peso unidad kg" },
   horas: { fecha: "Fecha", integrante: "Integrante", horas: "Horas", actividad: "Actividad",
     area: "Área", observaciones: "Observaciones" },
   stock: { fecha: "Fecha", tipo: "Tipo", cultivo: "Cultivo", variedad: "Variedad",
@@ -232,6 +239,8 @@ function campoCorreccion([k, rotulo, clase], v) {
     sectores().map((s) => `<option${s.sector === val ? " selected" : ""}>${esc(s.sector)}</option>`).join("")}</select>`;
   else if (clase === "area") campo = `<select name="${k}">${opcionesArea(val)}</select>`;
   else if (clase === "tipoStock") campo = `<select name="${k}">${opciones(TIPOS_STOCK)}</select>`;
+  else if (clase === "formatoCosecha") campo = `<select name="${k}">${FORMATOS_COSECHA.map(([v, t]) =>
+    `<option value="${v}"${v === (val || "kg") ? " selected" : ""}>${t}</option>`).join("")}</select>`;
   else if (clase === "formato") campo = `<select name="${k}">${opciones(FORMATOS_STOCK)}</select>`;
   else campo = `<input type="text" name="${k}" value="${esc(val)}">`;
   return `<div><label>${esc(rotulo)}</label>${campo}</div>`;
@@ -242,6 +251,7 @@ function formularioCorreccion(tipo, f) {
   // «Repetición» solo si el servicio la guarda: si no, se perdería al corregir.
   const campos = CORRECCION[tipo].filter((c) => (c[2] !== "repeticion" || CFG?.repeticion)
       && (c[2] !== "generacionCosecha" || CFG?.cierres)
+      && (!(tipo === "cosechas" && ["formato", "cantidad", "peso_unidad"].includes(c[0])) || CFG?.cosecha_formato)
       && (!["sectorCosecha", "bancalesCosecha"].includes(c[2]) || CFG?.cosecha_lugar))
     .map((c) => campoCorreccion(c, d[c[0]]));
   // De a dos por renglón, como el resto de los formularios.
@@ -271,7 +281,16 @@ function datosCorregidos(tipo, f, form) {
     d.fecha_planificada = base;
     d.diferencia_plan = base && d.fecha ? diasEntre(base, d.fecha) : "";
   };
-  if (tipo === "cosechas") d.generacion = parseInt(d.generacion, 10) || "";
+  if (tipo === "cosechas") {
+    d.generacion = parseInt(d.generacion, 10) || "";
+    // En atados o unidades los kilos salen de la cuenta; en kilos no queda
+    // nada de cantidad ni peso (20/11).
+    if (d.formato && d.formato !== "kg" && Number(d.cantidad) > 0 && Number(d.peso_unidad) > 0) {
+      d.kg = kgDeCosecha(d.cantidad, d.formato, Number(d.peso_unidad) * 1000);
+    } else {
+      d.formato = ""; d.cantidad = ""; d.peso_unidad = "";
+    }
+  }
   if (tipo === "siembras") {
     d.generacion = parseInt(d.generacion, 10) || 1;
     const conBandeja = EN_BANDEJA.has(d.tipo);
@@ -340,7 +359,9 @@ function columnasQueFaltan(esquema) {
   // la app no ofrece el campo (cfg.repeticion).
   // Lo mismo con «Generación» en Cosechas (12/11, cfg.cierres).
     // Y «Sector» y «Bancales» en Cosechas (15/11, cfg.cosecha_lugar).
-  const OPCIONALES = { siembras: ["Repetición"], cosechas: ["Generación", "Sector", "Bancales"] };
+  // Y «Formato», «Cantidad» y «Peso unidad kg» en Cosechas (20/11, cfg.cosecha_formato).
+  const OPCIONALES = { siembras: ["Repetición"],
+    cosechas: ["Generación", "Sector", "Bancales", "Formato", "Cantidad", "Peso unidad kg"] };
   const faltan = [];
   Object.entries(DE_LA_HOJA).forEach(([hoja, campos]) => {
     if (!Array.isArray(esquema[hoja])) return;

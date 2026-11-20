@@ -346,6 +346,31 @@ las fechas:
   el 15/11. Es el paso siguiente (ver `PENDIENTES.md`).
 - Aparece solo si el servicio lo guarda (`cfg.cosecha_lugar`).
 
+## Cosecha en atados o unidades, y foto de la pizarra (20/11, v101)
+
+- Cada renglón de Cosechas (lista y pizarra) se carga en **kg, atados o
+  unidades**; en atados o unidades se escribe el peso de cada uno en gramos
+  y la app calcula los kilos. **Kg sigue siendo siempre el total**: todo lo
+  que suma kilos (tablero, rinde, cierres, Economía) lee esa columna y no
+  cambió. Cómo se contó va en tres columnas al final: **Formato**,
+  **Cantidad**, **Peso unidad kg** (vacías = en kg). `cfg.cosecha_formato`.
+  Contra un servicio sin esas columnas se guardan igual los kilos.
+- Cada cultivo recuerda en el teléfono el último formato y peso
+  (`monagric_pesos_cosecha`), y vienen puestos la vez siguiente.
+- **Foto de la pizarra, EN PRUEBA** (`js/pizarra-foto.js`): se lee con
+  Tesseract.js en el teléfono, como los tickets de Hogar. Tesseract es para
+  letra impresa: con letra a mano puede leer poco. Lo leído nunca se guarda
+  solo: «Pasar a la pizarra» llena los casilleros (marcados) y la persona
+  revisa y guarda. La foto queda **solo en ese teléfono** (IndexedDB
+  `monagric-fotos`), para mirarla mientras se carga; la primera foto de una
+  semana nueva (lunes a domingo) borra las anteriores.
+- Formato de la pizarra en el campo: una fila por cultivo, **cultivo ·
+  atados · peso del atado · kg**; se llena atados y peso, o kg.
+- Si Tesseract no alcanza con la letra a mano, las alternativas son Google
+  Cloud Vision (gratis hasta 1.000 fotos por mes, pide proyecto con
+  tarjeta) o Claude (lee mejor y entiende las columnas, unos centavos por
+  foto). Las dos van por el servidor, con la clave en las propiedades.
+
 ## El mapa y los sectores que cambian (13/11)
 
 - **Una generación está ubicada solo si su lugar existe** (`estaUbicada`, en

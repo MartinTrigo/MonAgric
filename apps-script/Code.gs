@@ -187,14 +187,22 @@ var HOJAS = {
     // "Sector" y "Bancales" (15/11), al final y optativas: de donde salio la
     // cosecha, para saber cuanto rindio cada bancal. Bancales es una lista
     // ("4, 5"): va como texto, si no la planilla la vuelve una fecha.
+    // "Formato", "Cantidad" y "Peso unidad kg" (20/11), al final y
+    // optativas: 33 atados de 0,5 kg. Kg sigue siendo SIEMPRE el total (lo
+    // calcula la app): todo lo que suma kilos lee esa columna y no cambia.
+    // Vacias en lo cargado antes, que es como decir "kg".
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Kg", "Cosechó",
-                  "Cargado por", "Recibido", "Generación", "Sector", "Bancales"],
+                  "Cargado por", "Recibido", "Generación", "Sector", "Bancales",
+                  "Formato", "Cantidad", "Peso unidad kg"],
     columnasTexto: [11],
     fila: function (r) {
       var d = r.datos;
+      var porUnidad = d.formato && d.formato !== "kg";
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.kg,
               d.operador || "", r.dispositivo || "", new Date(), numeroOVacio(d.generacion),
-              d.sector || "", d.bancales || ""];
+              d.sector || "", d.bancales || "",
+              porUnidad ? d.formato : "", porUnidad ? numeroOVacio(d.cantidad) : "",
+              porUnidad ? numeroOVacio(d.peso_unidad) : ""];
     },
   },
   /* Cuando una generacion se termina (12/11): se cosecho entera, o se perdio
@@ -531,6 +539,9 @@ function atender(p) {
       // Cosechas guarda de que sector y bancales salio (15/11). Sin esto la
       // app no ofrece el campo: se perderia al guardar.
       cfg.cosecha_lugar = true;
+      // Y en atados o unidades, con su peso (20/11): Formato, Cantidad y
+      // Peso unidad kg. Sin esto la app igual manda los kilos totales.
+      cfg.cosecha_formato = true;
       // Las generaciones traen donde se plantaron de verdad (13/11): el mapa
       // dibuja lo plantado sobre lo planificado.
       cfg.lugar_real = true;

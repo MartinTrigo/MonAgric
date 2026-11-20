@@ -563,23 +563,60 @@ function prepararCosechas() {
   const lugarElegido = (sel, cultivo) => (sel && sel.value
     ? lugaresParaCosecha(cultivo).find((l) => l.clave === sel.value) || null : null);
 
+  // Cantidad, formato y peso de un renglón (20/11): en kg, o en atados o
+  // unidades con el peso de cada uno, y los kilos que dan.
+  const medidaDe = (div, campo) => {
+    const formato = div.querySelector(".formato-cosecha")?.value || "kg";
+    const peso_g = formato === "kg" ? 0 : aNumero(div.querySelector(".peso-cosecha input")?.value) || 0;
+    const cantidad = aNumero(campo?.value) || 0;
+    return { cantidad, formato, peso_g, kg: kgDeCosecha(cantidad, formato, peso_g) };
+  };
   const leerRenglones = () => {
     if (pizarra) {
       return [...pizarra.querySelectorAll("input[data-cultivo]")]
         .map((inp) => {
-          const sel = inp.parentElement.querySelector(".lugar-cosecha");
-          return { cultivo: inp.dataset.cultivo, kg: aNumero(inp.value) || 0, lugar: lugarElegido(sel, inp.dataset.cultivo) };
+          const div = inp.parentElement;
+          const sel = div.querySelector(".lugar-cosecha");
+          return { cultivo: inp.dataset.cultivo, ...medidaDe(div, inp), lugar: lugarElegido(sel, inp.dataset.cultivo) };
         })
-        .filter((r) => r.kg > 0);
+        .filter((r) => r.cantidad > 0);
     }
     return [...renglones.querySelectorAll(".renglon-cosecha")]
       .map((div) => {
         const i = div.dataset.renglon;
         const cultivo = f["cultivo_" + i]?.value || "";
-        return { cultivo, kg: aNumero(f["kg_" + i]?.value) || 0, lugar: lugarElegido(f["lugar_" + i], cultivo) };
+        return { cultivo, ...medidaDe(div, f["kg_" + i]), lugar: lugarElegido(f["lugar_" + i], cultivo) };
       })
-      .filter((r) => r.cultivo || r.kg);
+      .filter((r) => r.cultivo || r.cantidad);
   };
+  // El peso se pide solo en atados o unidades. En la lista, al elegir el
+  // cultivo vienen puestos el formato y el peso que se usaron la última vez,
+  // salvo que en ese renglón ya se hayan tocado.
+  const acomodarFormatos = () => {
+    f.querySelectorAll(".formato-cosecha").forEach((sel) => {
+      const peso = sel.parentElement.querySelector(".peso-cosecha");
+      if (peso) peso.hidden = sel.value === "kg";
+    });
+    if (pizarra) return;
+    renglones.querySelectorAll(".renglon-cosecha").forEach((div) => {
+      const i = div.dataset.renglon;
+      const cultivo = f["cultivo_" + i]?.value || "";
+      if (!cultivo || div.dataset.cultivo === cultivo) return;
+      div.dataset.cultivo = cultivo;
+      if (div.dataset.formatoTocado) return;
+      const u = ultimoFormatoCosecha(cultivo);
+      const formato = u.formato || "kg";
+      div.querySelector(".formato-cosecha").value = formato;
+      div.querySelector(".peso-cosecha input").value = formato !== "kg" ? String(u.peso_g || "") : "";
+      div.querySelector(".peso-cosecha").hidden = formato === "kg";
+    });
+  };
+  const marcarTocado = (e) => {
+    const div = e.target.closest(".renglon-cosecha");
+    if (div && e.target.closest(".formato-cosecha, .peso-cosecha")) div.dataset.formatoTocado = "1";
+  };
+  f.addEventListener("input", marcarTocado);
+  f.addEventListener("change", marcarTocado);
   // Llena los desplegables de los cultivos ya elegidos (en pizarra, los que
   // tienen kilos: así no se ven veinte desplegables vacíos).
   const llenarLugares = () => {
@@ -604,12 +641,13 @@ function prepararCosechas() {
     : generacionDeLaCosecha(r.cultivo));
 
   const actualizar = () => {
+    acomodarFormatos();
     llenarLugares();
-    const cargados = leerRenglones().filter((r) => r.cultivo && r.kg > 0);
+    const cargados = leerRenglones().filter((r) => r.cultivo && r.cantidad > 0);
     if (!cargados.length) {
       calculo.innerHTML = pizarra
-        ? "Escribí los kilos en los cultivos que cosechaste. Los vacíos no se guardan."
-        : "Cargá el cultivo y los kilos. Con el + sumás más cultivos.";
+        ? "Escribí los kilos, o los atados o unidades, en los cultivos que cosechaste. Los vacíos no se guardan."
+        : "Cargá el cultivo y los kilos, o los atados o unidades. Con el + sumás más cultivos.";
       return;
     }
     const total = cargados.reduce((a, r) => a + r.kg, 0);
@@ -619,8 +657,12 @@ function prepararCosechas() {
       // queda a su nombre: se muestra para que se vea a dónde va.
       const gen = generacionDe(r);
       const aQuien = (r.lugar ? ` · ${r.lugar.sector} ${tramosDeBancales(r.lugar.bancales)}` : "") + (gen ? ` → G${gen}` : "");
-      if (!plan?.cosecha_esperada_kg) return `${esc(r.cultivo)} ${num(r.kg, 1)} kg${aQuien}`;
-      return `${esc(r.cultivo)} ${num(r.kg, 1)} kg${aQuien} (${num((r.kg / plan.cosecha_esperada_kg) * 100, 1)}% de lo esperado)`;
+      if (r.formato !== "kg" && !r.peso_g) {
+        return `${esc(r.cultivo)} ${esc(cantidadCosechaTexto(r.cantidad, r.formato, 0))}: <b>falta el peso de cada uno</b>`;
+      }
+      const como = r.formato !== "kg" ? `${esc(cantidadCosechaTexto(r.cantidad, r.formato, r.peso_g))} = ` : "";
+      if (!plan?.cosecha_esperada_kg) return `${esc(r.cultivo)} ${como}${num(r.kg, 1)} kg${aQuien}`;
+      return `${esc(r.cultivo)} ${como}${num(r.kg, 1)} kg${aQuien} (${num((r.kg / plan.cosecha_esperada_kg) * 100, 1)}% de lo esperado)`;
     }).join(" · ");
     calculo.innerHTML = `<b>${num(total, 1)} kg</b> en ${cargados.length} cultivo(s)
       <div class="nota" style="margin-top:4px">${detalle}</div>`;
@@ -629,6 +671,9 @@ function prepararCosechas() {
   f.addEventListener("input", actualizar);
   f.addEventListener("change", actualizar);
   actualizar();
+  // La foto de la pizarra (pizarra-foto.js): sus fotos y, si se pidió,
+  // pasar lo leído a los casilleros.
+  prepararFotoPizarra();
 
   // En pizarra no hay renglones que agregar ni quitar: la lista es fija y los
   // vacíos simplemente no se guardan. Enter pasa al casillero siguiente.
@@ -695,19 +740,25 @@ function prepararCosechas() {
         : "Cargá al menos un cultivo con sus kilos.", true);
     }
 
-    const incompleto = cargados.find((r) => !r.cultivo || !(r.kg > 0));
+    const incompleto = cargados.find((r) => !r.cultivo || !(r.cantidad > 0));
     if (incompleto) {
       return aviso(incompleto.cultivo
-        ? `Faltan los kilos de ${incompleto.cultivo}.`
+        ? `Falta la cantidad de ${incompleto.cultivo}.`
         : "Hay un renglón sin cultivo elegido.", true);
     }
-    // Un mismo cultivo dos veces del mismo lugar sería confuso al analizar:
-    // se suma. De dos bancales distintos son dos filas (15/11).
+    const sinPeso = cargados.find((r) => r.formato !== "kg" && !(r.peso_g > 0));
+    if (sinPeso) {
+      return aviso(`Falta cuánto pesa cada ${sinPeso.formato === "atado" ? "atado" : "unidad"} de ${sinPeso.cultivo}.`, true);
+    }
+    // Un mismo cultivo dos veces del mismo lugar y en el mismo formato sería
+    // confuso al analizar: se suma. De dos bancales distintos, o en kilos y
+    // en atados, son dos filas (15/11, 20/11).
     const juntos = new Map();
     cargados.forEach((r) => {
-      const k = `${r.cultivo}|${r.lugar ? r.lugar.clave : ""}`;
-      const x = juntos.get(k) || { ...r, kg: 0 };
+      const k = `${r.cultivo}|${r.lugar ? r.lugar.clave : ""}|${r.formato}|${r.peso_g}`;
+      const x = juntos.get(k) || { ...r, kg: 0, cantidad: 0 };
       x.kg += r.kg;
+      x.cantidad += r.cantidad;
       juntos.set(k, x);
     });
 
@@ -720,8 +771,13 @@ function prepararCosechas() {
         kg: Math.round(r.kg * 100) / 100,
         operador: f.operador.value,
         generacion: generacionDe(r),
+        // Cómo se contó (20/11). Un servicio sin esas columnas las ignora y
+        // guarda igual los kilos totales.
+        ...(r.formato !== "kg" ? { formato: r.formato, cantidad: r.cantidad,
+                                   peso_unidad: Math.round(r.peso_g) / 1000 } : {}),
         ...(CFG?.cosecha_lugar ? { sector: r.lugar ? r.lugar.sector : "", bancales: r.lugar ? r.lugar.bancales.join(", ") : "" } : {}),
       }, `Cosecha guardada: ${juntos.size} renglón(es) ✓`);
+      recordarFormatoCosecha(r.cultivo, r.formato, r.peso_g);
     });
     render("inicio");
   };

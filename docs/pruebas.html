@@ -44,6 +44,7 @@ almacenamiento del teléfono.</p>
 <script src="js/stock.js"></script>
 <script src="js/configuracion.js"></script>
 <script src="js/formularios.js"></script>
+<script src="js/pizarra-foto.js"></script>
 <script src="js/vistas.js"></script>
 <script src="js/render.js"></script>
 <script>
@@ -506,6 +507,14 @@ almacenamiento del teléfono.</p>
       pendientes = pendAntes; enviados = envAntes;
     }
   }
+
+  // --- cosecha en atados y foto de la pizarra (20/11) ---
+  igual("33 atados de 500 g son 16,5 kg", kgDeCosecha(33, "atado", 500), 16.5);
+  igual("en kg la cantidad son los kilos", kgDeCosecha(12.5, "kg", 0), 12.5);
+  igual("pizarra: atados con peso en gramos, kilos sueltos, dos números sin unidad",
+    interpretarPizarra("CULTIVO ATADOS PESO KG\nLechuga 33 500g\nAcelga 12,5 kg\nRabanito 20 300\nalgo sin cultivo 4",
+      ["Lechuga", "Acelga", "Rabanito"]).map((r) => [r.cultivo, r.formato, r.cantidad, r.peso_g, r.kg]),
+    [["Lechuga", "atado", 33, 500, 16.5], ["Acelga", "kg", 12.5, 0, 12.5], ["Rabanito", "atado", 20, 300, 6]]);
 
   // --- mapa ---
   igual("bancales que ocuparía una de 3 al final del sector", bancalesQueOcuparia({ camas: 3 }, 24, 25), [23, 24, 25]);

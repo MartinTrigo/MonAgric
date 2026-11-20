@@ -6,6 +6,16 @@ que falta hacer.
 
 ---
 
+## Cosecha en atados y foto de la pizarra (20/11, v101)
+
+- **Falta: implementar Code.gs (Nueva versión).** Hasta entonces la app
+  guarda los kilos totales pero no Formato, Cantidad ni Peso unidad.
+- **Probar la foto con una pizarra real escrita a mano.** Con letra impresa
+  lee bien; con fibrón a mano no se sabe. Si no alcanza: Google Cloud Vision
+  o Claude por el servidor (ver CLAUDE.md).
+- La foto queda solo en el teléfono que la sacó. Si hace falta verla desde
+  la notebook, habría que subirla a Drive por el servidor.
+
 ## El mapa de Tica después de la recorrida del 14/11
 
 - **20/11 (v98 a v100):** lo plantado se arrastra (queda verificado) y su ✕

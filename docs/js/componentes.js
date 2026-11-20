@@ -55,13 +55,47 @@ function buscadorCultivo(valor = "", nombre = "cultivo") {
   });
 }
 
+/* ---- Cosecha en kilos, atados o unidades (20/11) ----
+   «33 atados de Acelga de 500 g»: la app hace la cuenta y guarda los kilos
+   totales en Kg, como siempre, y además cómo se contó (Formato, Cantidad,
+   Peso unidad kg). Cada cultivo recuerda en el teléfono el último formato
+   y peso que se usaron, y vienen puestos la próxima vez. */
+const FORMATOS_COSECHA = [["kg", "kg"], ["atado", "atados"], ["unidad", "unid."]];
+const ultimoFormatoCosecha = (cultivo) =>
+  (leer(LS.pesosCosecha, {}) || {})[claveArea(cultivo)] || { formato: "kg", peso_g: "" };
+function recordarFormatoCosecha(cultivo, formato, peso_g) {
+  if (!cultivo) return;
+  const m = leer(LS.pesosCosecha, {}) || {};
+  m[claveArea(cultivo)] = formato === "kg" ? { ...(m[claveArea(cultivo)] || {}), formato } : { formato, peso_g };
+  escribir(LS.pesosCosecha, m);
+}
+// Los kilos de un renglón: con atados o unidades, cantidad × peso.
+const kgDeCosecha = (cantidad, formato, peso_g) => (formato && formato !== "kg"
+  ? Math.round((Number(cantidad) || 0) * (Number(peso_g) || 0) / 10) / 100 : Number(cantidad) || 0);
+// «33 atados de 500 g»
+const cantidadCosechaTexto = (cantidad, formato, peso_g) => {
+  const n = Number(cantidad) || 0;
+  const nombre = formato === "atado" ? (n === 1 ? "atado" : "atados") : (n === 1 ? "unidad" : "unidades");
+  return `${num(n, n % 1 ? 1 : 0)} ${nombre}${peso_g ? ` de ${num(peso_g, 0)} g` : ""}`;
+};
+// El formato y el peso de un renglón. `pre` distingue lista y pizarra.
+function camposFormatoCosecha(pre, i, cultivo = "") {
+  const u = cultivo ? ultimoFormatoCosecha(cultivo) : { formato: "kg", peso_g: "" };
+  return `<select class="formato-cosecha" name="${pre}fmt_${i}" aria-label="Se cosechó en">${
+    FORMATOS_COSECHA.map(([v, t]) => `<option value="${v}"${v === u.formato ? " selected" : ""}>${t}</option>`).join("")}</select>
+    <label class="peso-cosecha"${u.formato === "kg" ? " hidden" : ""}>de
+      <input type="text" name="${pre}peso_${i}" inputmode="decimal" autocomplete="off"
+             value="${esc(u.formato === "kg" ? "" : String(u.peso_g || ""))}" placeholder="500"> g cada uno</label>`;
+}
+
 // Un renglón de pizarra: el nombre ya puesto y solo el casillero del número.
 // Sin buscador, que es lo que hace lenta la carga cuando son veinte.
 function renglonPizarra(cultivo, i) {
   return `<div class="renglon-pizarra">
     <label for="pz_${i}">${esc(cultivo)}</label>
     <input type="text" id="pz_${i}" name="pz_${i}" data-cultivo="${esc(cultivo)}"
-           inputmode="decimal" autocomplete="off" placeholder="kg">
+           inputmode="decimal" autocomplete="off" placeholder="—">
+    ${camposFormatoCosecha("pz", i, cultivo)}
     ${CFG?.cosecha_lugar ? `<select class="lugar-cosecha" name="pzlugar_${i}" hidden aria-label="De qué bancal"></select>` : ""}
   </div>`;
 }
@@ -84,7 +118,8 @@ function renglonCosecha(i, valor = "", kg = "") {
   return `<div class="renglon-cosecha" data-renglon="${i}">
     ${buscadorCultivo(valor, "cultivo_" + i)}
     <input type="text" name="kg_${i}" inputmode="decimal" autocomplete="off"
-           value="${esc(kg)}" placeholder="kg" aria-label="Kilos cosechados">
+           value="${esc(kg)}" placeholder="—" aria-label="Cantidad cosechada">
+    ${camposFormatoCosecha("", i, valor)}
     <button type="button" class="quitar" data-quitar-renglon="${i}"
             aria-label="Quitar este cultivo">&times;</button>
     ${CFG?.cosecha_lugar ? `<select class="lugar-cosecha" name="lugar_${i}" hidden aria-label="De qué bancal"></select>` : ""}
