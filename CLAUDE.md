@@ -289,7 +289,12 @@ las fechas:
 - **Plantado**: lo que dicen los registros —Trasplantes y, en siembra
   directa, Siembras—. Lo arma el servicio sobre las hojas enteras y viaja en
   cada generación como `lugar_real` (`cfg.lugar_real`). Es un hecho: en el
-  mapa va lleno, no se arrastra, y se corrige corrigiendo el registro (✎).
+  mapa va lleno. **Desde el 20/11 (v98) se arrastra**: moverlo no reescribe
+  el trasplante, deja *verificado* el lugar nuevo. Su ✕ (o «No está
+  plantada ahí») quita la verificación si la tenía, y si sale de un
+  registro busca ese trasplante o siembra directa en la ficha del cultivo y
+  ofrece borrarlo (`quitarPlantada`): así se arregla un trasplante cargado
+  por error (la Albahaca G1 figuraba en Verano A 11 por uno del 18/11).
 - Si se plantó en otro lado que el planificado, lo planificado queda en el
   mapa **en contorno punteado**, para comparar. No se borra.
 - **Lo verificado en el campo le gana a los registros** (13/11, v93). En

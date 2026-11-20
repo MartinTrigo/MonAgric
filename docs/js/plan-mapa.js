@@ -40,8 +40,9 @@ const ubicacionPerdida = (g) => (g.sector && bancalesDe(g).length && !estaUbicad
    mapa, y sirve para decidir la sucesión de cada bancal. Dónde se PLANTÓ
    sale de los registros (Trasplantes, y Siembras si es directa) y llega del
    servicio en lugar_real. Son dos cosas, como con las fechas:
-   - lo plantado es un hecho: se dibuja lleno y no se arrastra (se corrige
-     el registro, con ✎ en Trasplantes);
+   - lo plantado es un hecho: se dibuja lleno. Arrastrarlo (20/11) no toca
+     el registro: deja verificado dónde está de verdad. Su ✕ borra el
+     registro que la puso ahí, si estaba mal cargado;
    - lo planificado se dibuja en contorno cuando la generación terminó en
      otro lado, y queda para comparar.
    Qué bancal está ocupado se calcula con lo plantado si ya fue al campo, y
@@ -408,14 +409,17 @@ function mapaDeCultivos() {
            ? "Tocá en el mapa el bancal donde está de verdad."
            : plantadas.has(sel.id)
              ? (sel.lugar_verificado ? `Verificado en el campo${/^\d{4}/.test(sel.lugar_verificado) ? " el " + fechaCorta(sel.lugar_verificado) : ""}.`
-                : "Este lugar sale de lo que se registró al plantar y nadie lo verificó.")
+                : "Este lugar sale de lo que se registró al plantar y nadie lo verificó. Si está en otro bancal, arrastrala.")
              : "En verde, los bancales libres en esas fechas: tocá uno o arrastrala."}</span>
          ${CFG?.lugar_verificado && esSembrada(sel) ? `
            ${estaUbicada(sel) && !(sel.lugar_verificado && planCumplido(sel))
              ? `<button type="button" class="secundario" id="verificar-plan">Está donde dice el plan</button>` : ""}
            <button type="button" class="secundario" id="verificar-otro">Está en otro lado</button>
            ${sel.lugar_verificado ? `<button type="button" class="secundario" id="verificar-quitar">Quitar la verificación</button>` : ""}` : ""}
-         ${estaUbicada(sel) ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
+         ${plantadas.has(sel.id)
+           ? `<button type="button" class="secundario" id="sacar-plantada">${sel.lugar_verificado
+               ? "Quitar el lugar verificado" : "No está plantada ahí"}</button>`
+           : estaUbicada(sel) ? `<button type="button" class="secundario" id="sacar-del-mapa">Sacar del mapa</button>` : ""}
          <button type="button" class="secundario" id="cancelar-eleccion">Listo</button>`
       : `<span class="lz-ayuda">Arrastrá un sector por su título para acomodarlo como está
          en el campo. Arrastrá una generación de la lista a un bancal, o una ya puesta a
@@ -467,9 +471,9 @@ function mapaDeCultivos() {
           const ubicada = !plantada && estaUbicada(g);
           const perdida = plantada ? "" : ubicacionPerdida(g);
           const registroViejo = lugarRealPerdido(g);
-          return `<div class="registro elegible${plantada ? " plantada" : " lz-arrastrable"}${ubicada || plantada ? " ubicada" : ""}${g.id === genSeleccionada ? " elegida" : ""}"
+          return `<div class="registro elegible${plantada ? " plantada" : ""} lz-arrastrable${ubicada || plantada ? " ubicada" : ""}${g.id === genSeleccionada ? " elegida" : ""}"
                        data-elegir="${esc(g.id)}" role="button" tabindex="0"
-                       title="${plantada ? "Ya está en el campo: tocala para verla en el mapa"
+                       title="${plantada ? "Ya está en el campo: tocala para verla en el mapa, o arrastrala a donde está de verdad"
                          : ubicada ? "Ya está en el mapa: arrastrala a otro bancal para moverla"
                          : "Arrastrala a un bancal, o tocala y después tocá el bancal"}">
             <div>
@@ -489,7 +493,10 @@ function mapaDeCultivos() {
                 aria-label="Moverla" title="Elegirla para moverla a otro bancal">✎</button>
               <button type="button" class="quitar" data-quitar-ubicacion="${esc(g.id)}"
                 aria-label="Sacarla del mapa" title="Sacarla del mapa: vuelve a quedar sin ubicar">&times;</button>`
-              : plantada ? "" : `<span class="lz-asa">⠿</span>`}
+              : plantada ? `<button type="button" class="quitar" data-quitar-plantada="${esc(g.id)}"
+                aria-label="Sacarla del mapa" title="${g.lugar_verificado
+                  ? "Quitar el lugar verificado" : "No está plantada ahí: borrar el registro que la pone en el mapa"}">&times;</button>`
+              : `<span class="lz-asa">⠿</span>`}
           </div>`;
         }).join("")}
       </details>`).join("")
@@ -660,7 +667,7 @@ function prepararMapa() {
   // Arrastrar una generación: desde la lista o desde el mapa. Lo que sigue al
   // puntero es una etiqueta; la ubicación se decide por el bancal bajo el
   // puntero, y la altura no se toca porque la fijan las fechas del plan.
-  const arrastrarGeneracion = (ev, g, agarre, original) => {
+  const arrastrarGeneracion = (ev, g, agarre, original, alDestino = ubicar) => {
     let flotante = null, destino = null;
     seguirArrastre(ev, {
       alEmpezar: () => {
@@ -685,13 +692,93 @@ function prepararMapa() {
         limpiarPrevia();
         if (original) original.classList.remove("levantada");
         if (cancelado || !destino) return;
-        ubicar(g, destino.b.sector, destino.b.n, Math.max(1, destino.bancal - agarre));
+        alDestino(g, destino.b.sector, destino.b.n, Math.max(1, destino.bancal - agarre));
       },
       alTocar: () => {
         genSeleccionada = genSeleccionada === g.id ? "" : g.id;
         render("plan", true);
       },
     });
+  };
+
+  /* Lo plantado también se arrastra (20/11). Moverlo no reescribe el
+     trasplante, que es lo que se anotó ese día: deja verificado en el campo
+     que está ahí, que es lo que le gana a los registros. Ocupa tantos
+     bancales como los que hoy tiene plantados, no los del plan. Sin un
+     servicio que guarde la verificación, solo se elige. */
+  const plantadaParaMover = (g) => {
+    const n = (plantadasDe(todas).get(g.id) || []).length;
+    return { ...g, camas: Math.max(1, n || Math.round(Number(g.camas) || 1)) };
+  };
+  const moverPlantada = (g, sector, n, desde) => {
+    const bs = bancalesQueOcuparia(g, desde, n);
+    if (!bs.length) return aviso("Ese sector no tiene bancales suficientes.", true);
+    const antes = textoDeLugares(plantadasDe(todas).get(g.id) || []);
+    const despues = textoDeLugares(bs.map((b) => ({ sector, bancal: b })));
+    if (antes === despues) { render("plan", true); return; }
+    if (!confirm(`¿${g.cultivo} ${nombreGen(g)} está plantada en ${despues}?\n\n` +
+                 `Queda verificado hoy. El trasplante registrado no cambia.`)) {
+      render("plan", true);
+      return;
+    }
+    verificar([{ generacion_id: g.id, sector, bancales: bs.join(", ") }], hoy(),
+      `${g.cultivo} ${nombreGen(g)}: está en ${despues} ✓`);
+  };
+  const arrastrarPlantada = (ev, g, agarre, original) => {
+    const elegir = () => { genSeleccionada = genSeleccionada === g.id ? "" : g.id; render("plan", true); };
+    if (!CFG?.lugar_verificado) return elegir();
+    arrastrarGeneracion(ev, plantadaParaMover(g), agarre, original, moverPlantada);
+  };
+
+  /* Sacar del mapa algo que figura plantado (20/11). Si alguien verificó el
+     lugar, se quita la verificación. Si sale de un registro, el error está en
+     el registro: se busca el trasplante (o la siembra directa) que la pone
+     ahí y se ofrece borrarlo. Sin ese registro vuelve a quedar para
+     trasplantar, que es lo cierto si no se plantó. Queda copia en Cambios. */
+  const quitarPlantada = async (g) => {
+    if (!g) return;
+    const donde = textoDeLugares(plantadasDe(todas).get(g.id) || []);
+    if (g.lugar_verificado) {
+      if (!confirm(`¿Quitar el lugar verificado de ${g.cultivo} ${nombreGen(g)} (${donde})?\n\n` +
+                   "Si tiene un trasplante registrado, vuelve a verse donde dice ese registro, rayada.")) return;
+      return verificar([{ generacion_id: g.id, sector: "", bancales: "" }], "", "Lugar verificado quitado ✓");
+    }
+    if (!CFG?.corregir) return aviso("Este servicio todavía no sabe borrar registros.", true);
+    aviso("Buscando el registro…");
+    await traerFicha(g.cultivo, true);
+    const ficha = (leer(LS.fichas, {}) || {})[g.cultivo] || {};
+    const gen = Number(g.generacion) || 1;
+    const suya = (r) => (Number(r.generacion) || 1) === gen && r.sector && Number(r.bancal) > 0;
+    const regs = (ficha.trasplantes || []).filter(suya).map((r) => ({ ...r, hoja: "trasplantes", que: "el trasplante" }))
+      .concat((ficha.siembras || []).filter((r) => /directa/i.test(r.tipo || "") && suya(r))
+        .map((r) => ({ ...r, hoja: "siembras", que: "la siembra directa" })));
+    if (!regs.length) {
+      return aviso("No encontré el registro que la pone ahí. Si se cargó recién, " +
+                   "borralo desde Trasplantes → Últimos movimientos.", true);
+    }
+    const lista = regs.map((r) => `· ${r.que} del ${fechaCorta(r.fecha)} en ${r.sector} ${r.bancal}${
+      r.plantines ? ` (${r.plantines} plantines)` : ""}`).join("\n");
+    const directa = regs.some((r) => r.hoja === "siembras");
+    if (!confirm(`${g.cultivo} ${nombreGen(g)} figura plantada en ${donde} por:\n${lista}\n\n` +
+                 `¿Borrar ${regs.length > 1 ? "esos registros" : "ese registro"}? ` +
+                 (directa ? "Sin la siembra, la generación vuelve a figurar sin sembrar."
+                          : "Vuelve a quedar para trasplantar.") +
+                 "\nQueda una copia en la hoja «Cambios» de la planilla.")) return;
+    regs.forEach((r) => {
+      guardarRegistro("registro_borrar", { hoja: r.hoja, id: r.id }, "Registro borrado ✓");
+      tocarUltimos(r.hoja, r.id, null);
+    });
+    // En la copia del teléfono, para que el mapa responda ya; el plan que
+    // llega después del envío lo confirma.
+    const k = claveGen(g.cultivo, g.generacion);
+    escribir(LS.generaciones, (leer(LS.generaciones, []) || []).map((x) =>
+      claveGen(x.cultivo, x.generacion) === k && !x.lugar_verificado
+        ? { ...x, lugar_real: [], trasplantada_el: "", ...(directa ? { sembrada: false } : {}) } : x));
+    const fichas = leer(LS.fichas, {}) || {};
+    delete fichas[g.cultivo];
+    escribir(LS.fichas, fichas);
+    genSeleccionada = "";
+    render("plan", true);
   };
 
   // Desde la lista de las que faltan ubicar.
@@ -702,12 +789,9 @@ function prepararMapa() {
       // Los botones de la fila (mover, sacar) no arrancan un arrastre.
       if (ev.button !== 0 || ev.target.closest("button")) return;
       ev.preventDefault();
-      // Lo ya plantado no se arrastra: se elige, para verlo en el mapa.
-      if (plantadasDe(todas).has(g.id)) {
-        genSeleccionada = genSeleccionada === g.id ? "" : g.id;
-        render("plan", true);
-        return;
-      }
+      // Lo ya plantado se arrastra a donde está de verdad (queda verificado);
+      // un toque la elige, para verla en el mapa.
+      if (plantadasDe(todas).has(g.id)) return arrastrarPlantada(ev, g, 0, null);
       arrastrarGeneracion(ev, g, 0, null);
     };
     el.onkeydown = (k) => {
@@ -727,12 +811,19 @@ function prepararMapa() {
     if (ev.button !== 0) return;
     const puestaEl = ev.target.closest("[data-puesta]");
     const agarre = ev.target.closest("[data-agarrar]");
-    // Un bloque de lo plantado: se elige con un toque y no se mueve.
+    // Un bloque de lo plantado: con un toque se elige; arrastrándolo se dice
+    // dónde está de verdad (ver arrastrarPlantada).
     const realEl = ev.target.closest("[data-real]");
     if (realEl) {
       ev.preventDefault();
-      genSeleccionada = genSeleccionada === realEl.dataset.real ? "" : realEl.dataset.real;
-      render("plan", true);
+      const g = todas.find((x) => x.id === realEl.dataset.real);
+      if (!g) return;
+      const sector = realEl.closest("[data-grilla]")?.dataset.grilla || "";
+      const aqui = bancalBajo(ev.clientX, ev.clientY);
+      const bs = (plantadasDe(todas).get(g.id) || [])
+        .filter((l) => claveArea(l.sector) === claveArea(sector)).map((l) => l.bancal);
+      const primero = bs.length ? Math.min(...bs) : 1;
+      arrastrarPlantada(ev, g, aqui ? Math.max(0, aqui.bancal - primero) : 0, realEl);
       return;
     }
 
@@ -879,4 +970,9 @@ function prepararMapa() {
   if (cancelar) cancelar.onclick = () => { genSeleccionada = ""; verificandoLugar = ""; render("plan", true); };
   const sacar = $("#sacar-del-mapa");
   if (sacar) sacar.onclick = () => sacarDelMapa(todas.find((x) => x.id === genSeleccionada));
+  const sacarP = $("#sacar-plantada");
+  if (sacarP) sacarP.onclick = () => quitarPlantada(todas.find((x) => x.id === genSeleccionada));
+  document.querySelectorAll("[data-quitar-plantada]").forEach((b) => {
+    b.onclick = () => quitarPlantada(todas.find((x) => x.id === b.dataset.quitarPlantada));
+  });
 }
