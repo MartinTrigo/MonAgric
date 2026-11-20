@@ -8,6 +8,17 @@ que falta hacer.
 
 ## El mapa de Tica después de la recorrida del 14/11
 
+- **20/11 (v98 a v100):** lo plantado se arrastra (queda verificado) y su ✕
+  borra el registro que lo pone ahí. Corregir la generación de un trasplante
+  ahora cambia también la siembra de origen. Una generación terminada sin ir
+  al campo ya no ocupa bancal. **Pak choi:** G1 no germinó (cerrada el 6/11,
+  0 kg); el trasplante del 8/11 en Verano A 5 es de la G2 (corregido por
+  Martín). Falta sacar del mapa el plan de la G1 en Verano A 8. **Albahaca
+  G1:** figuraba en Verano A 11 por un trasplante del 18/11 que Martín dice
+  que no ocurrió; borrarlo con la ✕ del mapa si nadie la plantó.
+- **Verano A 8 («coles»):** si el Pak choi G1 no germinó, la col de ahí es
+  casi seguro el Brócoli G4. Confirmar y verificarlo (arrastrar su bloque).
+
 - **Arreglado (v96):** una generación partida en partes (Tomate G1 en tres)
   dejaba las partes sin lugar propio «plantadas» sin bancal: no se podían
   arrastrar, sacar ni verificar. Ahora siguen con su plan.
