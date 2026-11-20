@@ -190,6 +190,12 @@ def main() -> None:
     else:
         print("  [ANTERIOR] el bancal de cada cosecha (el formulario no pregunta de donde salio)")
         viejas.append("el bancal de la cosecha")
+    # 20/11: Cosechas guarda si fue en atados o unidades, cuantos y su peso.
+    if cf.get("cosecha_formato"):
+        print("  [al dia]   la cosecha en atados o unidades, con su peso")
+    else:
+        print("  [ANTERIOR] la cosecha en atados o unidades (se guardan los kilos, sin el detalle)")
+        viejas.append("la cosecha en atados")
     if cf.get("lugar_real"):
         print(f"  [al dia]   el lugar donde se planto cada generacion ({con_lugar} con lugar registrado en Tica)")
     else:
