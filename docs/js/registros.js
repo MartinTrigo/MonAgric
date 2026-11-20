@@ -301,10 +301,13 @@ function datosCorregidos(tipo, f, form) {
     // no, el servicio, que cruza por la siembra de origen, lo seguía viendo
     // como de la generación de antes (el Pak choi G1, que no germinó, figuraba
     // trasplantada con lo que era la G2). La fecha planificada congelada era
-    // de la otra generación: se deja vacía.
-    if (d.generacion !== (parseInt(f["Generación"], 10) || 1)) {
-      const g = (leer(LS.generaciones, []) || [])
-        .find((x) => claveGen(x.cultivo, x.generacion) === claveGen(d.cultivo, d.generacion));
+    // de la otra generación: se deja vacía. También si la generación ya se
+    // había cambiado antes y la siembra de origen quedó la de otra.
+    const gens = leer(LS.generaciones, []) || [];
+    const g = gens.find((x) => claveGen(x.cultivo, x.generacion) === claveGen(d.cultivo, d.generacion));
+    const deOtra = d.siembra_id && gens.some((x) => x.siembra_id === String(d.siembra_id)
+      && claveGen(x.cultivo, x.generacion) !== claveGen(d.cultivo, d.generacion));
+    if (d.generacion !== (parseInt(f["Generación"], 10) || 1) || deOtra) {
       d.siembra_id = g?.siembra_id || "";
       d.fecha_siembra = g?.sembrada_el || "";
       d.fecha_planificada = "";
