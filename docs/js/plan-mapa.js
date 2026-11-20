@@ -131,9 +131,17 @@ function lugaresDe(g, todas) {
   return estaUbicada(g) ? bancalesDe(g).map((b) => ({ sector: g.sector, bancal: b })) : [];
 }
 
+/* Terminada sin haber ido al campo (20/11): no ocupó ningún bancal. El Pak
+   choi G1 no germinó, se cerró, y el mapa la dibujaba como un bloquecito
+   desde el trasplante previsto hasta el día del cierre, en un bancal que
+   nunca tocó. En siembra directa la siembra ES la ida al campo: esa sí
+   ocupó. */
+const terminadaEnBandeja = (t, g) => !!(t && t.cerrada && !t.directa && !t.real.campo
+  && !(g.lugar_real || []).length);
+
 function ocupacionDe(g) {
   const t = tramosDe(g);
-  if (!t) return null;
+  if (!t || terminadaEnBandeja(t, g)) return null;
   return { desde: t.campo, hasta: t.fin };
 }
 
@@ -483,6 +491,7 @@ function mapaDeCultivos() {
                     g.lugar_verificado ? "" : ` <span class="lz-perdida">sin verificar</span>`} · `
                   : ubicada ? `<b>${esc(g.sector)} ${bancalesDe(g).join(", ")}</b> · ` : ""}${
                 oc ? `${ubicada || plantada ? "" : "ocupa "}del ${fechaCorta(oc.desde)} al ${fechaCorta(oc.hasta)}`
+                : terminadaEnBandeja(tramosDe(g), g) ? "terminada antes de ir al campo: no ocupa bancal"
                 : "sin fechas suficientes"}${
                 plantada && estaUbicada(g) && !planCumplido(g)
                   ? `<br>el plan decía ${esc(g.sector)} ${bancalesDe(g).join(", ")}` : ""}${
