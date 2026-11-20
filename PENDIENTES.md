@@ -6,6 +6,24 @@ que falta hacer.
 
 ---
 
+## Rinde ponderado y siembras logradas (20/11, v102) — FALTA NUEVA VERSIÓN
+
+En Inicio, el reloj **Rinde logrado** ahora pondera cada pérdida por los días
+de bancal que usó (Tica: 61 %; sin ponderar, 35 %) y hay un sexto reloj,
+**Siembras logradas** (41 de 42 llegaron al campo: 98 %). El formulario de
+cierre pregunta **«¿Cuándo se dio por perdida?»**, pero solo después de la
+Nueva versión del Apps Script (columna «Se perdió» en Cierres):
+1. Pegar `Code.gs` → Implementar → Administrar → ✏ → **Nueva versión**.
+2. `python tools/version_servicio.py` tiene que decir «el dia en que se
+   perdio una generacion».
+3. **Rúcula G1**: se dio por perdida un mes o 40 días después de sembrada
+   (≈ 27/10). Escribir 27/10/2026 en la columna «Se perdió» de su fila en
+   Cierres, o reabrirla y terminarla de nuevo con esa fecha. Hasta entonces
+   cuenta hasta el 11/11 y el reloj marca 53 % en vez de 61 %.
+
+Lo que quedó para después: llevar la pérdida a horas o pesos (sustrato,
+semilla, trasplante). Toca plata y vale solo para Bioma: iría por Economía.
+
 ## Cosecha en atados y foto de la pizarra (20/11, v101)
 
 - Code.gs implementado el 20/11: Cosechas ya guarda Formato, Cantidad y

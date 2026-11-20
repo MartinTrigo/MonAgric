@@ -44,7 +44,8 @@ function cierresVigentes() {
   const locales = recientes.filter((r) => r.tipo === "cierres" && !yaEstan.has(String(r.id)))
     .map((r) => ({ id: String(r.id), fecha: r.datos.fecha, cultivo: r.datos.cultivo,
                    generacion: Number(r.datos.generacion) || 1, motivo: r.datos.motivo || "",
-                   kg: Number(r.datos.kg) || 0, observaciones: r.datos.observaciones || "" }));
+                   kg: Number(r.datos.kg) || 0, observaciones: r.datos.observaciones || "",
+                   perdida: r.datos.perdida || "" }));
   const mapa = new Map();
   delServicio.concat(locales).forEach((c) => {
     if (!borrados.has(String(c.id))) mapa.set(claveGen(c.cultivo, c.generacion), c);
@@ -79,12 +80,34 @@ function kgSinAsignar(cultivo, seg, cierres) {
 const kgAsignados = (cultivo, generacion, seg) =>
   Number(((seg && seg.kg_generacion) || {})[`${claveArea(cultivo)}|${Number(generacion) || 1}`]) || 0;
 
+const NO_GERMINO = "No germinó o falló el almácigo";
+
+/* Dónde se perdió una generación terminada (20/11): no es lo mismo perder
+   una bandeja que un bancal a punto de cosechar. */
+const ETAPAS_PERDIDA = {
+  completa: "cosecha completa",
+  siembra: "se perdió en la siembra",
+  campo: "se perdió en el campo, antes de cosechar",
+  cosecha: "se perdió en cosecha",
+};
+
 /* Rinde logrado: de las generaciones terminadas, los kilos que dieron contra
    los que se esperaban de sus bancales (ventanasDeCosecha: bancales × m² ×
    rinde). Una fila por generación terminada, con los días que faltaban para
    el fin de cosecha previsto si no fue una cosecha completa. Las que no
    tienen kilos esperados (sin rinde cargado) se listan pero no entran en el
-   porcentaje. */
+   porcentaje.
+
+   Dos porcentajes (20/11):
+   - pctPlan: contra todo lo esperado. Una bandeja que no germinó pesa lo
+     mismo que un bancal que se perdió antes de cosechar.
+   - pct (el del reloj): PONDERADO por los días de bancal que la generación
+     alcanzó a usar. Lo que se perdió en la bandeja no ocupó bancal y no pesa
+     acá (va a «Siembras logradas»); lo que se perdió a mitad de ciclo pesa
+     la mitad. Una cosecha completa pesa entera aunque haya terminado antes:
+     si no, el Hakusai cosechado a los 43 de 105 días daba 229 %.
+   El día de la pérdida es «Se perdió» si se cargó; si no, la fecha del
+   cierre. */
 function rindeLogrado(ventanas, cierres) {
   const filas = [];
   cierres.forEach((c) => {
@@ -93,14 +116,27 @@ function rindeLogrado(ventanas, cierres) {
     const bancales = suyas.reduce((a, v) => a + v.camas, 0);
     const hasta = suyas.map((v) => v.hasta).sort().pop() || "";
     const kg = Number(c.kg) || 0;
-    const faltaban = hasta && c.motivo !== COSECHA_COMPLETA ? diasEntre(c.fecha, hasta) : 0;
+    const completa = c.motivo === COSECHA_COMPLETA;
+    const seFue = (c.perdida && c.perdida <= c.fecha) ? c.perdida : c.fecha;
+    const faltaban = hasta && !completa ? diasEntre(seFue, hasta) : 0;
+    // Los días de bancal: desde que llegó al campo hasta que se perdió.
+    const enCampo = suyas.map((v) => v.enCampo).filter(Boolean).sort()[0] || "";
+    const ciclo = Math.max(0, ...suyas.map((v) => Number(v.ciclo) || 0));
+    const aCosecha = Math.max(0, ...suyas.map((v) => (Number(v.ciclo) || 0) - (Number(v.dias) || 0)));
+    const usados = enCampo ? Math.max(0, diasEntre(enCampo, seFue)) : 0;
+    const peso = completa ? 1 : !enCampo ? 0 : ciclo ? Math.min(1, usados / ciclo) : 1;
+    const etapa = completa ? "completa"
+      : (!enCampo || c.motivo === NO_GERMINO) ? "siembra"
+      : usados < aCosecha ? "campo" : "cosecha";
     filas.push({ id: c.id, cultivo: c.cultivo, generacion: c.generacion, motivo: c.motivo, fecha: c.fecha,
-                 kg, esperado, bancales, pct: esperado ? (kg / esperado) * 100 : null,
-                 faltaban: faltaban > 0 ? faltaban : 0, perdida: kg === 0 });
+                 seFue, kg, esperado, bancales, pct: esperado ? (kg / esperado) * 100 : null,
+                 faltaban: faltaban > 0 ? faltaban : 0, perdida: kg === 0,
+                 etapa, usados, ciclo, peso, ponderado: esperado * peso });
   });
   filas.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   const conPlan = filas.filter((f) => f.esperado > 0);
-  const esperado = conPlan.reduce((a, f) => a + f.esperado, 0);
+  const esperadoPlan = conPlan.reduce((a, f) => a + f.esperado, 0);
+  const esperado = conPlan.reduce((a, f) => a + f.ponderado, 0);
   const kg = conPlan.reduce((a, f) => a + f.kg, 0);
   const motivos = {};
   filas.filter((f) => f.motivo !== COSECHA_COMPLETA).forEach((f) => {
@@ -109,7 +145,50 @@ function rindeLogrado(ventanas, cierres) {
     m.faltaron += Math.max(0, f.esperado - f.kg);
   });
   return { filas, esperado, kg, pct: esperado ? (kg / esperado) * 100 : null,
+           esperadoPlan, pctPlan: esperadoPlan ? (kg / esperadoPlan) * 100 : null,
+           // Las que se perdieron sin llegar a usar bancal: pesan cero acá.
+           sinBancal: conPlan.filter((f) => f.peso === 0).length,
            motivos: Object.values(motivos).sort((a, b) => b.faltaron - a.faltaron) };
+}
+
+/* Siembras logradas (20/11): de las generaciones sembradas, cuántas llegaron
+   al campo. Mide el manejo de las siembras y los almácigos, aparte del
+   rinde de los bancales.
+   - Lograda: llegó al bancal (trasplantada, o sembrada directo en él).
+   - Fallida: se terminó sin llegar al campo, o con «No germinó».
+   - Las que siguen en bandeja no cuentan todavía: no se sabe.
+   Una generación partida en bancales separados es una sola siembra. Las
+   resiembras se cuentan aparte: la generación se salvó, pero la siembra
+   pidió una segunda vuelta. */
+function siembrasLogradas(gens, cierres, resiembras = []) {
+  const juntas = new Map();
+  gens.forEach((g) => {
+    if (!esSembrada(g)) return;
+    const t = tramosDe(g);
+    if (!t) return;
+    const k = claveGen(g.cultivo, g.generacion);
+    const x = juntas.get(k) || { clave: k, cultivo: g.cultivo, generacion: Number(g.generacion) || 1,
+                                 enCampo: "", sembrada: t.real.siembra || "" };
+    if (t.real.campo && (!x.enCampo || t.real.campo < x.enCampo)) x.enCampo = t.real.campo;
+    juntas.set(k, x);
+  });
+  const logradas = [], fallidas = [], enBandeja = [];
+  juntas.forEach((x, k) => {
+    const c = cierres.get(k);
+    if (c && (c.motivo === NO_GERMINO || !x.enCampo)) fallidas.push({ ...x, motivo: c.motivo, fecha: c.perdida || c.fecha });
+    else if (x.enCampo) logradas.push(x);
+    else enBandeja.push(x);
+  });
+  const vistas = new Set();
+  const resembradas = resiembras.filter((r) => {
+    const k = claveGen(r.cultivo, r.generacion);
+    if (!juntas.has(k) || vistas.has(k)) return false;
+    vistas.add(k);
+    return true;
+  });
+  const definidas = logradas.length + fallidas.length;
+  return { logradas: logradas.length, fallidas, enBandeja: enBandeja.length, resembradas,
+           sembradas: juntas.size, pct: definidas ? (logradas.length / definidas) * 100 : null };
 }
 
 /* Las generaciones sembradas que siguen abiertas, una por número (las partes
@@ -204,6 +283,12 @@ function formularioCierre(x, d) {
                value="${sugerido ? esc(String(sugerido).replace(".", ",")) : ""}" placeholder="0 si nada"></div>
       <div><label>Fecha</label><input type="date" name="fecha" value="${hoy()}" max="${hoy()}"></div>
     </div>
+    ${CFG?.cierre_perdida ? `<div data-se-perdio hidden>
+      <label>¿Cuándo se dio por perdida? <small>aproximado</small></label>
+      <input type="date" name="perdida" max="${hoy()}"${x.enCampo || x.sembrada ? ` min="${esc(x.enCampo || x.sembrada)}"` : ""}>
+      <p class="nota">Si se perdió antes de hoy. El bancal se suele limpiar después: con este día se sabe
+        cuántos días de bancal alcanzó a usar. Vacío = la fecha de arriba.</p>
+    </div>` : ""}
     <label>Observaciones</label>
     <input type="text" name="observaciones" placeholder="Opcional">
     <div class="calculo" data-nota-cierre data-esperado="${d.esperado || 0}" data-hasta="${esc(x.hasta)}"></div>
@@ -256,7 +341,8 @@ function tarjetaCierres() {
     ${rinde.filas.length ? `<h3 class="subtitulo">Terminadas</h3>
       ${rinde.filas.slice(0, TOPE).map((f) => `<div class="registro">
         <div><div class="detalle">${esc(f.cultivo)} <span class="gen">G${f.generacion}</span></div>
-          <div class="cuando">${fechaCorta(f.fecha)} · ${esc(f.motivo.toLowerCase())} · ${num(f.kg, 1)} kg${
+          <div class="cuando">${fechaCorta(f.fecha)} · ${esc(f.motivo.toLowerCase())}${
+            f.seFue !== f.fecha ? ` (se perdió el ${fechaCorta(f.seFue)})` : ""} · ${num(f.kg, 1)} kg${
             f.esperado ? ` de ${num(f.esperado)} esperados (${num(f.pct)}%)` : ""}</div></div>
         <button type="button" class="secundario chico" data-reabrir="${esc(f.id)}">Reabrir</button>
       </div>`).join("")}${tantosMas(rinde.filas, TOPE)}` : ""}
@@ -301,11 +387,15 @@ function prepararCierres() {
     const nota = form.querySelector("[data-nota-cierre]");
     const esperado = Number(nota.dataset.esperado) || 0;
     const hasta = nota.dataset.hasta || "";
+    const sePerdio = form.querySelector("[data-se-perdio]");
     const avisar = () => {
+      // «¿Cuándo se dio por perdida?» solo si no fue una cosecha completa.
+      if (sePerdio) sePerdio.hidden = form.motivo.value === COSECHA_COMPLETA;
       const kg = aNumero(form.kg.value);
       const partes = [];
       if (esperado && kg >= 0) partes.push(`rindió el <b>${num((kg / esperado) * 100)}%</b> de lo esperado`);
-      const faltaban = hasta && form.fecha.value ? diasEntre(form.fecha.value, hasta) : 0;
+      const dia = (sePerdio && !sePerdio.hidden && form.perdida.value) || form.fecha.value;
+      const faltaban = hasta && dia ? diasEntre(dia, hasta) : 0;
       if (faltaban > 7) {
         partes.push(form.motivo.value === COSECHA_COMPLETA
           ? `<b class="texto-alerta">el plan esperaba cosecharla hasta el ${fechaCorta(hasta)}: faltaban ${faltaban} días.</b> Si hubo que levantarla antes, elegí por qué en «¿Cómo terminó?»`
@@ -328,9 +418,13 @@ function prepararCierres() {
       const kg = form.kg.value.trim() === "" ? NaN : aNumero(form.kg.value);
       if (!(kg >= 0)) return aviso("Poné los kilos que dio en total; 0 si no se cosechó nada.", true);
       if (!form.fecha.value || form.fecha.value > hoy()) return aviso("Revisá la fecha.", true);
+      const perdida = sePerdio && !sePerdio.hidden ? form.perdida.value : "";
+      if (perdida && perdida > form.fecha.value) {
+        return aviso("El día en que se perdió no puede ser después de la fecha del cierre.", true);
+      }
       guardarRegistro("cierres", {
         fecha: form.fecha.value, cultivo: x.cultivo, generacion: Number(generacion) || 1,
-        motivo: form.motivo.value, kg: Math.round(kg * 100) / 100,
+        motivo: form.motivo.value, kg: Math.round(kg * 100) / 100, perdida,
         observaciones: form.observaciones.value.trim(), operador: leer(LS.nombre, ""),
       }, `${x.cultivo} G${x.generacion} terminada ✓`);
       cierreAbierto = "";

@@ -211,16 +211,20 @@ var HOJAS = {
      sale el rinde logrado: kilos contra lo que se esperaba de esos bancales,
      que no depende de ninguna fecha. Reabrir una generacion es borrar su
      fila (queda copia en Cambios). Si quedaran dos filas de la misma, vale
-     la ultima. */
+     la ultima.
+     "Se perdió" (20/11), al final y optativa: el dia en que se dio por
+     perdida, que no es el dia en que se cargo el cierre (el bancal se limpia
+     despues). Con ella el rinde pondera la perdida por los dias de bancal
+     que de verdad uso. Vacia = la Fecha. */
   cierres: {
     nombre: "Cierres",
     encabezados: ["Id", "Temporada", "Fecha", "Cultivo", "Generación", "Motivo", "Kg",
-                  "Observaciones", "Cerró", "Cargado por", "Recibido"],
+                  "Observaciones", "Cerró", "Cargado por", "Recibido", "Se perdió"],
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.cultivo, d.generacion || 1, d.motivo || "",
               numeroOVacio(d.kg), d.observaciones || "", d.operador || "",
-              r.dispositivo || "", new Date()];
+              r.dispositivo || "", new Date(), d.perdida || ""];
     },
   },
   // Stock (23/10): una FOTO de lo que hay, no una cuenta de entradas y
@@ -536,6 +540,9 @@ function atender(p) {
       // Tiene la hoja Cierres y Cosechas guarda la generacion (12/11). Sin
       // esto la app no ofrece terminar una generacion: quedaria en la cola.
       cfg.cierres = true;
+      // Y el dia en que se dio por perdida (20/11, columna "Se perdió"). Sin
+      // esto la app no ofrece el campo: se perderia al guardar.
+      cfg.cierre_perdida = true;
       // Cosechas guarda de que sector y bancales salio (15/11). Sin esto la
       // app no ofrece el campo: se perderia al guardar.
       cfg.cosecha_lugar = true;
@@ -1735,13 +1742,15 @@ function seguimientoDe(chacra) {
     if (g.veces > 1 && dias > 7) res.repetidas.push(g);
   });
 
-  // Cierres: Fecha 2, Cultivo 3, Generacion 4, Motivo 5, Kg 6, Observaciones 7.
-  filasDe(HOJAS.cierres, 8).forEach(function (f) {
+  // Cierres: Fecha 2, Cultivo 3, Generacion 4, Motivo 5, Kg 6, Observaciones 7,
+  // Se perdio 11 (20/11).
+  filasDe(HOJAS.cierres, 12).forEach(function (f) {
     var fecha = texto(f[2]), cultivo = String(f[3] || "").trim();
     if (!cultivo || !enTemporada(fecha)) return;
     res.cierres.push({ id: String(f[0]), fecha: fecha, cultivo: cultivo,
                        generacion: Number(f[4]) || 1, motivo: String(f[5] || ""),
-                       kg: Number(f[6]) || 0, observaciones: String(f[7] || "") });
+                       kg: Number(f[6]) || 0, observaciones: String(f[7] || ""),
+                       perdida: texto(f[11]) });
   });
 
   // Trasplantes: Fecha 2, Cultivo 8.

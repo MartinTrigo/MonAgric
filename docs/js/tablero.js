@@ -124,8 +124,12 @@ function ventanasDeCosecha(gens, plan = []) {
     const aCosecha = diasEntre(s.campo, s.inicioCosecha) || 0;
     const dura = diasEntre(s.inicioCosecha, s.fin) || DIAS_EN_COSECHA_SUPUESTOS;
     const desde = masDias(t.plan.campo, aCosecha);
+    // ciclo: los días de bancal que tenía previstos (a cosecha + cosecha);
+    // enCampo: cuándo llegó al bancal de verdad. Con eso el rinde pondera
+    // una pérdida por lo que alcanzó a usar (ver rindeLogrado).
     out.push({ cultivo: g.cultivo, generacion: Number(g.generacion) || 1, camas, kg, desde,
-               hasta: masDias(desde, dura), dias: dura, cerrada: t.cerrada || "" });
+               hasta: masDias(desde, dura), dias: dura, cerrada: t.cerrada || "",
+               ciclo: aCosecha + dura, enCampo: t.real.campo || "" });
   });
   return out;
 }
@@ -291,6 +295,7 @@ function datosDelTablero() {
     primeraCosecha: ventanas.map((v) => v.desde).sort()[0] || "",
     revisar: datosParaRevisar({ etapas, vencidos, seg, ventanas, hoyISO }),
     rinde: rindeLogrado(ventanas, cierresVigentes()),
+    siembras: siembrasLogradas(gens, cierresVigentes(), (seg && seg.resiembras) || []),
     hayCierres: !!CFG?.cierres,
   };
 }
@@ -329,7 +334,8 @@ function relojesDelTablero(d) {
   const h = serie.hoy;
   const tocaCosecha = h && h.plan >= 1;
   const pctCosecha = tocaCosecha ? (h.real / h.plan) * 100 : null;
-  return `<div class="relojes${d.hayCierres ? " cinco" : ""}">
+  const s = d.siembras;
+  return `<div class="relojes${d.hayCierres ? " seis" : ""}">
     ${reloj("ritmo", {
       pct: ritmo.pct, titulo: "Ritmo del plan",
       valor: ritmo.pct === null ? "—" : pctTexto(ritmo.pct),
@@ -357,8 +363,14 @@ function relojesDelTablero(d) {
     ${d.hayCierres ? reloj("rinde", {
       pct: rinde.pct, titulo: "Rinde logrado",
       valor: rinde.pct === null ? "—" : pctTexto(rinde.pct),
-      detalle: rinde.pct === null ? "todavía no se terminó ninguna generación"
-        : `${num(rinde.kg)} de ${num(rinde.esperado)} kg en ${plural(rinde.filas.filter((f) => f.esperado > 0).length, "generación terminada", "generaciones terminadas")}`,
+      detalle: rinde.pct === null ? (rinde.filas.length ? "lo terminado no llegó a ocupar bancal" : "todavía no se terminó ninguna generación")
+        : `${num(rinde.kg)} de ${num(rinde.esperado)} kg, por los días de bancal usados`,
+    }) : ""}
+    ${d.hayCierres ? reloj("siembras", {
+      pct: s.pct, titulo: "Siembras logradas",
+      valor: s.pct === null ? "—" : pctTexto(s.pct),
+      detalle: s.pct === null ? "todavía ninguna llegó al campo"
+        : `${num(s.logradas)} de ${plural(s.logradas + s.fallidas.length, "llegó al campo", "llegaron al campo")}`,
     }) : ""}
   </div>`;
 }
@@ -535,10 +547,19 @@ function detalleRinde(d) {
     </div>`;
   }
   const TOPE = 10;
+  const { pctPlan, sinBancal } = d.rinde;
   const maximo = Math.max(...filas.map((f) => Math.max(f.esperado, f.kg)), 1);
+  /* Lo que cuenta en el reloj de cada generación: entera si se cosechó, una
+     parte si se perdió a mitad de ciclo, nada si no llegó al bancal. */
+  const cuenta = (f) => f.etapa === "completa" ? ""
+    : f.peso === 0 ? " · no llegó al bancal: no cuenta acá"
+    : ` · usó ${num(f.usados)} de ${num(f.ciclo)} días de bancal: cuenta ${num(f.ponderado)} kg`;
   return `<div class="reloj-panel">
     <p class="nota">De cada generación terminada: la barra es lo que dio y la marca, lo que se esperaba de sus bancales.
-      No mira fechas: dice si el bancal rindió.</p>
+      Una pérdida pesa según los días de bancal que alcanzó a usar: perder un bancal a punto de cosechar
+      cuesta más que perderlo recién plantado. Lo que se perdió en la bandeja va a «Siembras logradas».${
+      pctPlan !== null && Math.round(pctPlan) !== Math.round(d.rinde.pct ?? -1)
+        ? ` Contra todo lo esperado, sin ponderar, da <b>${num(pctPlan)}%</b>${sinBancal ? ` (incluye ${plural(sinBancal, "generación que no llegó", "generaciones que no llegaron")} al bancal)` : ""}.` : ""}</p>
     ${filas.slice(0, TOPE).map((f) => `<div class="bala">
       <div class="bala-cab"><b>${esc(f.cultivo)} <span class="gen">G${f.generacion}</span></b>
         <span>${num(f.kg)}${f.esperado ? ` de ${num(f.esperado)} kg · ${num(f.pct)}%` : " kg"}</span></div>
@@ -546,8 +567,9 @@ function detalleRinde(d) {
         <i style="width:${((f.kg / maximo) * 100).toFixed(1)}%"></i>
         ${f.esperado ? `<u style="left:${((f.esperado / maximo) * 100).toFixed(1)}%"></u>` : ""}
       </div>
-      <div class="cuando">${esc(f.motivo.toLowerCase())}${
-        f.bancales ? ` · ${num(f.kg / f.bancales)} kg por bancal${f.esperado ? ` (esperaba ${num(f.esperado / f.bancales)})` : ""}` : ""}${
+      <div class="cuando">${esc(f.motivo.toLowerCase())}${f.etapa !== "completa" ? ` · ${ETAPAS_PERDIDA[f.etapa]}` : ""}${
+        f.esperado ? cuenta(f) : ""}${
+        f.bancales && f.etapa === "completa" ? ` · ${num(f.kg / f.bancales)} kg por bancal${f.esperado ? ` (esperaba ${num(f.esperado / f.bancales)})` : ""}` : ""}${
         f.faltaban ? ` · ${f.faltaban} días antes de lo previsto` : ""}</div>
     </div>`).join("")}${tantosMas(filas, TOPE)}
     ${motivos.length ? `<h3 class="subtitulo">Lo que no fue cosecha completa</h3>
@@ -555,6 +577,30 @@ function detalleRinde(d) {
         <span class="etiqueta espera">${plural(m.generaciones, "generación", "generaciones")}${
           m.faltaron >= 1 ? ` · faltaron ${num(m.faltaron)} kg` : ""}</span></div>`).join("")}` : ""}
     <button type="button" class="secundario chico" data-ir-seccion="cosechas" style="margin:8px 0">Terminar otra generación</button>
+  </div>`;
+}
+
+/* Siembras logradas: qué siembras no llegaron al campo, y cuáles pidieron
+   una resiembra. Mide el manejo de bandejas y siembras; el rinde de los
+   bancales es otro reloj. */
+function detalleSiembras(d) {
+  const s = d.siembras;
+  const TOPE = 8;
+  return `<div class="reloj-panel">
+    <p class="nota">De las generaciones sembradas, cuántas llegaron al campo: trasplantadas, o sembradas
+      directo y germinadas. Lo que se pierde acá cuesta semilla, sustrato y unas horas, y suele
+      arreglarse sembrando de nuevo.${s.enBandeja ? ` ${plural(s.enBandeja, "sigue", "siguen")} en bandeja y todavía no cuentan.` : ""}</p>
+    ${s.fallidas.length ? `<h3 class="subtitulo">No llegaron al campo</h3>
+      ${s.fallidas.slice(0, TOPE).map((x) => `<div class="registro">
+        <div><div class="detalle">${nombreEtapa(x)}</div>
+          <div class="cuando">${esc(String(x.motivo).toLowerCase())}${x.fecha ? ` · ${fechaCorta(x.fecha)}` : ""}</div></div>
+      </div>`).join("")}${tantosMas(s.fallidas, TOPE)}`
+      : s.pct !== null ? `<p class="nota"><b>Todas las que se definieron llegaron al campo.</b></p>` : ""}
+    ${s.resembradas.length ? `<h3 class="subtitulo">Necesitaron resiembra</h3>
+      ${s.resembradas.slice(0, TOPE).map((r) => `<div class="registro">
+        <div><div class="detalle">${nombreEtapa(r)}</div>
+          <div class="cuando">${esc(String(r.motivo || "resiembra").toLowerCase())}${r.fecha ? ` · ${fechaCorta(r.fecha)}` : ""}</div></div>
+      </div>`).join("")}${tantosMas(s.resembradas, TOPE)}` : ""}
   </div>`;
 }
 
@@ -581,7 +627,7 @@ function tarjetaTablero() {
   const d = datosDelTablero();
   if (!d) return "";
   const detalle = { ritmo: detalleRitmo, cosecha: detalleCosecha, puntualidad: detallePuntualidad,
-                    revisar: detalleRevisar, rinde: detalleRinde }[relojAbierto];
+                    revisar: detalleRevisar, rinde: detalleRinde, siembras: detalleSiembras }[relojAbierto];
   return `<div class="tarjeta tablero">
     <h2>Cómo viene la temporada <small>plan contra real</small></h2>
     ${relojesDelTablero(d)}

@@ -257,7 +257,21 @@ flor parecía un éxito en «Cosecha a hoy» y había rendido menos.
   número: las partes de una generación partida se cierran juntas). Reabrir
   es borrar esa fila.
 - **Rinde logrado** = kilos de los cierres ÷ kilos esperados de esos bancales
-  (`rindeLogrado`, sobre `ventanasDeCosecha`).
+  (`rindeLogrado`, sobre `ventanasDeCosecha`). **Desde el 20/11 el reloj es
+  ponderado**: cada pérdida pesa los días de bancal que alcanzó a usar
+  (desde que llegó al campo hasta «Se perdió», sobre el `ciclo` previsto).
+  Lo que no llegó al bancal pesa cero; una cosecha completa pesa entera
+  aunque termine antes (si no, el Hakusai daba 229 %). El porcentaje sin
+  ponderar sigue como `pctPlan`, en el detalle. Cada cierre tiene su etapa:
+  siembra, campo (antes de cosechar) o cosecha.
+- **Siembras logradas** (sexto reloj, 20/11, `siembrasLogradas`): de las
+  generaciones sembradas, cuántas llegaron al campo. Fallida = cierre sin
+  llegar al campo o con «No germinó». Lo que sigue en bandeja no cuenta.
+  Las resiembras se listan aparte. Mide el manejo de siembras, separado del
+  rinde de los bancales.
+- **«Se perdió»** (20/11, columna 12 de Cierres, `cfg.cierre_perdida`): el día
+  en que se dio por perdida, que suele ser antes del cierre (el bancal se
+  limpia después). Optativa; vacía = la Fecha.
 - **La cosecha puede decir de qué generación es** (columna «Generación» de
   Cosechas, optativa). La app la pone sola únicamente cuando ese cultivo
   tiene una sola generación abierta en el campo (`generacionEnCosecha`); si

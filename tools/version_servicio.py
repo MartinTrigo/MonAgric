@@ -176,6 +176,13 @@ def main() -> None:
     else:
         print("  [ANTERIOR] terminar generaciones y rinde logrado (Cosechas no ofrece «Terminar una generación»)")
         viejas.append("terminar generaciones")
+    # 20/11: el cierre guarda el dia en que se dio por perdida (columna
+    # "Se perdió"), para ponderar el rinde por los dias de bancal usados.
+    if cf.get("cierre_perdida"):
+        print("  [al dia]   el dia en que se perdio una generacion (rinde ponderado)")
+    else:
+        print("  [ANTERIOR] el dia en que se perdio una generacion (el formulario no lo pregunta)")
+        viejas.append("el dia en que se perdio")
     # 13/11: el plan trae donde se planto de verdad cada generacion.
     con_lugar = sum(1 for g in pedir("generaciones=1&chacra=tica").get("generaciones", []) if g.get("lugar_real"))
     if cf.get("lugar_verificado"):

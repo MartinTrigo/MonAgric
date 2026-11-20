@@ -729,13 +729,47 @@ almacenamiento del teléfono.</p>
       const cierres = new Map([[claveGen("Repollo bco", 1), cierre]]);
       const rl = rindeLogrado(v, cierres);
       igual("rinde logrado: los kilos que dio contra lo esperado de sus bancales (las dos partes: 360 kg)",
-        [rl.filas.length, rl.esperado, rl.kg, rl.pct, rl.filas[0].bancales], [1, 360, 180, 50, 3]);
+        [rl.filas.length, rl.esperadoPlan, rl.kg, rl.pctPlan, rl.filas[0].bancales], [1, 360, 180, 50, 3]);
       igual("rinde logrado: lo que no fue cosecha completa, por causa y con lo que faltó",
         rl.motivos, [{ motivo: "Se fue en flor", generaciones: 1, faltaron: 180 }]);
       igual("rinde logrado: si no fue cosecha completa, cuántos días antes de lo previsto se terminó",
         rl.filas[0].faltaban, diasEntre("2026-10-15", v[0].hasta));
       igual("rinde logrado: sin generaciones terminadas no hay porcentaje",
         rindeLogrado(v, new Map()).pct, null);
+
+      // Ponderado por los días de bancal (20/11), con los números de Tica.
+      const vt = [
+        { cultivo: "Hakusai", generacion: 1, camas: 1, kg: 144, dias: 0, ciclo: 105, enCampo: "2026-09-22", hasta: "2027-01-05" },
+        { cultivo: "Rucula", generacion: 1, camas: 1, kg: 120, dias: 14, ciclo: 54, enCampo: "2026-09-22", hasta: "2026-11-15" },
+        { cultivo: "Pak choi", generacion: 1, camas: 1, kg: 120, dias: 14, ciclo: 82, enCampo: "", hasta: "2027-01-01" }];
+      const ct = new Map([
+        [claveGen("Hakusai", 1), { id: "h", fecha: "2026-11-04", cultivo: "Hakusai", generacion: 1, motivo: "Cosecha completa", kg: 135 }],
+        [claveGen("Rucula", 1), { id: "r", fecha: "2026-11-11", perdida: "2026-10-27", cultivo: "Rucula", generacion: 1, motivo: "Malezas", kg: 0 }],
+        [claveGen("Pak choi", 1), { id: "p", fecha: "2026-11-06", cultivo: "Pak choi", generacion: 1, motivo: "No germinó o falló el almácigo", kg: 0 }]]);
+      const rp = rindeLogrado(vt, ct);
+      const porCultivo = (c) => rp.filas.find((f) => f.cultivo === c);
+      igual("rinde ponderado: la cosecha completa pesa entera aunque termine antes",
+        [porCultivo("Hakusai").peso, porCultivo("Hakusai").etapa], [1, "completa"]);
+      igual("rinde ponderado: la pérdida pesa los días de bancal usados hasta «Se perdió» (35 de 54)",
+        [porCultivo("Rucula").usados, Math.round(porCultivo("Rucula").ponderado), porCultivo("Rucula").etapa], [35, 78, "campo"]);
+      igual("rinde ponderado: lo que no llegó al bancal no pesa",
+        [porCultivo("Pak choi").peso, porCultivo("Pak choi").etapa, rp.sinBancal], [0, "siembra", 1]);
+      igual("rinde ponderado: 135 kg de 222 ponderados (61 %); contra todo el plan, 35 %",
+        [Math.round(rp.esperado), Math.round(rp.pct), Math.round(rp.pctPlan)], [222, 61, 35]);
+      ct.get(claveGen("Rucula", 1)).perdida = "";
+      igual("rinde ponderado: sin «Se perdió», la pérdida se cuenta hasta la fecha del cierre",
+        rindeLogrado(vt, ct).filas.find((f) => f.cultivo === "Rucula").usados, 50);
+
+      const sem = [g("a", 1, "2026-08-01", "2026-09-05", 2, hecha),
+                   g("ab", 1, "2026-08-01", "2026-09-05", 1, hecha),
+                   g("b", 2, "2026-09-01", "2026-10-06", 1, { sembrada: true, sembrada_el: "2026-09-01" }),
+                   g("c", 3, "2026-10-01", "2026-11-06", 1, { sembrada: true, sembrada_el: "2026-10-01" }),
+                   g("d", 4, "2027-01-10", "2027-02-14", 1)];
+      const sl = siembrasLogradas(sem,
+        new Map([[claveGen("Repollo bco", 2), { fecha: "2026-10-01", motivo: "No germinó o falló el almácigo" }]]),
+        [{ cultivo: "Repollo bco", generacion: 1, motivo: "Germinó poco" }, { cultivo: "Repollo bco", generacion: 1 }]);
+      igual("siembras logradas: la partida es una; la que falló en bandeja no llegó; la que sigue en bandeja no cuenta",
+        [sl.sembradas, sl.logradas, sl.fallidas.length, sl.enBandeja, sl.pct, sl.resembradas.length], [3, 1, 1, 1, 50, 1]);
 
       const seg = { kg_sin_asignar: { "repollo bco": 200 }, kg_generacion: { "repollo bco|1": 30 } };
       igual("kilos sin asignar: un cierre de 180 kg con 30 a su nombre se lleva 150 de los 200",
