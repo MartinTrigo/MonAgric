@@ -119,25 +119,46 @@ function stockAl(fecha) {
     .sort((a, b) => String(a.r.creado_en).localeCompare(String(b.r.creado_en)))
     .map(({ r, porEnviar }) => ({ ...r.datos, id: String(r.id), porEnviar }));
   const ultimos = stockVigente(agotados.concat(base, locales), fecha, true);
-  return { lista: fotoDelCultivo(stockVigente(base.concat(locales), fecha), ultimos),
+  const apagado = apagadoPorCierres(fecha, [...cierresVigentes().values()], leer(LS.generaciones, []) || []);
+  return { lista: fotoDelCampo(stockVigente(base.concat(locales), fecha), ultimos, apagado),
            ultimos, delServicio };
 }
 
-/* En el campo, el último día que se relevó un cultivo es su foto (14/11):
-   lo relevado ese día es TODO lo que hay de ese cultivo, y lo de días
-   anteriores en otros bancales ya no cuenta. Por lugar solo no alcanzaba:
-   cuando Tica partió «Primavera» en A y B, la acelga relevada el 6/11 en
-   «Primavera 1» seguía vigente al lado de la del 14/11 en «Primavera A 1», y
-   el mensaje la ofrecía dos veces. El mismo día, cada bancal sigue siendo un
-   lugar. Lo marcado agotado ese día también es parte de la foto. La cámara,
-   lo elaborado y lo demás siguen yendo por lugar. Igual que stockDe en Code.gs. */
-function fotoDelCultivo(lista, ultimos) {
-  const ultimoDia = new Map();
-  ultimos.concat(lista).filter(esDeCampo).forEach((d) => {
-    const k = claveArea(d.cultivo);
-    if (!ultimoDia.has(k) || d.fecha > ultimoDia.get(k)) ultimoDia.set(k, d.fecha);
-  });
-  return lista.filter((d) => !esDeCampo(d) || d.fecha >= (ultimoDia.get(claveArea(d.cultivo)) || ""));
+/* En el campo, el último día de relevamiento es la foto de TODO el campo
+   (22/11): lo que no se anotó ese día no está. Antes era por cultivo (14/11),
+   y lo que nadie volvía a nombrar seguía vigente para siempre: el rabanito
+   del 14/11, ya cosechado entero, seguía en la oferta del 21/11, y una
+   lechuga para semilla cargada el 30/10 entraba «la semana que viene». Lo que
+   se cosecha se registra en Cosechas: el stock no tiene que llevar la cuenta.
+   El mismo día, cada bancal sigue siendo un lugar. El día de relevamiento es
+   el último con algo anotado: un «Agotado» suelto apaga su bancal y nada más
+   (el 22/11, marcar dos bancales agotados borraba todo lo relevado el 21/11).
+   La cámara, lo elaborado y lo demás siguen yendo por lugar. Además, lo
+   relevado en los bancales de una generación terminada, hasta el día del
+   cierre, ya no está (apagado). Igual que stockDe en Code.gs.
+   ultimos queda en la firma por compatibilidad: los agotados no cuentan. */
+function fotoDelCampo(lista, ultimos, apagado = () => false) {
+  const ultimoDia = lista.filter((d) => esDeCampo(d) && (Number(d.kg) > 0 || Number(d.cantidad) > 0))
+    .reduce((m, d) => (d.fecha > m ? d.fecha : m), "");
+  return lista.filter((d) => !esDeCampo(d) || (d.fecha >= ultimoDia && !apagado(d)));
+}
+
+/* Terminar una generación apaga su stock en el campo (22/11): lo relevado de
+   ese cultivo en sus bancales hasta el día del cierre. Sus bancales son lo
+   plantado o, si no fue al campo, lo planificado (lugaresDe). Sin lugar
+   conocido no se apaga nada: podría ser el stock de otra generación. */
+function apagadoPorCierres(fecha, cierres, generaciones) {
+  const reglas = cierres.filter((c) => c.fecha && c.fecha <= fecha).map((c) => {
+    const k = claveArea(c.cultivo);
+    const gens = generaciones.filter((g) => claveArea(g.cultivo) === k
+      && (Number(g.generacion) || 1) === (Number(c.generacion) || 1));
+    const lugares = new Set(gens.flatMap((g) => lugaresDe(g, generaciones))
+      .map((l) => `${l.sector}|${Number(l.bancal)}`));
+    return { k, hasta: c.fecha, lugares };
+  }).filter((r) => r.lugares.size);
+  if (!reglas.length) return () => false;
+  return (d) => reglas.some((r) => r.k === claveArea(d.cultivo) && d.fecha <= r.hasta
+    && r.lugares.has(`${d.sector}|${Number(d.bancal)}`));
 }
 
 // En qué grupo cae, mirado desde la fecha que se está viendo.
@@ -205,12 +226,13 @@ function stockAgrupado(lista, fecha) {
    por cultivo); los plantines y los elaborados, por producto y variedad,
    contados en unidades: sus kilos no le dicen nada a nadie. */
 const CATEGORIAS_STOCK = [
-  { nombre: "Verduras en el campo", tipos: ["En campo"], enKg: true },
-  { nombre: "Verduras cosechadas", tipos: ["Cosechado"], enKg: true },
-  { nombre: "Fruta", tipos: ["Fruta"], enKg: true },
-  { nombre: "Plantines", tipos: ["Plantines"], enKg: false },
-  { nombre: "Elaborados", tipos: ["Elaborado"], enKg: false },
-  { nombre: "Otros", tipos: ["Otro"], enKg: false },
+  // color: la franja del título (22/11), ver .stock-cat en styles.css.
+  { nombre: "Verduras en el campo", tipos: ["En campo"], enKg: true, color: "verde" },
+  { nombre: "Verduras cosechadas", tipos: ["Cosechado"], enKg: true, color: "verde" },
+  { nombre: "Fruta", tipos: ["Fruta"], enKg: true, color: "ambar" },
+  { nombre: "Plantines", tipos: ["Plantines"], enKg: false, color: "verde" },
+  { nombre: "Elaborados", tipos: ["Elaborado"], enKg: false, color: "ambar" },
+  { nombre: "Otros", tipos: ["Otro"], enKg: false, color: "gris" },
 ];
 const categoriaStock = (d) => CATEGORIAS_STOCK.find((c) => c.tipos.includes(d.tipo || "En campo"))
   || CATEGORIAS_STOCK[CATEGORIAS_STOCK.length - 1];
@@ -277,7 +299,7 @@ function cuerpoHoy(lista, fecha) {
   const ultimoDia = lista.reduce((m, d) => (d.fecha > m ? d.fecha : m), "");
   return `<p class="nota">Lo último relevado, el <b>${fechaCorta(ultimoDia)}</b>. Para ver cada bancal
       o marcar algo agotado, en «Por lugar».</p>
-    ${cats.map((c) => `<h3 class="sub stock-cat">${esc(c.nombre)} <small>${esc(c.total)}</small></h3>
+    ${cats.map((c) => `<h3 class="sub stock-cat ${c.color}">${esc(c.nombre)} <small>${esc(c.total)}</small></h3>
     ${c.items.map((it) => `<div class="stock-hoy">
       <div class="stock-hoy-fila">
         <b>${esc(it.nombre)}${it.variedades.length ? ` <small>${esc(it.variedades.join(", "))}</small>` : ""}${
@@ -1098,6 +1120,9 @@ function prepararStock() {
     if (!Number.isInteger(dias) || dias < 0) return aviso("Los días tienen que ser un número entero (0 si está listo).", true);
     if (d.tipo === "Plantines" && d.formato === "kg"
         && !confirm(`¿${d.cantidad} kg de plantines? Lo normal es contarlos por unidad o por bandeja. Aceptar guarda en kg igual.`)) return;
+    // El chutney de 360 g quedó como «5 kg» y eran 5 frascos (22/11).
+    if (d.tipo === "Elaborado" && d.formato === "kg"
+        && !confirm(`¿${d.cantidad} kg de ${d.cultivo}? Lo elaborado se cuenta por frasco o unidad. Aceptar guarda en kg igual.`)) return;
 
     if (d.operador && !leer(LS.nombre, "")) escribir(LS.nombre, d.operador);
     const datos = { ...d, ...calcularStock({ ...d, dias }) };

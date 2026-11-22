@@ -463,7 +463,7 @@ function atender(p) {
   // de escritorio, que no tienen un telefono asociado.
   if (p.config || p.resumen || p.tareas || p.ranking || p.ultimos || p.micuenta
       || p.catalogo || p.almacigos || p.ficha || p.generaciones || p.columnas || p.stock
-      || p.seguimiento) {
+      || p.seguimiento || p.versiones || p.temporada) {
     var permiso = esAdmin(p.clave) ? { ok: true }
                                    : permitido(chacra, p.credencial, p.dispositivo);
     if (!permiso.ok) return respuesta(permiso);
@@ -505,6 +505,11 @@ function atender(p) {
     // no puede contar con sus ultimas 15 filas. Ver seguimientoDe.
     if (p.seguimiento) return respuesta(recordado_("seguimiento", chacra, seguimientoDe));
 
+    // La temporada en el telefono (22/11): que hojas cambiaron, y una hoja
+    // entera de la temporada. Ver temporadaDeHoja.
+    if (p.versiones) return respuesta({ ok: true, versiones: versionesDeHojas_(chacra) });
+    if (p.temporada) return respuesta(temporadaDeHoja(chacra, p.temporada));
+
     // Diagnostico para las herramientas: las hojas cuyas columnas no estan
     // donde el codigo las espera (ver revisarColumnas).
     if (p.columnas) {
@@ -536,6 +541,10 @@ function atender(p) {
       // Y guarda el apuro de cada cosa relevada (22/11, columna "Apuro"). Sin
       // esto la app no ofrece el campo: se perderia al guardar.
       cfg.stock_apuro = true;
+      // Sabe responder ?versiones=1 y ?temporada=<hoja> (22/11): cada
+      // telefono baja la temporada entera de cada hoja y la guarda. Contra
+      // una version anterior la app sigue con las ultimas 15 filas.
+      cfg.copia_local = true;
       // Sabe responder ?seguimiento=1 (10/11): la cosecha semana por semana y
       // las senales de datos para revisar, para el tablero de Inicio.
       cfg.tablero = true;
@@ -701,6 +710,10 @@ function doPost(e) {
           guardados += filas.length;
         }
       });
+      // Las hojas que este lote toco cambian de numero: los telefonos las
+      // vuelven a bajar (ver temporadaDeHoja). Si alguno fallo, marcar de
+      // mas solo cuesta una bajada.
+      try { marcarHojasCambiadas_(chacra, hojasQueToca_(registros)); } catch (err) { /* no frena lo guardado */ }
     } finally {
       lock.releaseLock();
     }
@@ -1878,8 +1891,111 @@ function corregirLugares(chacra, tabla, aplicar) {
   if (aplicar) {
     olvidarPlan_(chacra);
     CacheService.getScriptCache().removeAll(["resumen_" + chacra, "seguimiento_" + String(chacra).toLowerCase()]);
+    marcarHojasCambiadas_(chacra, ["siembras", "trasplantes", "stock"]);
   }
   return informe;
+}
+
+// ---------- La temporada en el telefono (22/11) ----------
+//
+// Hasta el 22/11 el telefono recibia solo las ultimas 15 filas de cada hoja
+// (ultimosDeHoja), y otras funciones las usaron como si fueran todo: hubo
+// trasplantes que no se podian cargar, horas mal sumadas y registros viejos
+// que no se podian corregir. Ahora cada telefono baja la temporada entera de
+// cada hoja y la guarda (IndexedDB, js/copia.js). La planilla siempre gana:
+// el telefono reemplaza su copia entera con lo que llega de aca.
+//
+// - ?versiones=1: un numero por hoja que cambia con cada escritura,
+//   correccion o borrado que pasa por este servicio. Es liviano: no abre
+//   ninguna planilla. El telefono vuelve a bajar solo la hoja que cambio.
+// - ?temporada=<hoja>: las filas de esa hoja fechadas en la temporada (1/7 a
+//   30/6, ver temporadaDe_), mas las que no tienen una fecha que se entienda
+//   (si no, no habria forma de corregirlas desde la app), y su numero.
+// Lo editado a mano en la planilla no mueve el numero: por eso el telefono
+// ademas baja todo una vez por dia.
+var HOJAS_DE_LA_COPIA = ["siembras", "trasplantes", "cosechas", "cierres", "stock", "horas"];
+
+// El numero es la hora (en milisegundos) del ultimo cambio de esa hoja, en
+// las propiedades del script: {"tica": {"siembras": 1763800000000, ...}}.
+// Se escribe dentro del lock de doPost, asi dos pedidos no se pisan.
+function versionesDeHojas_(chacra) {
+  var todas = {};
+  try { todas = JSON.parse(PropertiesService.getScriptProperties().getProperty("COPIA_VERSIONES") || "{}"); }
+  catch (e) { todas = {}; }
+  var deEsta = todas[String(chacra).toLowerCase()] || {};
+  var out = {};
+  HOJAS_DE_LA_COPIA.forEach(function (h) { out[h] = Number(deEsta[h]) || 0; });
+  return out;
+}
+
+function marcarHojasCambiadas_(chacra, hojas) {
+  var lista = (hojas || []).filter(function (h) { return HOJAS_DE_LA_COPIA.indexOf(h) >= 0; });
+  if (!lista.length) return;
+  var props = PropertiesService.getScriptProperties();
+  var todas = {};
+  try { todas = JSON.parse(props.getProperty("COPIA_VERSIONES") || "{}"); } catch (e) { todas = {}; }
+  var c = String(chacra).toLowerCase();
+  var deEsta = todas[c] || {};
+  var ahora = Date.now();
+  lista.forEach(function (h) {
+    // Siempre para adelante, aunque dos cambios caigan en el mismo milisegundo.
+    deEsta[h] = Math.max(ahora, (Number(deEsta[h]) || 0) + 1);
+  });
+  todas[c] = deEsta;
+  props.setProperty("COPIA_VERSIONES", JSON.stringify(todas));
+}
+
+// Las hojas que toca un lote de registros de doPost.
+function hojasQueToca_(registros) {
+  var hojas = {};
+  (registros || []).forEach(function (r) {
+    if (r.tipo === "registro_editar" || r.tipo === "registro_borrar") {
+      hojas[String((r.datos || {}).hoja || "").toLowerCase()] = true;
+    } else if (HOJAS[r.tipo]) {
+      hojas[r.tipo] = true;
+    }
+  });
+  return Object.keys(hojas);
+}
+
+function temporadaDeHoja(chacra, cual) {
+  cual = String(cual || "").toLowerCase();
+  if (HOJAS_DE_LA_COPIA.indexOf(cual) < 0) {
+    return { ok: false, error: "Esa hoja no se baja al teléfono: " + cual };
+  }
+  // El numero se lee ANTES que las filas: si algo se escribe mientras tanto,
+  // el telefono se queda con un numero viejo y la vuelve a bajar. Al reves se
+  // quedaria con filas viejas y un numero nuevo, y no se enteraria nunca.
+  var version = versionesDeHojas_(chacra)[cual];
+  var libro = planillaDe(chacra);
+  var t = temporadaDe_(libro, chacra);
+  var filas;
+  if (cual === "horas" && String(chacra).toLowerCase() === CHACRA_CON_HORAS_APARTE) {
+    filas = horasDeTicaComoFilas_(0);
+  } else {
+    var def = HOJAS[cual];
+    var hoja = libro.getSheetByName(def.nombre);
+    filas = [];
+    if (hoja && hoja.getLastRow() >= 2) {
+      var tz = Session.getScriptTimeZone();
+      filas = hoja.getRange(2, 1, hoja.getLastRow() - 1, def.encabezados.length).getValues()
+        .map(function (f) {
+          var obj = {};
+          def.encabezados.forEach(function (c, i) {
+            var v = f[i];
+            obj[c] = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : v;
+          });
+          return obj;
+        });
+    }
+  }
+  var esFecha = function (f) { return /^\d{4}-\d{2}-\d{2}$/.test(String(f || "")); };
+  filas = filas.filter(function (o) {
+    if (!o.Id) return false;
+    var f = String(o.Fecha || "");
+    return !esFecha(f) || (f >= t.desde && f < t.hasta);
+  }).reverse();          // el mas nuevo primero, como ultimosDeHoja
+  return { ok: true, hoja: cual, version: version, desde: t.desde, hasta: t.hasta, filas: filas };
 }
 
 function ultimosDeHoja(chacra, cual, cuantos) {
@@ -1950,18 +2066,23 @@ function stockDe(chacra, fecha, desde) {
   var limpia = function (o) { var c = Object.assign({}, o); delete c._orden; return c; };
   var hayAlgo = function (o) { return Number(o.Kg) > 0 || Number(o.Cantidad) > 0; };
   var ultimas = Object.keys(ultima).map(function (k) { return ultima[k]; });
-  // En el campo, el ultimo dia que se relevo un cultivo es su foto (14/11):
-  // lo de dias anteriores en otros bancales ya no cuenta. Cuando Tica partio
-  // "Primavera" en A y B, la acelga del 6/11 en "Primavera 1" seguia al lado
-  // de la del 14/11 en "Primavera A 1". Igual que fotoDelCultivo en stock.js.
+  // En el campo, el ultimo dia de relevamiento es la foto de TODO el campo
+  // (22/11): lo que no se anoto ese dia no esta. Antes era por cultivo
+  // (14/11) y lo que nadie volvia a nombrar quedaba vigente para siempre (el
+  // rabanito ya cosechado, una lechuga para semilla del 30/10). Lo cosechado
+  // se registra en Cosechas. Ademas, lo relevado en los bancales de una
+  // generacion terminada, hasta el dia del cierre, ya no esta. Igual que
+  // fotoDelCampo y apagadoPorCierres en stock.js.
   var deCampo = function (o) { return (o.Tipo || "En campo") === "En campo"; };
-  var ultimoDia = {};
-  ultimas.filter(deCampo).forEach(function (o) {
-    var k = claveCultivo(o.Cultivo);
-    if (!ultimoDia[k] || o.Fecha > ultimoDia[k]) ultimoDia[k] = o.Fecha;
-  });
+  // El dia de relevamiento es el ultimo con algo anotado: un "Agotado" suelto
+  // apaga su bancal y nada mas (el 22/11, marcar dos bancales agotados
+  // borraba todo lo relevado el 21/11).
+  var ultimoDia = "";
+  ultimas.filter(deCampo).filter(hayAlgo)
+    .forEach(function (o) { if (o.Fecha > ultimoDia) ultimoDia = o.Fecha; });
+  var apagado = stockApagadoPorCierres_(chacra, ultimoDia, hasta);
   var vigente = ultimas.filter(hayAlgo)
-    .filter(function (o) { return !deCampo(o) || o.Fecha >= ultimoDia[claveCultivo(o.Cultivo)]; })
+    .filter(function (o) { return !deCampo(o) || (o.Fecha >= ultimoDia && !apagado(o)); })
     .map(limpia);
   // Lo ultimo de un lugar que quedo en cero (24/10): la vista por semanas lo
   // necesita para no volver a mostrar ese bancal como "lo que dice el plan".
@@ -1970,6 +2091,51 @@ function stockDe(chacra, fecha, desde) {
     .reverse().slice(0, 1000).map(limpia);
   return { ok: true, fecha: hasta, desde: inicio, vigente: vigente, agotados: agotados,
            registros: registros };
+}
+
+/* Terminar una generacion apaga su stock en el campo (22/11): lo relevado de
+   ese cultivo en sus bancales (lo plantado o, si no fue al campo, lo
+   planificado) hasta el dia del cierre. Solo importan los cierres desde el
+   ultimo dia de relevamiento: lo anterior ya lo saco la foto del campo, asi
+   que casi nunca hace falta leer el plan. Sin lugar conocido no se apaga
+   nada. Si algo falla, el stock sale igual, sin apagar. */
+function stockApagadoPorCierres_(chacra, desde, hasta) {
+  var nada = function () { return false; };
+  try {
+    var hoja = planillaDe(chacra).getSheetByName(HOJAS.cierres.nombre);
+    if (!desde || !hoja || hoja.getLastRow() < 2) return nada;
+    var tz = Session.getScriptTimeZone();
+    var texto = function (v) {
+      return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || "");
+    };
+    // Cierres: Fecha 2, Cultivo 3, Generacion 4.
+    var cierres = hoja.getRange(2, 1, hoja.getLastRow() - 1, 5).getValues()
+      .map(function (f) {
+        return { id: String(f[0] || ""), fecha: texto(f[2]), k: claveCultivo(f[3]), gen: Number(f[4]) || 1 };
+      })
+      .filter(function (c) { return c.id && c.k && c.fecha >= desde && c.fecha <= hasta; });
+    if (!cierres.length) return nada;
+    var gens = generacionesDelPlan(chacra);
+    var reglas = cierres.map(function (c) {
+      var lugares = {};
+      gens.filter(function (g) { return claveCultivo(g.cultivo) === c.k && (Number(g.generacion) || 1) === c.gen; })
+        .forEach(function (g) {
+          var lr = (g.lugar_real && g.lugar_real.length) ? g.lugar_real
+            : (g.sector && g.bancales ? [{ sector: g.sector, bancales: String(g.bancales).split(",") }] : []);
+          lr.forEach(function (l) {
+            (l.bancales || []).forEach(function (b) { lugares[l.sector + "|" + Number(b)] = true; });
+          });
+        });
+      return { k: c.k, hasta: c.fecha, lugares: lugares };
+    }).filter(function (r) { return Object.keys(r.lugares).length; });
+    if (!reglas.length) return nada;
+    return function (o) {
+      var k = claveCultivo(o.Cultivo), lugar = o.Sector + "|" + Number(o.Bancal);
+      return reglas.some(function (r) { return r.k === k && o.Fecha <= r.hasta && r.lugares[lugar]; });
+    };
+  } catch (e) {
+    return nada;
+  }
 }
 
 // ---------- Corregir y borrar registros ----------
@@ -2059,9 +2225,16 @@ function hojaHorasDeTica() {
 }
 
 function ultimasHorasDeTica(cuantos) {
+  return horasDeTicaComoFilas_(Math.min(Math.max(cuantos, 1), 30)).reverse();
+}
+
+// Las ultimas `cuantos` horas de Tica (0 = todas), en el orden de la hoja y
+// con los mismos encabezados que la hoja Horas de las demas chacras.
+function horasDeTicaComoFilas_(cuantos) {
   var hoja = hojaHorasDeTica();
   if (hoja.getLastRow() < 2) return [];
-  var n = Math.min(Math.max(cuantos, 1), Math.min(hoja.getLastRow() - 1, 30));
+  var disponibles = hoja.getLastRow() - 1;
+  var n = cuantos > 0 ? Math.min(cuantos, disponibles) : disponibles;
   var tz = Session.getScriptTimeZone();
   var fecha = function (v) { return (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v || ""); };
   return hoja.getRange(hoja.getLastRow() - n + 1, 1, n, 8).getValues().map(function (f) {
@@ -2069,7 +2242,7 @@ function ultimasHorasDeTica(cuantos) {
              "Fecha": fecha(f[1]), "Integrante": String(f[2] || ""), "Horas": f[3],
              "Actividad": String(f[4] || ""), "Área": String(f[6] || ""),
              "Observaciones": String(f[5] || ""), "Cargado por": String(f[7] || "planilla de horas") };
-  }).reverse();
+  });
 }
 
 function corregirHoraDeTica(libro, id, datos, borrar, quien) {

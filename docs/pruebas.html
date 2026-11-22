@@ -604,11 +604,34 @@ almacenamiento del teléfono.</p>
       const nuevos = [r("n1", "2026-11-14", "Acelga", 29, { sector: "Primavera A", bancal: 1 }),
                       r("n2", "2026-11-14", "Acelga", 20, { sector: "Primavera A", bancal: 2 })];
       const vig = stockVigente(viejos.concat(nuevos), "2026-11-14");
-      igual("stock en campo: el último día relevado de un cultivo es su foto",
-        fotoDelCultivo(vig, vig).map((x) => x.id).sort(), ["c1", "n1", "n2", "v2"]);
-      const agot = r("n3", "2026-11-14", "Rabanito", 0, { sector: "Primavera A", bancal: 5 });
-      igual("stock en campo: marcarlo agotado ese día también es la foto",
-        fotoDelCultivo(vig, vig.concat(agot)).map((x) => x.id).sort(), ["c1", "n1", "n2"]);
+      igual("stock en campo: el último día relevado es la foto de todo el campo",
+        fotoDelCampo(vig, vig).map((x) => x.id).sort(), ["c1", "n1", "n2"]);
+      // 22/11: un «Agotado» suelto no es un relevamiento: no borra lo del día anterior.
+      const agot = r("n3", "2026-11-15", "Rabanito", 0, { sector: "Primavera A", bancal: 5 });
+      const conAgot = stockVigente(viejos.concat(nuevos, agot), "2026-11-15");
+      igual("stock en campo: un agotado suelto no borra el último relevamiento",
+        fotoDelCampo(conAgot, conAgot.concat(agot)).map((x) => x.id).sort(), ["c1", "n1", "n2"]);
+    }
+    {
+      // 22/11: el rabanito G1 se cerró el 20/11; su stock del 14/11 se apaga,
+      // el de otro bancal (otra generación) y lo de después del cierre no.
+      const gens = [{ id: "g1", cultivo: "Rabanito", generacion: 1, sector: "Primavera A", bancales: "5",
+                      lugar_real: [{ sector: "Primavera A", bancales: [5] }] }];
+      const cierres = [{ cultivo: "rabanitos", generacion: 1, fecha: "2026-11-20" }];
+      const cfgAntes = CFG;
+      CFG = { ...CFG, sectores: [{ sector: "Primavera A", bancales: 12 }] };
+      const ap = apagadoPorCierres("2026-11-22", cierres, gens);
+      CFG = cfgAntes;
+      const lista = [r("a", "2026-11-14", "Rabanito", 50, { sector: "Primavera A", bancal: 5 }),
+                     r("b", "2026-11-14", "Rabanito", 20, { sector: "Primavera A", bancal: 8 }),
+                     r("c", "2026-11-14", "Acelga", 20, { sector: "Primavera A", bancal: 5 })];
+      igual("stock: terminar una generación apaga lo relevado en sus bancales",
+        fotoDelCampo(lista, lista, ap).map((x) => x.id).sort(), ["b", "c"]);
+      igual("stock: lo relevado después del cierre sigue",
+        fotoDelCampo([r("d", "2026-11-21", "Rabanito", 5, { sector: "Primavera A", bancal: 5 })], [], ap)
+          .map((x) => x.id), ["d"]);
+      igual("stock: un cierre posterior a la fecha que se mira no apaga nada",
+        fotoDelCampo(lista, lista, apagadoPorCierres("2026-11-19", cierres, gens)).length, 3);
     }
     igual("stock: 25 unidades de 1,2 kg, listas en 7 días",
       calcularStock({ fecha: "2026-10-23", formato: "unidad", cantidad: 25, peso_unidad: 1.2, dias: 7 }),

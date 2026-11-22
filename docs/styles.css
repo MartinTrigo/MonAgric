@@ -1803,7 +1803,13 @@ button.enlace {
 .stock-sem-item:last-child { border-bottom: none; }
 
 /* Stock «Hoy» (22/11): por categoría, un renglón por cultivo o producto. */
-h3.sub.stock-cat { font-size: .95rem; text-transform: uppercase; letter-spacing: .02em; }
+/* El título de cada categoría de «Hoy», en una franja (22/11): verde la
+   verdura y los plantines, ámbar la fruta y lo elaborado. */
+h3.sub.stock-cat { font-size: .95rem; text-transform: uppercase; letter-spacing: .02em;
+  background: var(--sage-suave); color: var(--sage-dark); border-top: none;
+  border-left: 5px solid var(--sage); border-radius: 8px; padding: 7px 10px; margin-top: 16px; }
+h3.sub.stock-cat.ambar { background: var(--amber-suave); color: var(--amber-tx); border-left-color: var(--amber); }
+h3.sub.stock-cat.gris { background: var(--linea); color: var(--texto); border-left-color: var(--linea-fuerte); }
 h3.sub.stock-cat small { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--tenue); margin-left: 4px; }
 .stock-hoy { padding: 8px 2px; border-bottom: 1px solid var(--sage-light); }
 .stock-hoy:last-child { border-bottom: none; }
