@@ -166,6 +166,9 @@ function cuandoStock(d, fecha = hoy()) {
   return faltan <= 0 ? "listo" : `en ${faltan} día${faltan === 1 ? "" : "s"} (${fechaCorta(d.disponible)})`;
 }
 
+// «20 kg», «49,5 kg»: el decimal solo si hace falta.
+const kgTexto = (n) => `${num(n, Math.round(n * 10) % 10 ? 1 : 0)} kg`;
+
 // Kilos y unidades de varios registros juntos: "40 kg · 32 atados".
 function totalStock(lista) {
   const kg = lista.reduce((a, d) => a + (Number(d.kg) || 0), 0);
@@ -189,6 +192,96 @@ function stockAgrupado(lista, fecha) {
     const cultivos = [...porCultivo.values()].sort((a, b) => a.cultivo.localeCompare(b.cultivo));
     return { ...g, cultivos, lista: delGrupo };
   }).filter((g) => g.lista.length);
+}
+
+/* ---- La foto de hoy, por categoría (22/11) ----
+   Lo que se mira para armar el bolsón: qué hay, cuánto y con qué apuro,
+   ordenado por categoría y no por fecha. Las verduras y la fruta van por
+   cultivo, con el total en kg y la presentación (comercialización vende
+   por cultivo); los plantines y los elaborados, por producto y variedad,
+   contados en unidades: sus kilos no le dicen nada a nadie. */
+const CATEGORIAS_STOCK = [
+  { nombre: "Verduras en el campo", tipos: ["En campo"], enKg: true },
+  { nombre: "Verduras cosechadas", tipos: ["Cosechado"], enKg: true },
+  { nombre: "Fruta", tipos: ["Fruta"], enKg: true },
+  { nombre: "Plantines", tipos: ["Plantines"], enKg: false },
+  { nombre: "Elaborados", tipos: ["Elaborado"], enKg: false },
+  { nombre: "Otros", tipos: ["Otro"], enKg: false },
+];
+const categoriaStock = (d) => CATEGORIAS_STOCK.find((c) => c.tipos.includes(d.tipo || "En campo"))
+  || CATEGORIAS_STOCK[CATEGORIAS_STOCK.length - 1];
+// En la lista de plantines, «Plantín de Tomate» es «Tomate».
+const sinPrefijoPlantin = (n) => String(n || "").replace(/^plant[ií]n(es)?\s+de\s+/i, "");
+
+// Cuántos hay, en lo que se cuentan: «8 frascos», «25 plantines · 2 bandejas».
+function unidadesStock(regs, esPlantin) {
+  const por = new Map();
+  regs.forEach((d) => {
+    const f = d.formato || "kg";
+    por.set(f, (por.get(f) || 0) + (Number(f === "kg" ? d.kg || d.cantidad : d.cantidad) || 0));
+  });
+  return [...por.entries()].map(([f, n]) => (f === "kg" ? kgTexto(n)
+    : esPlantin && f === "unidad" ? `${num(n)} ${n === 1 ? "plantín" : "plantines"}` : enFormato(n, f))).join(" · ");
+}
+
+function resumenStock(lista, fecha) {
+  // El último día que se relevó algo: lo relevado antes se marca, para
+  // revisarlo (puede que ya no esté).
+  const ultimoDia = lista.reduce((m, d) => (d.fecha > m ? d.fecha : m), "");
+  return CATEGORIAS_STOCK.map((cat) => {
+    const deCat = lista.filter((d) => categoriaStock(d) === cat);
+    const esPlantin = cat.tipos.includes("Plantines");
+    const grupos = new Map();
+    deCat.forEach((d) => {
+      const k = claveArea(d.cultivo) + (cat.enKg ? "" : "|" + textoPlano(d.variedad));
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push(d);
+    });
+    const items = [...grupos.values()].map((regs) => {
+      const disponible = regs.map((d) => d.disponible || d.fecha).sort()[0];
+      const relevado = regs.map((d) => d.fecha).sort().pop();
+      return {
+        nombre: esPlantin ? sinPrefijoPlantin(regs[0].cultivo) : regs[0].cultivo,
+        variedades: [...new Set(regs.map((d) => String(d.variedad || "").trim()).filter(Boolean))],
+        regs,
+        kg: Math.round(regs.reduce((a, d) => a + (Number(d.kg) || 0), 0) * 100) / 100,
+        cantidad: cat.enKg ? cantidadParaMensaje(regs) : unidadesStock(regs, esPlantin),
+        faltan: Math.max(0, diasEntre(fecha, disponible) || 0),
+        disponible, relevado, viejo: relevado < ultimoDia,
+        obs: [...new Set(regs.map((d) => String(d.observaciones || "").trim())
+          .filter((o) => o && o !== "Agotado"))],
+        lugares: lugaresCortos(regs),
+        porEnviar: regs.some((d) => d.porEnviar),
+      };
+    }).sort((a, b) => a.faltan - b.faltan || a.nombre.localeCompare(b.nombre));
+    const kg = items.reduce((a, it) => a + it.kg, 0);
+    return { ...cat, items, kg, total: cat.enKg ? kgTexto(kg) : unidadesStock(deCat, esPlantin) };
+  }).filter((c) => c.items.length);
+}
+
+const cuandoItem = (it) => (it.faltan ? `listo en ${it.faltan} día${it.faltan === 1 ? "" : "s"} (${
+  fechaCorta(it.disponible)})` : "listo");
+
+function cuerpoHoy(lista, fecha) {
+  const cats = resumenStock(lista, fecha);
+  if (!cats.length) return `<p class="nota">No hay stock relevado ${fecha === hoy() ? "todavía" : "a esa fecha"}.</p>`;
+  const ultimoDia = lista.reduce((m, d) => (d.fecha > m ? d.fecha : m), "");
+  return `<p class="nota">Lo último relevado, el <b>${fechaCorta(ultimoDia)}</b>. Para ver cada bancal
+      o marcar algo agotado, en «Por lugar».</p>
+    ${cats.map((c) => `<h3 class="sub stock-cat">${esc(c.nombre)} <small>${esc(c.total)}</small></h3>
+    ${c.items.map((it) => `<div class="stock-hoy">
+      <div class="stock-hoy-fila">
+        <b>${esc(it.nombre)}${it.variedades.length ? ` <small>${esc(it.variedades.join(", "))}</small>` : ""}</b>
+        <span>${esc(it.cantidad)}</span>
+      </div>
+      <div class="cuando">${[
+        it.faltan ? `<span class="stock-falta">${esc(cuandoItem(it))}</span>` : "listo",
+        it.lugares ? esc(it.lugares) : "",
+        it.viejo ? `<span class="stock-viejo">relevado el ${fechaCorta(it.relevado)}</span>` : "",
+        it.porEnviar ? `<span class="etiqueta espera">Por enviar</span>` : "",
+      ].filter(Boolean).join(" · ")}</div>
+      ${it.obs.length ? `<div class="stock-obs">${it.obs.map(esc).join(" · ")}</div>` : ""}
+    </div>`).join("")}`).join("")}`;
 }
 
 // ---- Lo que el plan dice que hay en un bancal ----
@@ -290,6 +383,9 @@ function buscadorProductoStock(tipo, valor = "") {
 }
 
 // ---- Pantalla ----
+// Cómo se cuenta cada tipo si nadie dice otra cosa.
+const formatoDeTipo = (tipo) => (tipo === "Plantines" ? "unidad" : tipo === "Elaborado" ? "frasco" : "kg");
+
 function tarjetaFormStock() {
   const yo = leer(LS.nombre, "");
   const u = stockUltimo || {};
@@ -299,6 +395,10 @@ function tarjetaFormStock() {
   const nBancales = (secs.find((s) => s.sector === sector) || {}).bancales || 0;
   // La recorrida va de un bancal al siguiente.
   const bancal = u.bancal ? Math.min(Number(u.bancal) + 1, nBancales) : 1;
+  // Al volver a dibujar después de guardar, el formato del tipo que sigue
+  // elegido (22/11): venía siempre «kg», y en Tica quedaron 100 plantines de
+  // zapallo y 35 de apio guardados como 135 kg.
+  const formato = u.formato || formatoDeTipo(tipo);
   return `<div class="tarjeta" id="tarjeta-form-stock">
     <h2>&#128230; Registrar stock</h2>
     <p class="nota">Lo que hay hoy en un lugar. Un registro nuevo del mismo cultivo
@@ -347,7 +447,7 @@ function tarjetaFormStock() {
         </div>
         <div>
           <label>Se vende por</label>
-          <select name="formato">${FORMATOS_STOCK.map((f) => `<option>${f}</option>`).join("")}</select>
+          <select name="formato">${FORMATOS_STOCK.map((f) => `<option${f === formato ? " selected" : ""}>${f}</option>`).join("")}</select>
         </div>
       </div>
 
@@ -385,7 +485,7 @@ function tarjetaFormStock() {
 // campo, punteadas lo que el plan dice que entra en cosecha y nadie relevó
 // todavía. Las dos cosas nunca se suman.
 const SEMANAS_STOCK = 8;
-let modoStock = "semanas";       // "semanas" o "lugares"
+let modoStock = "hoy";           // "hoy", "semanas" o "lugares"
 
 function lunesDe(iso) {
   const d = new Date(iso + "T12:00:00");
@@ -584,11 +684,15 @@ function tarjetaDisponible() {
   const { lista, ultimos, delServicio } = stockAl(fecha);
   const grupos = stockAgrupado(lista, fecha);
   const porSemana = modoStock === "semanas";
+  const enHoy = modoStock === "hoy";
   const esHoy = fecha === hoy();
-  const kgListo = (grupos.find((g) => g.hasta === 0)?.lista || []).reduce((a, d) => a + (Number(d.kg) || 0), 0);
-  const kgMes = grupos.filter((g) => g.hasta <= 30).flatMap((g) => g.lista)
-    .reduce((a, d) => a + (Number(d.kg) || 0), 0);
-  const cultivos = new Set(lista.map((d) => claveArea(d.cultivo))).size;
+  // Las cifras, solo de verdura y fruta: los kilos de los frascos y de los
+  // plantines no se suman a los de la cosecha (22/11).
+  const deKg = lista.filter((d) => categoriaStock(d).enKg);
+  const faltan = (d) => diasEntre(fecha, d.disponible || d.fecha) || 0;
+  const kgListo = deKg.filter((d) => faltan(d) <= 0).reduce((a, d) => a + (Number(d.kg) || 0), 0);
+  const kgMes = deKg.filter((d) => faltan(d) <= 30).reduce((a, d) => a + (Number(d.kg) || 0), 0);
+  const cultivos = new Set(deKg.map((d) => claveArea(d.cultivo))).size;
 
   const linea = (d) => {
     const hace = diasEntre(d.fecha, fecha) || 0;
@@ -604,7 +708,8 @@ function tarjetaDisponible() {
     </div>`;
   };
 
-  const cuerpo = porSemana ? cuerpoSemanas(lista, ultimos, fecha) : grupos.length ? grupos.map((g) => `
+  const cuerpo = enHoy ? cuerpoHoy(lista, fecha)
+    : porSemana ? cuerpoSemanas(lista, ultimos, fecha) : grupos.length ? grupos.map((g) => `
     <h3 class="sub">${g.nombre} <small>${esc(totalStock(g.lista))}</small></h3>
     ${g.cultivos.map((c) => {
       const clave = `stock:${g.nombre}:${claveArea(c.cultivo)}`;
@@ -619,18 +724,19 @@ function tarjetaDisponible() {
   return `<div class="tarjeta" id="tarjeta-disponible">
     <h2>Disponible <small>${esHoy ? "hoy" : "al " + fechaCorta(fecha)}</small></h2>
     <div class="pestanas-tareas">
+      <button type="button" class="pestana${enHoy ? " activa" : ""}" data-modo-stock="hoy">Hoy</button>
       <button type="button" class="pestana${porSemana ? " activa" : ""}" data-modo-stock="semanas">Por semana</button>
-      <button type="button" class="pestana${porSemana ? "" : " activa"}" data-modo-stock="lugares">Por lugar</button>
+      <button type="button" class="pestana${!enHoy && !porSemana ? " activa" : ""}" data-modo-stock="lugares">Por lugar</button>
     </div>
     ${!delServicio && navigator.onLine === false ? `<p class="nota alerta">Sin señal: se ve lo último
       que bajó este teléfono y lo que cargó acá.</p>` : ""}
     ${lista.length ? `<div class="cifras">
-      <div class="cifra"><b>${num(kgListo)}</b><span>kg listos</span></div>
+      <div class="cifra"><b>${num(kgListo)}</b><span>kg de verdura listos</span></div>
       <div class="cifra"><b>${num(kgMes)}</b><span>kg en 30 días</span></div>
       <div class="cifra"><b>${cultivos}</b><span>cultivos</span></div>
     </div>` : ""}
     ${cuerpo}
-    ${!porSemana && esHoy && lista.length ? `<p class="nota"><b>Agotado</b> lo deja en cero: ya no queda (por
+    ${!porSemana && !enHoy && esHoy && lista.length ? `<p class="nota"><b>Agotado</b> lo deja en cero: ya no queda (por
       ejemplo, porque se cosechó todo).</p>` : ""}
   </div>`;
 }
@@ -651,13 +757,16 @@ function tarjetaResumenStock() {
       </div>
     </div>
     ${parte("stock-periodo", periodoStock())}
+    <button type="button" class="principal" id="btn-stock-compartir">Compartir por WhatsApp</button>
     <div class="fila">
-      <div><button type="button" class="secundario" data-stock-descargar="lista">Descargar lista</button></div>
-      <div><button type="button" class="secundario" data-stock-descargar="registros">Descargar registros</button></div>
+      <div><button type="button" class="secundario" data-stock-descargar="lista">Planilla (Excel)</button></div>
+      <div><button type="button" class="secundario" data-stock-descargar="texto">Texto</button></div>
     </div>
-    <button type="button" class="secundario" id="btn-stock-compartir">Compartir (WhatsApp…)</button>
-    <p class="nota">La <b>lista</b> es lo disponible a esa fecha. Los <b>registros</b> son cada
-      relevamiento cargado en el período. Se abren con Excel o con la planilla de Google.</p>
+    <button type="button" class="secundario" data-stock-descargar="registros">Registros del período, bancal por bancal</button>
+    <p class="nota">El mensaje, la <b>planilla</b> y el <b>texto</b> son lo disponible a esa fecha,
+      ordenado por categoría y con un renglón por cultivo o producto, como en «Hoy». Los
+      <b>registros</b> son cada relevamiento cargado en el período. La planilla se abre con
+      Excel o con la planilla de Google.</p>
   </div>`;
 }
 
@@ -703,13 +812,27 @@ function descargarStock(cual) {
   const fecha = fechaStock();
   const sufijo = (chacraCodigo() || "chacra") + "_" + fecha.replace(/-/g, "");
   if (cual === "lista") {
-    const lista = stockAl(fecha).lista
-      .map((d) => ({ d, g: grupoStock(d, fecha) }))
-      .sort((a, b) => GRUPOS_STOCK.indexOf(a.g) - GRUPOS_STOCK.indexOf(b.g)
-        || a.d.cultivo.localeCompare(b.d.cultivo));
-    if (!lista.length) return aviso("No hay stock disponible a esa fecha.", true);
-    descargarCSV(`stock_${sufijo}.csv`, ["Cuándo", ...COLUMNAS_STOCK],
-      lista.map(({ d, g }) => [g.nombre, ...filaCSVStock(d)]));
+    // Un renglón por cultivo o producto, en el orden de «Hoy» (22/11).
+    const cats = resumenStock(stockAl(fecha).lista, fecha);
+    if (!cats.length) return aviso("No hay stock disponible a esa fecha.", true);
+    descargarCSV(`stock_${sufijo}.csv`,
+      ["Categoría", "Producto", "Variedad", "Cantidad", "Kg", "Cuándo", "Observaciones", "Dónde", "Relevado"],
+      cats.flatMap((c) => c.items.map((it) => [c.nombre, it.nombre, it.variedades.join(", "), it.cantidad,
+        c.tipos.includes("Plantines") || !it.kg ? "" : it.kg, cuandoItem(it), it.obs.join(" · "),
+        it.lugares, it.relevado])));
+    return;
+  }
+  if (cual === "texto") {
+    const texto = textoStock(false);
+    if (!texto) return aviso("No hay stock disponible a esa fecha.", true);
+    const url = URL.createObjectURL(new Blob(["﻿" + texto.replace(/\n/g, "\r\n")], { type: "text/plain;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `stock_${sufijo}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
     return;
   }
   const g = stockGuardado(fecha, desdeStock());
@@ -739,39 +862,38 @@ function cantidadParaMensaje(regs) {
     const k = `${d.formato}|${peso}`;
     presentaciones.set(k, { formato: d.formato, peso, n: (presentaciones.get(k)?.n || 0) + n });
   });
-  if (!presentaciones.size) return `${num(kgTotal, 1)} kg`;
+  if (!presentaciones.size) return kgTexto(kgTotal);
   const partes = [...presentaciones.values()].sort((a, b) => a.formato.localeCompare(b.formato) || a.peso - b.peso)
     .map((p) => `${enFormato(p.n, p.formato)}${p.peso ? ` de ${pesoCorto(p.peso)} kg` : ""}`);
-  if (sueltos) partes.push(`${num(sueltos, 1)} kg sueltos`);
-  return `${partes.join(" + ")}${kgTotal ? ` (${num(kgTotal, 1)} kg)` : ""}`;
+  if (sueltos) partes.push(`${kgTexto(sueltos)} sueltos`);
+  return `${partes.join(" + ")}${kgTotal ? ` (${kgTexto(kgTotal)})` : ""}`;
 }
 
-// El texto para mandar por WhatsApp a quien arma la venta de la semana. Va
-// por la semana en que entra cada cosa, y solo lo relevado: lo del plan es una
-// estimación y no se ofrece.
-function textoStock() {
+/* El texto para mandar por WhatsApp a quien arma la venta (22/11): por
+   categoría, un renglón por cultivo o producto con su presentación, cuándo
+   está listo si no lo está, y debajo lo que se anotó en el campo (el apuro,
+   si se está espigando). Solo lo relevado: lo del plan es una estimación y no
+   se ofrece. Antes iba por semana y todo mezclado.
+   conFormato: las negritas y cursivas de WhatsApp (* y _); sin ellas, para
+   el archivo de texto. */
+function textoStock(conFormato = true) {
   const fecha = fechaStock();
   const lista = stockAl(fecha).lista;
   if (!lista.length) return "";
+  const negrita = (t) => (conFormato ? `*${t}*` : t);
+  const cursiva = (t) => (conFormato ? `_${t}_` : t);
   const nombre = chacraActual()?.nombre || "la chacra";
-  const lunes0 = lunesDe(fecha);
-  const bloques = semanasStock(fecha).map((s) => {
-    const deEsta = lista.filter((d) => Math.max(0, semanaDe(d.disponible || d.fecha, lunes0)) === s.i);
-    if (!deEsta.length) return "";
-    const porCultivo = new Map();
-    deEsta.forEach((d) => {
-      const k = claveArea(d.cultivo);
-      porCultivo.set(k, { cultivo: d.cultivo, regs: (porCultivo.get(k)?.regs || []).concat(d) });
-    });
-    return [``, `*${s.nombre.toUpperCase()}*${s.rango ? ` (${s.rango})` : ""}`,
-      ...[...porCultivo.values()].sort((a, b) => a.cultivo.localeCompare(b.cultivo))
-        .map((c) => `• ${c.cultivo}: ${cantidadParaMensaje(c.regs)}`)].join("\n");
-  }).filter(Boolean);
-  const despues = lista.filter((d) => semanaDe(d.disponible || d.fecha, lunes0) >= SEMANAS_STOCK);
-  if (despues.length) {
-    bloques.push(["", "*MÁS ADELANTE*", ...despues.map((d) => `• ${d.cultivo}: ${cantidadParaMensaje([d])}`)].join("\n"));
-  }
-  return [`Stock de ${nombre} ${fecha === hoy() ? "hoy" : "al"} ${fechaCorta(fecha)}`, ...bloques].join("\n");
+  const ultimoDia = lista.reduce((m, d) => (d.fecha > m ? d.fecha : m), "");
+  const bloques = resumenStock(lista, fecha).map((c) => ["", negrita(`${c.nombre.toUpperCase()} (${c.total})`),
+    ...c.items.flatMap((it) => {
+      const extra = [it.faltan ? cuandoItem(it) : "", it.viejo ? `relevado el ${fechaCorta(it.relevado)}` : ""]
+        .filter(Boolean).join(" · ");
+      const nombreIt = it.nombre + (it.variedades.length ? ` (${it.variedades.join(", ")})` : "");
+      return [`• ${nombreIt}: ${it.cantidad}${extra ? ` — ${extra}` : ""}`,
+        ...it.obs.map((o) => `   ${cursiva(o)}`)];
+    })].join("\n"));
+  return [negrita(`Stock de ${nombre} ${fecha === hoy() ? "hoy" : "al"} ${fechaCorta(fecha)}`)
+    + (ultimoDia && ultimoDia !== fecha ? ` · relevado el ${fechaCorta(ultimoDia)}` : ""), ...bloques].join("\n");
 }
 
 async function compartirStock() {
@@ -914,9 +1036,9 @@ function prepararStock() {
     $("#stock-producto").innerHTML = buscadorProductoStock(tipo, sigue);
     enlazarBuscadores(f);
     if (!sigue) cultivoSugerido = "";
-    // Los plantines se cuentan, no se pesan.
-    if (tipo === "Plantines" && f.formato.value === "kg") f.formato.value = "unidad";
-    else if (antes === "Plantines" && tipo !== "Plantines" && f.formato.value === "unidad") f.formato.value = "kg";
+    // Los plantines se cuentan, no se pesan; los elaborados van en frascos.
+    // Solo se cambia lo que estaba en el formato de siempre del tipo anterior.
+    if (f.formato.value === formatoDeTipo(antes) || f.formato.value === "kg") f.formato.value = formatoDeTipo(tipo);
   };
 
   // Al elegir un producto de la lista: cómo se vende y cuánto pesa, si la
@@ -924,7 +1046,8 @@ function prepararStock() {
   const completarDeProducto = () => {
     const p = productoPorNombre(f.cultivo.value);
     if (!p) return;
-    if (FORMATOS_STOCK.includes(p.unidad) && f.formato.value === "kg") f.formato.value = p.unidad;
+    const sinTocar = ["kg", formatoDeTipo(f.tipo.value)].includes(f.formato.value);
+    if (FORMATOS_STOCK.includes(p.unidad) && sinTocar) f.formato.value = p.unidad;
     else if (p.unidad && p.unidad !== "kg" && f.formato.value === "kg") f.formato.value = "unidad";
     const kg = Number(p.kg) || kgDePresentacion(p.presentacion);
     if (kg && f.formato.value !== "kg" && !f.peso_unidad.value.trim()) f.peso_unidad.value = String(kg).replace(".", ",");
@@ -955,13 +1078,15 @@ function prepararStock() {
     if (d.peso_unidad !== "" && !(d.peso_unidad > 0)) return aviso("El peso por unidad tiene que ser un número.", true);
     const dias = String(d.dias).trim() === "" ? 0 : Number(d.dias);
     if (!Number.isInteger(dias) || dias < 0) return aviso("Los días tienen que ser un número entero (0 si está listo).", true);
+    if (d.tipo === "Plantines" && d.formato === "kg"
+        && !confirm(`¿${d.cantidad} kg de plantines? Lo normal es contarlos por unidad o por bandeja. Aceptar guarda en kg igual.`)) return;
 
     if (d.operador && !leer(LS.nombre, "")) escribir(LS.nombre, d.operador);
     const datos = { ...d, ...calcularStock({ ...d, dias }) };
     guardarRegistro("stock", datos, d.cantidad === 0
       ? `${d.cultivo}: marcado sin stock ✓` : `Stock guardado: ${d.cultivo} ✓`);
     stockUltimo = { tipo: d.tipo, sector: d.sector, bancal: d.bancal, lugar: d.lugar,
-                    fecha: d.fecha, operador: d.operador };
+                    fecha: d.fecha, operador: d.operador, formato: d.formato };
     render("stock", true);
     const caja = $("#form-stock [data-buscador] .buscador-texto");
     if (caja && d.tipo !== "En campo") caja.focus();

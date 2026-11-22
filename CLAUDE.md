@@ -425,6 +425,17 @@ las fechas:
   algo entra. Las barras punteadas del plan son generaciones en cosecha sin
   relevar (un registro del cultivo en sus bancales posterior a su ida al
   campo, agotado incluido, las tapa). Relevado y plan nunca se suman.
+- **«Hoy»** (22/11, la vista que abre): la foto por categoría (Verduras en
+  el campo, cosechadas, Fruta, Plantines, Elaborados, Otros;
+  `CATEGORIAS_STOCK` y `resumenStock`). Verdura y fruta, un renglón por
+  cultivo con el total en kg y la presentación; plantines y elaborados, por
+  producto y variedad, **contados, sin kilos**. Lo relevado antes del último
+  día de relevamiento se marca en rojo para revisarlo. Las observaciones van
+  a la vista: ahí se anota el apuro. **El mensaje de WhatsApp, la planilla y
+  el texto salen de la misma función**: no pueden decir cosas distintas.
+- El formato viene puesto según el tipo (`formatoDeTipo`: plantines en
+  unidad, elaborados en frasco) y se recuerda al guardar: venía siempre «kg»
+  y en Tica quedaron 135 plantines guardados como kilos (21/11).
 - Comercialización lo pide por endpoint (31/10): `?stockcomercial=1` con la
   clave de la proyección, servidor a servidor, para la pestaña Semana de AMA
   Economía. Solo lo vigente, sin quién relevó. Nunca copias de la planilla.

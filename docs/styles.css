@@ -1801,6 +1801,28 @@ button.enlace {
   font-size: .88rem;
 }
 .stock-sem-item:last-child { border-bottom: none; }
+
+/* Stock «Hoy» (22/11): por categoría, un renglón por cultivo o producto. */
+h3.sub.stock-cat { font-size: .95rem; text-transform: uppercase; letter-spacing: .02em; }
+h3.sub.stock-cat small { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--tenue); margin-left: 4px; }
+.stock-hoy { padding: 8px 2px; border-bottom: 1px solid var(--sage-light); }
+.stock-hoy:last-child { border-bottom: none; }
+.stock-hoy-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.stock-hoy-fila b { font-size: .95rem; min-width: 0; }
+.stock-hoy-fila b small { font-weight: 400; color: var(--tenue); }
+.stock-hoy-fila span { text-align: right; font-weight: 600; color: var(--sage-dark); font-size: .9rem; }
+.stock-hoy .cuando { margin-top: 2px; }
+.stock-falta { color: var(--amber-tx); font-weight: 600; }
+.stock-viejo { color: var(--alerta); font-weight: 600; }
+.stock-obs {
+  margin-top: 5px;
+  padding: 5px 9px;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-suave);
+  color: var(--amber-tx);
+  border-radius: 0 8px 8px 0;
+  font-size: .86rem;
+}
 .stock-sem-item.plan { color: var(--tenue); font-style: italic; }
 .stock-entra {
   margin-left: 5px;

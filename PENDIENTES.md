@@ -6,6 +6,36 @@ que falta hacer.
 
 ---
 
+## Stock «Hoy» por categoría (22/11, v103) — PUBLICADO
+
+Pedido de Martín para el bolsón del miércoles 25/11: Stock abre en «Hoy», la
+foto por categoría con totales, presentación y observaciones; el mensaje de
+WhatsApp, la planilla (Excel) y el texto van igual. No hace falta Nueva
+versión. Para corregir en la planilla de Tica (lo relevado el 21/11):
+- **Plantín de Apio** (35) y **Plantín de Zapallo Tetsukabuto** (100) quedaron
+  en **kg**: eran unidades. Cargarlos de nuevo en Plantinera por unidad (el
+  registro nuevo reemplaza al viejo).
+- **Chutney Durazno 360g**: 5 en kg con peso 0,36. ¿Eran 5 frascos?
+- **Lechuga** (30/10, «para semilla», 120 kg) y **Rabanito** (14/11) siguen
+  vigentes: no se relevaron el 21/11. Marcarlos agotados en «Por lugar» si
+  ya no se ofrecen.
+- Propuesto, sin decidir: un campo **Apuro** (urgente / normal / sin apuro)
+  para ordenar las verduras por urgencia. Pide columna nueva y Nueva versión.
+
+## Bajar la temporada a cada teléfono (22/11) — DECIDIDO, sin empezar
+
+Decidido por Martín el 22/11: el teléfono baja la temporada entera de cada
+hoja (y después solo lo que cambió), para terminar con los errores de la
+ventana de 15 filas. Condiciones: solo la temporada; **Horas entra igual que
+lo demás** (a Martín no le importa que todos vean las horas de todos); lo
+que ya anda por pedidos al servicio (`?seguimiento=1`, `?almacigos=1`,
+`?stock=1`…) **se deja como está**, y la copia local la usan primero las
+funciones nuevas (buscar y corregir registros viejos, la línea de tiempo).
+En IndexedDB, no en `localStorage` (compartido con Economía y BioSalud). Las
+correcciones, borrados y lo editado a mano en la planilla: un número de
+versión por hoja en el servicio y una bajada completa por día. La planilla
+siempre gana a la copia. Para una conversación propia.
+
 ## Idea que salió de BioSalud (21/11) — PROPUESTA, sin empezar, para recordarle a Martín
 
 Al diseñar el inicio de BioSalud se revisó el de AMA. Relojes, curva y «Para

@@ -539,6 +539,38 @@ almacenamiento del teléfono.</p>
   igual("corregir bandejas recalcula plantines y trasplante estimado",
     [d.bandejas, d.plantines, d.trasplante_estimado], [3, 384, "2026-11-18"]);
 
+  // --- stock «Hoy»: por categoría, un renglón por cultivo (22/11) ---
+  {
+    const r = (id, fecha, tipo, cultivo, formato, cantidad, peso, extra = {}) => ({ id, fecha, tipo, cultivo,
+      formato, cantidad, peso_unidad: peso, kg: formato === "kg" ? cantidad : (peso ? cantidad * peso : ""),
+      disponible: fecha, sector: tipo === "En campo" ? "Primavera A" : "", bancal: extra.bancal || "",
+      lugar: tipo === "En campo" ? "" : "Depósito", ...extra });
+    const lista = [
+      r("k1", "2026-11-21", "Elaborado", "Kimchi 360g", "frasco", 8, 0.36),
+      r("a1", "2026-11-21", "En campo", "Acelga", "atado", 20, 0.5, { bancal: 1 }),
+      r("p1", "2026-11-21", "Plantines", "Plantín de Tomate", "unidad", 35, "", { variedad: "Redondo rojo" }),
+      r("a2", "2026-11-21", "En campo", "Acelga", "atado", 20, 0.5, { bancal: 2 }),
+      r("r1", "2026-11-14", "En campo", "Rabanito", "atado", 100, 0.5, { bancal: 5, observaciones: "Está floreciendo" }),
+      r("l1", "2026-10-30", "En campo", "Lechuga", "kg", 120, "", { bancal: 6, disponible: "2026-11-29" }),
+    ];
+    const cats = resumenStock(lista, "2026-11-22");
+    igual("stock hoy: categorías en orden, sin las vacías",
+      cats.map((c) => c.nombre), ["Verduras en el campo", "Plantines", "Elaborados"]);
+    igual("stock hoy: la acelga de dos bancales es un renglón con el total",
+      cats[0].items.find((it) => it.nombre === "Acelga").cantidad, "40 atados de 0,5 kg (20 kg)");
+    igual("stock hoy: lo listo primero, lo que viene después",
+      cats[0].items.map((it) => it.nombre), ["Acelga", "Rabanito", "Lechuga"]);
+    igual("stock hoy: lo relevado antes del último día queda marcado",
+      cats[0].items.map((it) => it.viejo), [false, true, true]);
+    igual("stock hoy: los plantines se cuentan y sin «Plantín de»",
+      [cats[1].items[0].nombre, cats[1].items[0].cantidad, cats[1].total], ["Tomate", "35 plantines", "35 plantines"]);
+    igual("stock hoy: los elaborados en frascos, sin sumar kilos",
+      cats[2].total, "8 frascos");
+    igual("stock hoy: el total de verduras en kg", cats[0].total, "190 kg");
+    igual("stock: los plantines vienen en unidades, los elaborados en frascos",
+      [formatoDeTipo("Plantines"), formatoDeTipo("Elaborado"), formatoDeTipo("En campo")], ["unidad", "frasco", "kg"]);
+  }
+
   // --- stock: una foto por lugar, no una suma ---
   {
     const r = (id, fecha, cultivo, kg, extra = {}) => ({ id, fecha, tipo: "En campo", sector: "Verano",
