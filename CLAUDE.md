@@ -431,7 +431,10 @@ las fechas:
   cultivo con el total en kg y la presentación; plantines y elaborados, por
   producto y variedad, **contados, sin kilos**. Lo relevado antes del último
   día de relevamiento se marca en rojo para revisarlo. Las observaciones van
-  a la vista: ahí se anota el apuro. **El mensaje de WhatsApp, la planilla y
+  a la vista. **Apuro** (22/11, columna al final, `cfg.stock_apuro`):
+  Urgente / Normal / Sin apuro; vacío es Normal, y si un bancal es urgente
+  el cultivo es urgente. Lo listo va primero, y ahí lo urgente arriba.
+  **El mensaje de WhatsApp, la planilla y
   el texto salen de la misma función**: no pueden decir cosas distintas.
 - El formato viene puesto según el tipo (`formatoDeTipo`: plantines en
   unidad, elaborados en frasco) y se recuerda al guardar: venía siempre «kg»

@@ -19,8 +19,13 @@ versión. Para corregir en la planilla de Tica (lo relevado el 21/11):
 - **Lechuga** (30/10, «para semilla», 120 kg) y **Rabanito** (14/11) siguen
   vigentes: no se relevaron el 21/11. Marcarlos agotados en «Por lugar» si
   ya no se ofrecen.
-- Propuesto, sin decidir: un campo **Apuro** (urgente / normal / sin apuro)
-  para ordenar las verduras por urgencia. Pide columna nueva y Nueva versión.
+- **Apuro (v104, FALTA NUEVA VERSIÓN):** Urgente / Normal / Sin apuro al
+  relevar; lo urgente sale primero en «Hoy», en el mensaje («*URGENTE*») y
+  en la planilla. Columna «Apuro» al final de Stock (`cfg.stock_apuro`).
+  Hasta pegar `Code.gs` e implementar Nueva versión el campo no aparece;
+  `version_servicio.py` tiene que decir «el apuro de cada cosa del stock».
+  `?stockcomercial=1` también lo manda: la pestaña Semana de AMA Economía
+  podría usarlo para ordenar la oferta (no se tocó).
 
 ## Bajar la temporada a cada teléfono (22/11) — DECIDIDO, sin empezar
 

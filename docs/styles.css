@@ -1814,6 +1814,28 @@ h3.sub.stock-cat small { text-transform: none; letter-spacing: 0; font-weight: 6
 .stock-hoy .cuando { margin-top: 2px; }
 .stock-falta { color: var(--amber-tx); font-weight: 600; }
 .stock-viejo { color: var(--alerta); font-weight: 600; }
+.stock-apuro {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: .7rem;
+  font-weight: 700;
+  vertical-align: 2px;
+  background: var(--sage-suave);
+  color: var(--tenue);
+}
+.stock-apuro.urgente { background: var(--peligro-suave); color: var(--alerta); border: 1px solid var(--peligro-borde); }
+.opciones-apuro { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.opcion-apuro {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  margin: 0; padding: 9px 4px;
+  border: 1px solid var(--linea-fuerte); border-radius: 10px;
+  font-size: .86rem; font-weight: 600; cursor: pointer;
+}
+.opcion-apuro input { width: auto; margin: 0; }
+.opcion-apuro:has(input:checked) { background: var(--sage-suave); border-color: var(--sage); }
+.opcion-apuro.urgente:has(input:checked) { background: var(--peligro-suave); border-color: var(--alerta); color: var(--alerta); }
 .stock-obs {
   margin-top: 5px;
   padding: 5px 9px;

@@ -16,6 +16,10 @@
 const TIPOS_STOCK = ["En campo", "Cosechado", "Elaborado", "Fruta", "Plantines", "Otro"];
 const FORMATOS_STOCK = ["kg", "unidad", "atado", "frasco", "caja", "bandeja"];
 const LUGARES_STOCK = ["Cámara", "Sala de lavado", "Depósito", "Biofábrica", "Plantinera", "Invernadero"];
+// El apuro por venderlo (22/11): lo urgente se ofrece primero. Vacío (lo
+// cargado antes de la columna) es Normal.
+const APUROS_STOCK = ["Urgente", "Normal", "Sin apuro"];
+const rangoApuro = (a) => (a === "Urgente" ? 0 : a === "Sin apuro" ? 2 : 1);
 // Los plantines se guardan como «Plantín de Brócoli», no «Brócoli»: AMA
 // Economía junta el stock por nombre sin mirar el tipo, y cien plantines de
 // brócoli se sumaban a los kilos de brócoli para vender. Es además como se
@@ -252,8 +256,13 @@ function resumenStock(lista, fecha) {
           .filter((o) => o && o !== "Agotado"))],
         lugares: lugaresCortos(regs),
         porEnviar: regs.some((d) => d.porEnviar),
+        // Si un bancal es urgente, el cultivo es urgente.
+        apuro: APUROS_STOCK[Math.min(...regs.map((d) => rangoApuro(d.apuro)))],
       };
-    }).sort((a, b) => a.faltan - b.faltan || a.nombre.localeCompare(b.nombre));
+    // Lo listo primero, y ahí lo urgente arriba y lo que no tiene apuro abajo;
+    // después lo que viene, por fecha.
+    }).sort((a, b) => (a.faltan > 0) - (b.faltan > 0) || rangoApuro(a.apuro) - rangoApuro(b.apuro)
+      || a.faltan - b.faltan || a.nombre.localeCompare(b.nombre));
     const kg = items.reduce((a, it) => a + it.kg, 0);
     return { ...cat, items, kg, total: cat.enKg ? kgTexto(kg) : unidadesStock(deCat, esPlantin) };
   }).filter((c) => c.items.length);
@@ -271,7 +280,9 @@ function cuerpoHoy(lista, fecha) {
     ${cats.map((c) => `<h3 class="sub stock-cat">${esc(c.nombre)} <small>${esc(c.total)}</small></h3>
     ${c.items.map((it) => `<div class="stock-hoy">
       <div class="stock-hoy-fila">
-        <b>${esc(it.nombre)}${it.variedades.length ? ` <small>${esc(it.variedades.join(", "))}</small>` : ""}</b>
+        <b>${esc(it.nombre)}${it.variedades.length ? ` <small>${esc(it.variedades.join(", "))}</small>` : ""}${
+          it.apuro === "Urgente" ? ` <span class="stock-apuro urgente">Urgente</span>`
+          : it.apuro === "Sin apuro" ? ` <span class="stock-apuro">Sin apuro</span>` : ""}</b>
         <span>${esc(it.cantidad)}</span>
       </div>
       <div class="cuando">${[
@@ -465,6 +476,11 @@ function tarjetaFormStock() {
       <label id="rotulo-dias-stock">Días a cosecha</label>
       <input type="text" name="dias" inputmode="numeric" autocomplete="off" value="0">
       <p class="nota">0 = ya está listo · 7 = la semana que viene · 30 = falta un mes.</p>
+
+      ${CFG?.stock_apuro ? `<label>¿Hay apuro por venderlo?</label>
+      <div class="opciones-apuro">${APUROS_STOCK.map((a) => `<label class="opcion-apuro${a === "Urgente" ? " urgente" : ""}">
+        <input type="radio" name="apuro" value="${a}"${a === "Normal" ? " checked" : ""}> ${a}</label>`).join("")}</div>
+      <p class="nota">Urgente: se espiga, florece o se pasa; se ofrece primero.</p>` : ""}
 
       <div class="calculo" id="calculo-stock"></div>
 
@@ -816,9 +832,9 @@ function descargarStock(cual) {
     const cats = resumenStock(stockAl(fecha).lista, fecha);
     if (!cats.length) return aviso("No hay stock disponible a esa fecha.", true);
     descargarCSV(`stock_${sufijo}.csv`,
-      ["Categoría", "Producto", "Variedad", "Cantidad", "Kg", "Cuándo", "Observaciones", "Dónde", "Relevado"],
+      ["Categoría", "Producto", "Variedad", "Cantidad", "Kg", "Cuándo", "Apuro", "Observaciones", "Dónde", "Relevado"],
       cats.flatMap((c) => c.items.map((it) => [c.nombre, it.nombre, it.variedades.join(", "), it.cantidad,
-        c.tipos.includes("Plantines") || !it.kg ? "" : it.kg, cuandoItem(it), it.obs.join(" · "),
+        c.tipos.includes("Plantines") || !it.kg ? "" : it.kg, cuandoItem(it), it.apuro, it.obs.join(" · "),
         it.lugares, it.relevado])));
     return;
   }
@@ -886,7 +902,8 @@ function textoStock(conFormato = true) {
   const ultimoDia = lista.reduce((m, d) => (d.fecha > m ? d.fecha : m), "");
   const bloques = resumenStock(lista, fecha).map((c) => ["", negrita(`${c.nombre.toUpperCase()} (${c.total})`),
     ...c.items.flatMap((it) => {
-      const extra = [it.faltan ? cuandoItem(it) : "", it.viejo ? `relevado el ${fechaCorta(it.relevado)}` : ""]
+      const extra = [it.apuro === "Urgente" ? negrita("URGENTE") : it.apuro === "Sin apuro" ? "sin apuro" : "",
+        it.faltan ? cuandoItem(it) : "", it.viejo ? `relevado el ${fechaCorta(it.relevado)}` : ""]
         .filter(Boolean).join(" · ");
       const nombreIt = it.nombre + (it.variedades.length ? ` (${it.variedades.join(", ")})` : "");
       return [`• ${nombreIt}: ${it.cantidad}${extra ? ` — ${extra}` : ""}`,
@@ -967,6 +984,7 @@ function prepararStock() {
     cantidad: f.cantidad.value.trim() === "" ? "" : aNumero(f.cantidad.value),
     peso_unidad: f.peso_unidad.value.trim() === "" ? "" : aNumero(f.peso_unidad.value),
     dias: f.dias.value, observaciones: f.observaciones.value.trim(), operador: f.operador.value,
+    apuro: f.querySelector('[name="apuro"]:checked')?.value || "",
   });
 
   const ponerCultivo = (nombre) => {

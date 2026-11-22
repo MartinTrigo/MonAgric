@@ -238,14 +238,17 @@ var HOJAS = {
     encabezados: ["Id", "Temporada", "Fecha", "Tipo", "Cultivo", "Variedad",
                   "Sector", "Bancal", "Lugar", "Formato", "Cantidad", "Peso unidad kg",
                   "Kg", "Días a cosecha", "Disponible desde", "Observaciones", "Relevó",
-                  "Cargado por", "Recibido"],
+                  "Cargado por", "Recibido", "Apuro"],
+    // "Apuro" (22/11), al final y optativa: Urgente, Normal o Sin apuro.
+    // Comercializacion ofrece primero lo urgente (se espiga, se pasa).
+    // Vacia en lo cargado antes, que es como decir "Normal".
     fila: function (r) {
       var d = r.datos;
       return [r.id, r.temporada || "", d.fecha, d.tipo || "En campo", d.cultivo, d.variedad || "",
               d.sector || "", d.bancal || "", d.lugar || "", d.formato || "kg",
               numeroOVacio(d.cantidad), numeroOVacio(d.peso_unidad), numeroOVacio(d.kg),
               numeroOVacio(d.dias), d.disponible || d.fecha, d.observaciones || "",
-              d.operador || "", r.dispositivo || "", new Date()];
+              d.operador || "", r.dispositivo || "", new Date(), d.apuro || ""];
     },
   },
   horas: {
@@ -530,6 +533,9 @@ function atender(p) {
       // Tiene la hoja Stock y sabe responder ?stock=1 (23/10). Sin esto la
       // app no muestra la seccion: lo cargado quedaria en la cola para siempre.
       cfg.stock = true;
+      // Y guarda el apuro de cada cosa relevada (22/11, columna "Apuro"). Sin
+      // esto la app no ofrece el campo: se perderia al guardar.
+      cfg.stock_apuro = true;
       // Sabe responder ?seguimiento=1 (10/11): la cosecha semana por semana y
       // las senales de datos para revisar, para el tablero de Inicio.
       cfg.tablero = true;
@@ -2537,7 +2543,7 @@ function stockParaComercializar(chacra, fecha) {
         formato: o["Formato"] || "kg", cantidad: numero(o["Cantidad"]),
         peso_unidad: numero(o["Peso unidad kg"]), kg: numero(o["Kg"]),
         disponible: o["Disponible desde"] || o["Fecha"],
-        observaciones: o["Observaciones"] || "",
+        observaciones: o["Observaciones"] || "", apuro: o["Apuro"] || "",
       };
     }),
   };

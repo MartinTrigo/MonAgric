@@ -203,6 +203,12 @@ def main() -> None:
     else:
         print("  [ANTERIOR] la cosecha en atados o unidades (se guardan los kilos, sin el detalle)")
         viejas.append("la cosecha en atados")
+    # 22/11: Stock guarda el apuro (Urgente, Normal, Sin apuro).
+    if cf.get("stock_apuro"):
+        print("  [al dia]   el apuro de cada cosa del stock")
+    else:
+        print("  [ANTERIOR] el apuro del stock (la app no ofrece el campo)")
+        viejas.append("el apuro del stock")
     if cf.get("lugar_real"):
         print(f"  [al dia]   el lugar donde se planto cada generacion ({con_lugar} con lugar registrado en Tica)")
     else:

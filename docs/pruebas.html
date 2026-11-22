@@ -567,6 +567,17 @@ almacenamiento del teléfono.</p>
     igual("stock hoy: los elaborados en frascos, sin sumar kilos",
       cats[2].total, "8 frascos");
     igual("stock hoy: el total de verduras en kg", cats[0].total, "190 kg");
+    {
+      const conApuro = lista.concat(
+        r("h1", "2026-11-21", "En campo", "Hakusai", "unidad", 110, 0.45, { bancal: 4, apuro: "Sin apuro" }),
+        r("m1", "2026-11-21", "En campo", "Mix de hojas", "unidad", 128, 0.25, { bancal: 12, apuro: "Urgente" }),
+        r("a3", "2026-11-21", "En campo", "Acelga", "atado", 5, 0.5, { bancal: 3, apuro: "Urgente" }));
+      const it = resumenStock(conApuro, "2026-11-22")[0].items;
+      igual("stock hoy: lo urgente arriba, lo sin apuro abajo, lo que viene al final",
+        it.map((x) => x.nombre), ["Acelga", "Mix de hojas", "Rabanito", "Hakusai", "Lechuga"]);
+      igual("stock hoy: un bancal urgente hace urgente al cultivo; vacío es Normal",
+        it.map((x) => x.apuro), ["Urgente", "Urgente", "Normal", "Sin apuro", "Normal"]);
+    }
     igual("stock: los plantines vienen en unidades, los elaborados en frascos",
       [formatoDeTipo("Plantines"), formatoDeTipo("Elaborado"), formatoDeTipo("En campo")], ["unidad", "frasco", "kg"]);
   }

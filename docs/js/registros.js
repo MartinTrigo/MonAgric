@@ -184,7 +184,7 @@ const CORRECCION = {
     ["sector", "Sector (en campo)", "sector"], ["bancal", "Bancal (en campo)", "numero"],
     ["lugar", "Dónde (si no es campo)", "texto"], ["formato", "Se vende por", "formato"],
     ["cantidad", "Cantidad", "numero"], ["peso_unidad", "Peso por unidad (kg)", "numero"],
-    ["dias", "Días a cosecha", "numero"], ["operador", "Relevó", "persona"],
+    ["dias", "Días a cosecha", "numero"], ["apuro", "Apuro", "apuro"], ["operador", "Relevó", "persona"],
     ["observaciones", "Observaciones", "texto"]],
 };
 // Todo lo que guarda la hoja de ese tipo: lo que no se corrige viaja como
@@ -213,7 +213,8 @@ const DE_LA_HOJA = {
   stock: { fecha: "Fecha", tipo: "Tipo", cultivo: "Cultivo", variedad: "Variedad",
     sector: "Sector", bancal: "Bancal", lugar: "Lugar", formato: "Formato",
     cantidad: "Cantidad", peso_unidad: "Peso unidad kg", kg: "Kg", dias: "Días a cosecha",
-    disponible: "Disponible desde", observaciones: "Observaciones", operador: "Relevó" },
+    disponible: "Disponible desde", observaciones: "Observaciones", operador: "Relevó",
+    apuro: "Apuro" },
 };
 const datosDeFila = (tipo, f) => Object.fromEntries(
   Object.entries(DE_LA_HOJA[tipo]).map(([k, c]) => [k, f[c] ?? ""]));
@@ -242,6 +243,8 @@ function campoCorreccion([k, rotulo, clase], v) {
   else if (clase === "formatoCosecha") campo = `<select name="${k}">${FORMATOS_COSECHA.map(([v, t]) =>
     `<option value="${v}"${v === (val || "kg") ? " selected" : ""}>${t}</option>`).join("")}</select>`;
   else if (clase === "formato") campo = `<select name="${k}">${opciones(FORMATOS_STOCK)}</select>`;
+  else if (clase === "apuro") campo = `<select name="${k}">${APUROS_STOCK.map((a) =>
+    `<option${a === (val || "Normal") ? " selected" : ""}>${a}</option>`).join("")}</select>`;
   else campo = `<input type="text" name="${k}" value="${esc(val)}">`;
   return `<div><label>${esc(rotulo)}</label>${campo}</div>`;
 }
@@ -360,8 +363,10 @@ function columnasQueFaltan(esquema) {
   // Lo mismo con «Generación» en Cosechas (12/11, cfg.cierres).
     // Y «Sector» y «Bancales» en Cosechas (15/11, cfg.cosecha_lugar).
   // Y «Formato», «Cantidad» y «Peso unidad kg» en Cosechas (20/11, cfg.cosecha_formato).
+  // Y «Apuro» en Stock (22/11, cfg.stock_apuro).
   const OPCIONALES = { siembras: ["Repetición"],
-    cosechas: ["Generación", "Sector", "Bancales", "Formato", "Cantidad", "Peso unidad kg"] };
+    cosechas: ["Generación", "Sector", "Bancales", "Formato", "Cantidad", "Peso unidad kg"],
+    stock: ["Apuro"] };
   const faltan = [];
   Object.entries(DE_LA_HOJA).forEach(([hoja, campos]) => {
     if (!Array.isArray(esquema[hoja])) return;
