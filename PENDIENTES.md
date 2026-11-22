@@ -6,6 +6,26 @@ que falta hacer.
 
 ---
 
+## Idea que salió de BioSalud (21/11) — PROPUESTA, sin empezar, para recordarle a Martín
+
+Al diseñar el inicio de BioSalud se revisó el de AMA. Relojes, curva y «Para
+hacer» ya están; lo que falta, y no figura en las etapas de
+`PROMPT-TABLERO.md`, es **ver juntos lo que se hizo y lo que viene**:
+
+- **Tira de días en Inicio**: una semana para atrás y una para adelante, con
+  «hoy» marcado. Un renglón por tipo de trabajo (siembra, trasplante,
+  cosecha) o por cultivo, y un símbolo por día: hecho, viene, atrasado.
+  «Para hacer» hoy muestra solo lo pendiente, como botones con un número, y
+  lo hecho la semana pasada no se ve en ningún lado del Inicio. Tocar un día
+  abriría lo de ese día.
+- Cuidado con la ventana de 15 filas: lo hecho de los últimos 7 días tiene
+  que salir del servicio (`?seguimiento=1` o similar), no de `ultimos`.
+- Opcional, de menor peso: un «sabías que» del día con datos del catálogo
+  (días a cosecha, familia, asociaciones), con enlace a la ficha.
+
+Es una conversación propia, nueva y abierta en la carpeta `AMA`: no depende de
+lo que esté a medio hacer. Antes de programar, pasarle a Martín un boceto.
+
 ## Rinde ponderado y siembras logradas (20/11, v102) — FALTA NUEVA VERSIÓN
 
 En Inicio, el reloj **Rinde logrado** ahora pondera cada pérdida por los días
