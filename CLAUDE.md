@@ -410,6 +410,14 @@ las fechas:
   `?stock=1&fecha=&desde=`), no el teléfono con sus últimas 15 filas. La app
   le suma encima solo lo que cargó y el servicio todavía no tenía al pedirlo
   (`stockAl`): sumar lo ya enviado resucitaba lo que otro marcó agotado.
+- **En el campo, el último día de relevamiento es la foto de todo el campo**
+  (22/11, pedido de Martín): lo que no se anotó ese día no está; lo cosechado
+  va en Cosechas. Cuenta como relevamiento el último día con algo anotado: un
+  «Agotado» suelto apaga su bancal y nada más (marcar dos agotados el 22/11
+  borró de la vista todo el 21/11). **Terminar una generación apaga su stock**
+  en sus bancales hasta el cierre (`fotoDelCampo` y `apagadoPorCierres` en
+  stock.js, `stockApagadoPorCierres_` en Code.gs). Reemplaza a la foto por
+  cultivo del 14/11.
 - Los días a cosecha se guardan también como fecha («Disponible desde»):
   "7 días" cargado hace dos semanas ya es "listo".
 - El servicio avisa `cfg.stock`; sin eso la pestaña no se muestra.
